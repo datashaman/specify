@@ -65,7 +65,7 @@
                 <div class="relative flex justify-center text-xs"><span class="bg-white px-2 text-zinc-500 dark:bg-zinc-900">{{ __('or') }}</span></div>
             </div>
             <a href="{{ route('socialite.redirect', 'github') }}" class="w-full">
-                <flux:button variant="ghost" class="w-full" icon="github">{{ __('Continue with GitHub') }}</flux:button>
+                <flux:button variant="ghost" class="w-full" icon="code-bracket">{{ __('Continue with GitHub') }}</flux:button>
             </a>
         @endif
 
