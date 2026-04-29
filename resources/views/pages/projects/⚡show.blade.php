@@ -69,7 +69,7 @@ new #[Title('Project')] class extends Component {
             <div>
                 <flux:heading size="xl">{{ $this->project->name }}</flux:heading>
                 <flux:text class="text-sm text-zinc-500">
-                    {{ $this->project->team->workspace->name }} / {{ $this->project->team->name }}
+                    {{ $this->project->team->workspace->name }}
                 </flux:text>
             </div>
         </div>
