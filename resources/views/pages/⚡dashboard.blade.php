@@ -158,7 +158,10 @@ new #[Title('Dashboard')] class extends Component {
                     <flux:text class="mt-1 text-sm text-zinc-500">
                         {{ $project->features_count }} {{ __('features') }} &middot; {{ $project->repos_count }} {{ __('repos') }}
                     </flux:text>
-                    <a href="{{ route('projects.repos', $project) }}" wire:navigate class="mt-2 inline-block text-sm underline">{{ __('Manage repos') }} &rarr;</a>
+                    <div class="mt-2 flex flex-wrap gap-3 text-sm">
+                        <a href="{{ route('projects.show', $project) }}" wire:navigate class="underline">{{ __('Open') }}</a>
+                        <a href="{{ route('projects.repos', $project) }}" wire:navigate class="underline">{{ __('Repos') }}</a>
+                    </div>
                 </flux:card>
             @empty
                 <flux:text class="text-zinc-500">{{ __('No projects in your teams.') }}</flux:text>

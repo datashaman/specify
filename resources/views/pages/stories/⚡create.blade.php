@@ -9,12 +9,14 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Title;
+use Livewire\Attributes\Url;
 use Livewire\Attributes\Validate;
 use Livewire\Component;
 
 new #[Title('New story')] class extends Component {
     public ?int $project_id = null;
 
+    #[Url(as: 'feature_id')]
     public ?int $feature_id = null;
 
     #[Validate('required|string|max:255')]
@@ -28,6 +30,18 @@ new #[Title('New story')] class extends Component {
 
     public function mount(): void
     {
+        if ($this->feature_id) {
+            $feature = Feature::query()
+                ->whereHas('project', fn ($q) => $q->whereIn('id', Auth::user()->accessibleProjectIds()))
+                ->find($this->feature_id);
+            if ($feature) {
+                $this->project_id = $feature->project_id;
+
+                return;
+            }
+            $this->feature_id = null;
+        }
+
         $project = Project::query()
             ->whereIn('id', Auth::user()->accessibleProjectIds())
             ->orderBy('id')
@@ -109,7 +123,10 @@ new #[Title('New story')] class extends Component {
             }
         });
 
-        $this->redirectRoute('inbox', navigate: true);
+        $this->redirectRoute('features.show', [
+            'project' => $feature->project_id,
+            'feature' => $feature->id,
+        ], navigate: true);
     }
 }; ?>
 
