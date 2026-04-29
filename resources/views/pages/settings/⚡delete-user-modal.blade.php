@@ -3,6 +3,7 @@
 use App\Concerns\PasswordValidationRules;
 use App\Livewire\Actions\Logout;
 use Illuminate\Support\Facades\Auth;
+use Livewire\Attributes\Computed;
 use Livewire\Component;
 
 new class extends Component {
@@ -10,16 +11,36 @@ new class extends Component {
 
     public string $password = '';
 
-    /**
-     * Delete the currently authenticated user.
-     */
+    public string $emailConfirmation = '';
+
+    #[Computed]
+    public function oauthOnly(): bool
+    {
+        $user = Auth::user();
+
+        return $user !== null && $user->github_id !== null;
+    }
+
     public function deleteUser(Logout $logout): void
     {
-        $this->validate([
-            'password' => $this->currentPasswordRules(),
-        ]);
+        $user = Auth::user();
 
-        tap(Auth::user(), $logout(...))->delete();
+        if ($this->oauthOnly) {
+            $this->validate([
+                'emailConfirmation' => ['required', 'string'],
+            ]);
+            if ($this->emailConfirmation !== $user->email) {
+                $this->addError('emailConfirmation', __('Email does not match.'));
+
+                return;
+            }
+        } else {
+            $this->validate([
+                'password' => $this->currentPasswordRules(),
+            ]);
+        }
+
+        tap($user, $logout(...))->delete();
 
         $this->redirect('/', navigate: true);
     }
@@ -31,11 +52,19 @@ new class extends Component {
             <flux:heading size="lg">{{ __('Are you sure you want to delete your account?') }}</flux:heading>
 
             <flux:subheading>
-                {{ __('Once your account is deleted, all of its resources and data will be permanently deleted. Please enter your password to confirm you would like to permanently delete your account.') }}
+                @if ($this->oauthOnly)
+                    {{ __('Once your account is deleted, all of its resources and data will be permanently deleted. Type your email to confirm.') }}
+                @else
+                    {{ __('Once your account is deleted, all of its resources and data will be permanently deleted. Please enter your password to confirm you would like to permanently delete your account.') }}
+                @endif
             </flux:subheading>
         </div>
 
-        <flux:input wire:model="password" :label="__('Password')" type="password" viewable />
+        @if ($this->oauthOnly)
+            <flux:input wire:model="emailConfirmation" :label="__('Email')" :placeholder="auth()->user()->email" />
+        @else
+            <flux:input wire:model="password" :label="__('Password')" type="password" viewable />
+        @endif
 
         <div class="flex justify-end space-x-2 rtl:space-x-reverse">
             <flux:modal.close>

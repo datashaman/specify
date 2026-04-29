@@ -73,3 +73,36 @@ test('correct password must be provided to delete account', function () {
 
     expect($user->fresh())->not->toBeNull();
 });
+
+test('oauth user deletes their account by typing their email', function () {
+    $user = User::factory()->create([
+        'email' => 'octo@example.com',
+        'github_id' => '12345',
+    ]);
+
+    $this->actingAs($user);
+
+    Livewire::test('pages::settings.delete-user-modal')
+        ->set('emailConfirmation', 'octo@example.com')
+        ->call('deleteUser')
+        ->assertHasNoErrors()
+        ->assertRedirect('/');
+
+    expect($user->fresh())->toBeNull();
+});
+
+test('oauth user must type the matching email to delete', function () {
+    $user = User::factory()->create([
+        'email' => 'octo@example.com',
+        'github_id' => '12345',
+    ]);
+
+    $this->actingAs($user);
+
+    Livewire::test('pages::settings.delete-user-modal')
+        ->set('emailConfirmation', 'wrong@example.com')
+        ->call('deleteUser')
+        ->assertHasErrors(['emailConfirmation']);
+
+    expect($user->fresh())->not->toBeNull();
+});
