@@ -1,8 +1,11 @@
 <?php
 
+use App\Http\Controllers\Webhooks\GithubWebhookController;
 use Illuminate\Support\Facades\Route;
 
 Route::view('/', 'welcome')->name('home');
+
+Route::post('webhooks/github/{repo}', GithubWebhookController::class)->name('webhooks.github');
 
 Route::middleware(['auth', 'verified'])->group(function () {
     Route::view('dashboard', 'dashboard')->name('dashboard');
