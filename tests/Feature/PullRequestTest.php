@@ -112,12 +112,10 @@ test('GitHub provider surfaces non-2xx responses as exceptions', function () {
         ->toThrow(RuntimeException::class, '422');
 });
 
-test('PullRequestManager returns null for non-GitHub providers', function () {
+test('PullRequestManager returns null for Generic provider', function () {
     $ws = Workspace::factory()->create();
-    foreach ([RepoProvider::Gitlab, RepoProvider::Bitbucket, RepoProvider::Generic] as $p) {
-        $repo = Repo::factory()->for($ws)->create(['provider' => $p]);
-        expect((new PullRequestManager)->for($repo))->toBeNull();
-    }
+    $repo = Repo::factory()->for($ws)->create(['provider' => RepoProvider::Generic]);
+    expect((new PullRequestManager)->for($repo))->toBeNull();
 });
 
 test('PullRequestManager returns the GitHub driver for github repos', function () {
@@ -199,8 +197,6 @@ test('full pipeline records pull_request_url after a successful run on a github 
     $plan = Plan::factory()->for($story)->create();
     $task = Task::factory()->for($plan)->create(['name' => 'add file', 'position' => 0]);
     $plan->submitForApproval();
-
-    app(ExecutionService::class)->dispatchTaskExecution($task->fresh());
 
     $run = AgentRun::where('runnable_id', $task->id)->latest('id')->firstOrFail();
 

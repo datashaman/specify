@@ -36,6 +36,14 @@ return [
         'api_base' => env('SPECIFY_GITHUB_API_BASE', 'https://api.github.com'),
     ],
 
+    'gitlab' => [
+        'api_base' => env('SPECIFY_GITLAB_API_BASE', 'https://gitlab.com/api/v4'),
+    ],
+
+    'bitbucket' => [
+        'api_base' => env('SPECIFY_BITBUCKET_API_BASE', 'https://api.bitbucket.org/2.0'),
+    ],
+
     /*
     |--------------------------------------------------------------------------
     | Executor

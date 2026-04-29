@@ -143,8 +143,6 @@ test('full pipeline with cli driver: clone → branch → cli edits → commit �
     $task = Task::factory()->for($plan)->create(['name' => 'append', 'position' => 0]);
     $plan->submitForApproval();
 
-    app(ExecutionService::class)->dispatchTaskExecution($task->fresh());
-
     $run = AgentRun::where('runnable_id', $task->id)->latest('id')->firstOrFail();
 
     expect($run->status)->toBe(AgentRunStatus::Succeeded)

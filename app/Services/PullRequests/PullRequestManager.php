@@ -11,6 +11,8 @@ class PullRequestManager
     {
         return match ($repo->provider) {
             RepoProvider::Github => app(GithubPullRequestProvider::class),
+            RepoProvider::Gitlab => app(GitlabPullRequestProvider::class),
+            RepoProvider::Bitbucket => app(BitbucketPullRequestProvider::class),
             default => null,
         };
     }
