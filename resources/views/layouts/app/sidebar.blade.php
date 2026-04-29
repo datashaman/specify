@@ -18,6 +18,9 @@
                     <flux:sidebar.item icon="inbox" :href="route('inbox')" :current="request()->routeIs('inbox')" wire:navigate>
                         {{ __('Inbox') }}
                     </flux:sidebar.item>
+                    <flux:sidebar.item icon="plus" :href="route('stories.create')" :current="request()->routeIs('stories.create')" wire:navigate>
+                        {{ __('New story') }}
+                    </flux:sidebar.item>
                 </flux:sidebar.group>
             </flux:sidebar.nav>
 

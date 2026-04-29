@@ -10,6 +10,7 @@ Route::post('webhooks/github/{repo}', GithubWebhookController::class)->name('web
 Route::middleware(['auth', 'verified'])->group(function () {
     Route::view('dashboard', 'dashboard')->name('dashboard');
     Route::livewire('inbox', 'pages::inbox')->name('inbox');
+    Route::livewire('stories/create', 'pages::stories.create')->name('stories.create');
 });
 
 require __DIR__.'/settings.php';
