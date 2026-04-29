@@ -104,6 +104,13 @@ new #[Title('Repositories')] class extends Component {
         $project->repos()->detach($repoId);
         unset($this->repos);
     }
+
+    public function useGithubToken(): void
+    {
+        $token = Auth::user()->github_token;
+        abort_unless($token, 422);
+        $this->access_token = $token;
+    }
 }; ?>
 
 <div class="flex flex-col gap-6 p-6">
@@ -160,7 +167,15 @@ new #[Title('Repositories')] class extends Component {
                 <flux:input wire:model="default_branch" :label="__('Default branch')" />
                 <flux:input wire:model="role" :label="__('Role (optional)')" placeholder="backend / server / worker" />
                 <flux:checkbox wire:model="is_primary" :label="__('Primary repo for this project')" />
-                <flux:input type="password" wire:model="access_token" :label="__('Access token')" />
+                <div class="flex flex-col gap-1">
+                    <flux:input type="password" wire:model="access_token" :label="__('Access token')" />
+                    <flux:text class="text-xs text-zinc-500">{{ __('Used by the agent to clone, push, and open PRs. GitHub: needs repo scope (and admin:repo_hook for webhook install).') }}</flux:text>
+                    @if (auth()->user()->github_id && $provider === 'github' && ! $access_token)
+                        <flux:button type="button" variant="ghost" size="sm" wire:click="useGithubToken" class="self-start">
+                            {{ __('Use my GitHub token') }}
+                        </flux:button>
+                    @endif
+                </div>
                 <flux:input type="password" wire:model="webhook_secret" :label="__('Webhook secret')" />
                 <flux:button type="submit" variant="primary">{{ __('Attach') }}</flux:button>
             </form>

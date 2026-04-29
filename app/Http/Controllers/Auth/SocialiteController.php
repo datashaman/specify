@@ -15,7 +15,7 @@ class SocialiteController extends Controller
 {
     /** @var array<string, array<int, string>> */
     private const SCOPES = [
-        'github' => ['read:user', 'user:email', 'repo'],
+        'github' => ['read:user', 'user:email', 'repo', 'admin:repo_hook'],
     ];
 
     public function redirect(string $provider): SymfonyRedirectResponse
