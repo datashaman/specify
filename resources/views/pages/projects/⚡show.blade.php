@@ -65,17 +65,8 @@ new #[Title('Project')] class extends Component {
     @if (! $this->project)
         <flux:text class="text-zinc-500">{{ __('Project not found.') }}</flux:text>
     @else
-        <div class="flex items-center justify-between">
-            <div>
-                <flux:heading size="xl">{{ $this->project->name }}</flux:heading>
-                <flux:text class="text-sm text-zinc-500">
-                    {{ $this->project->team->workspace->name }}
-                </flux:text>
-            </div>
-        </div>
-
         <section class="flex flex-col gap-3">
-            <flux:heading size="lg">{{ __('Features') }}</flux:heading>
+            <flux:heading size="xl">{{ __('Features') }}</flux:heading>
             @forelse ($this->features as $feature)
                 <flux:card>
                     <div class="flex items-center justify-between gap-2">
