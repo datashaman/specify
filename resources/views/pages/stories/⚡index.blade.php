@@ -1,7 +1,6 @@
 <?php
 
 use App\Enums\StoryStatus;
-use App\Models\Project;
 use App\Models\Story;
 use Illuminate\Support\Facades\Auth;
 use Livewire\Attributes\Computed;
@@ -16,15 +15,6 @@ new #[Title('Stories')] class extends Component {
     #[Url(as: 'status')]
     public ?string $status = null;
 
-    #[Url(as: 'project_id')]
-    public ?int $project_id = null;
-
-    #[Computed]
-    public function projects()
-    {
-        return Auth::user()->accessibleProjectsInCurrentWorkspace();
-    }
-
     #[Computed]
     public function stories()
     {
@@ -32,7 +22,6 @@ new #[Title('Stories')] class extends Component {
 
         return Story::query()
             ->whereHas('feature', fn ($q) => $q->whereIn('project_id', $projectIds))
-            ->when($this->project_id, fn ($q) => $q->whereHas('feature', fn ($qq) => $qq->where('project_id', $this->project_id)))
             ->when($this->status, fn ($q, $s) => $q->where('status', $s))
             ->with(['feature.project', 'creator', 'currentPlan'])
             ->latest('updated_at')
@@ -49,12 +38,6 @@ new #[Title('Stories')] class extends Component {
     </div>
 
     <div class="flex flex-wrap gap-2">
-        <flux:select wire:model.live="project_id" :placeholder="__('All projects')">
-            <flux:select.option value="">{{ __('All projects') }}</flux:select.option>
-            @foreach ($this->projects as $project)
-                <flux:select.option value="{{ $project->id }}">{{ $project->name }}</flux:select.option>
-            @endforeach
-        </flux:select>
         <flux:select wire:model.live="status" :placeholder="__('All statuses')">
             <flux:select.option value="">{{ __('All statuses') }}</flux:select.option>
             @foreach (StoryStatus::cases() as $s)
@@ -65,22 +48,24 @@ new #[Title('Stories')] class extends Component {
 
     <div class="flex flex-col gap-3">
         @forelse ($this->stories as $story)
-            <flux:card>
-                <div class="flex flex-wrap items-center gap-2">
-                    <flux:badge variant="solid">{{ $story->feature->project->name }}</flux:badge>
-                    <flux:badge>{{ $story->status->value }}</flux:badge>
-                    <flux:badge>rev {{ $story->revision }}</flux:badge>
-                    @if ($story->creator)
-                        <flux:badge>{{ __('by') }} {{ $story->creator->name }}</flux:badge>
-                    @endif
-                    @if ($story->current_plan_id)
-                        <flux:badge>plan v{{ $story->currentPlan?->version }}</flux:badge>
-                    @endif
-                    <flux:text class="ml-auto text-xs text-zinc-500">{{ $story->updated_at?->diffForHumans() }}</flux:text>
-                </div>
-                <flux:heading class="mt-2">{{ $story->name }}</flux:heading>
-                <flux:text class="mt-1">{{ $story->description }}</flux:text>
-            </flux:card>
+            <a href="{{ route('stories.show', $story) }}" wire:navigate>
+                <flux:card class="hover:bg-zinc-50 dark:hover:bg-zinc-800/50">
+                    <div class="flex flex-wrap items-center gap-2">
+                        <flux:badge variant="solid">{{ $story->feature->project->name }}</flux:badge>
+                        <flux:badge>{{ $story->status->value }}</flux:badge>
+                        <flux:badge>rev {{ $story->revision }}</flux:badge>
+                        @if ($story->creator)
+                            <flux:badge>{{ __('by') }} {{ $story->creator->name }}</flux:badge>
+                        @endif
+                        @if ($story->current_plan_id)
+                            <flux:badge>plan v{{ $story->currentPlan?->version }}</flux:badge>
+                        @endif
+                        <flux:text class="ml-auto text-xs text-zinc-500">{{ $story->updated_at?->diffForHumans() }}</flux:text>
+                    </div>
+                    <flux:heading class="mt-2">{{ $story->name }}</flux:heading>
+                    <flux:text class="mt-1">{{ $story->description }}</flux:text>
+                </flux:card>
+            </a>
         @empty
             <flux:text class="text-zinc-500">{{ __('No stories found.') }}</flux:text>
         @endforelse
