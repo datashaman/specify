@@ -1,5 +1,6 @@
 <?php
 
+use App\Enums\ApprovalDecision;
 use App\Enums\PlanStatus;
 use App\Enums\StoryStatus;
 use App\Enums\TeamRole;
@@ -8,6 +9,7 @@ use App\Models\Feature;
 use App\Models\Plan;
 use App\Models\Project;
 use App\Models\Story;
+use App\Models\StoryApproval;
 use App\Models\Task;
 use App\Models\Team;
 use App\Models\User;
@@ -103,6 +105,61 @@ test('approving a plan flips its status', function () {
         ->call('decide', 'plan', $plan->id, 'approve');
 
     expect($plan->fresh()->status)->toBe(PlanStatus::Executing);
+});
+
+test('Member sees only the no-permission notice (no buttons)', function () {
+    ['user' => $user, 'feature' => $feature] = inboxScene(TeamRole::Member);
+    Story::factory()->for($feature)->create([
+        'status' => StoryStatus::PendingApproval,
+        'name' => 'Visible to member',
+    ]);
+
+    $this->actingAs($user);
+
+    Livewire::test('pages::inbox')
+        ->assertSee('Visible to member')
+        ->assertSee('Your role does not permit')
+        ->assertDontSee('Approve');
+});
+
+test('inbox shows approval count and approver names', function () {
+    ['user' => $user, 'feature' => $feature, 'project' => $project] = inboxScene();
+
+    // Bump policy to require 2 approvals
+    ApprovalPolicy::query()
+        ->where('scope_type', ApprovalPolicy::SCOPE_PROJECT)
+        ->where('scope_id', $project->id)
+        ->update(['required_approvals' => 2]);
+
+    $story = Story::factory()->for($feature)->create(['status' => StoryStatus::PendingApproval]);
+    $alice = User::factory()->create(['name' => 'Alice']);
+    StoryApproval::create([
+        'story_id' => $story->id,
+        'story_revision' => $story->revision ?? 1,
+        'approver_id' => $alice->id,
+        'decision' => ApprovalDecision::Approve->value,
+    ]);
+
+    $this->actingAs($user);
+    Livewire::test('pages::inbox')
+        ->assertSee('1/2 approvals')
+        ->assertSee('Alice');
+});
+
+test('Revoke replaces Approve button after the user has approved', function () {
+    ['user' => $user, 'feature' => $feature, 'project' => $project] = inboxScene();
+    ApprovalPolicy::query()
+        ->where('scope_type', ApprovalPolicy::SCOPE_PROJECT)
+        ->where('scope_id', $project->id)
+        ->update(['required_approvals' => 2]);
+
+    $story = Story::factory()->for($feature)->create(['status' => StoryStatus::PendingApproval]);
+
+    $this->actingAs($user);
+
+    Livewire::test('pages::inbox')
+        ->call('decide', 'story', $story->id, 'approve')
+        ->assertSee('Revoke approval');
 });
 
 test('Members can view the inbox but cannot approve', function () {
