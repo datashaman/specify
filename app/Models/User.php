@@ -3,6 +3,7 @@
 namespace App\Models;
 
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
+use App\Enums\TeamRole;
 use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
@@ -56,6 +57,23 @@ class User extends Authenticatable
             ->whereIn('team_id', $this->teams()->pluck('teams.id'))
             ->pluck('id')
             ->all();
+    }
+
+    public function roleInTeam(int $teamId): ?TeamRole
+    {
+        $row = $this->teams()->where('teams.id', $teamId)->first();
+        $value = $row?->pivot->role ?? null;
+
+        return $value ? TeamRole::from($value) : null;
+    }
+
+    public function canApproveInProject(Project $project): bool
+    {
+        return in_array(
+            $this->roleInTeam($project->team_id),
+            [TeamRole::Owner, TeamRole::Admin],
+            true,
+        );
     }
 
     public function switchTeam(Team $team): void

@@ -2,6 +2,7 @@
 
 use App\Enums\PlanStatus;
 use App\Enums\StoryStatus;
+use App\Enums\TeamRole;
 use App\Models\ApprovalPolicy;
 use App\Models\Feature;
 use App\Models\Plan;
@@ -17,12 +18,12 @@ use Livewire\Livewire;
 
 uses(RefreshDatabase::class);
 
-function inboxScene(): array
+function inboxScene(TeamRole $role = TeamRole::Admin): array
 {
     $workspace = Workspace::factory()->create();
     $team = Team::factory()->for($workspace)->create();
     $user = User::factory()->create();
-    $team->addMember($user);
+    $team->addMember($user, $role);
     $user->forceFill(['current_team_id' => $team->id])->save();
     $project = Project::factory()->for($team)->create();
     $feature = Feature::factory()->for($project)->create();
@@ -102,6 +103,24 @@ test('approving a plan flips its status', function () {
         ->call('decide', 'plan', $plan->id, 'approve');
 
     expect($plan->fresh()->status)->toBe(PlanStatus::Executing);
+});
+
+test('Members can view the inbox but cannot approve', function () {
+    ['user' => $user, 'feature' => $feature] = inboxScene(TeamRole::Member);
+    $story = Story::factory()->for($feature)->create([
+        'status' => StoryStatus::PendingApproval,
+        'name' => 'Visible to member',
+    ]);
+
+    $this->actingAs($user);
+
+    Livewire::test('pages::inbox')->assertSee('Visible to member');
+
+    Livewire::test('pages::inbox')
+        ->call('decide', 'story', $story->id, 'approve')
+        ->assertStatus(403);
+
+    expect($story->fresh()->status)->toBe(StoryStatus::PendingApproval);
 });
 
 test('deciding on an out-of-scope item 404s', function () {

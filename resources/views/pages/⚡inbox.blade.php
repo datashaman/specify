@@ -50,13 +50,13 @@ new #[Title('Inbox')] class extends Component {
 
         match ($kind) {
             'story' => $service->recordDecision(
-                $this->authorizedStory($id, $accessible),
+                $this->authorizedStory($id, $accessible, $user),
                 $user,
                 $decisionEnum,
                 $note,
             ),
             'plan' => $service->recordDecision(
-                $this->authorizedPlan($id, $accessible),
+                $this->authorizedPlan($id, $accessible, $user),
                 $user,
                 $decisionEnum,
                 $note,
@@ -67,18 +67,28 @@ new #[Title('Inbox')] class extends Component {
         unset($this->pendingStories, $this->pendingPlans);
     }
 
-    private function authorizedStory(int $id, array $projectIds): Story
+    private function authorizedStory(int $id, array $projectIds, $user): Story
     {
-        return Story::query()
+        $story = Story::query()
             ->whereHas('feature', fn ($q) => $q->whereIn('project_id', $projectIds))
+            ->with('feature.project')
             ->findOrFail($id);
+
+        abort_unless($user->canApproveInProject($story->feature->project), 403);
+
+        return $story;
     }
 
-    private function authorizedPlan(int $id, array $projectIds): Plan
+    private function authorizedPlan(int $id, array $projectIds, $user): Plan
     {
-        return Plan::query()
+        $plan = Plan::query()
             ->whereHas('story.feature', fn ($q) => $q->whereIn('project_id', $projectIds))
+            ->with('story.feature.project')
             ->findOrFail($id);
+
+        abort_unless($user->canApproveInProject($plan->story->feature->project), 403);
+
+        return $plan;
     }
 }; ?>
 
