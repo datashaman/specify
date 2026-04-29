@@ -4,6 +4,7 @@ use App\Enums\RepoProvider;
 use App\Models\AgentRun;
 use App\Models\Repo;
 use App\Models\Task;
+use App\Models\WebhookEvent;
 use App\Models\Workspace;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
@@ -121,4 +122,27 @@ test('returns matched=false when PR number does not match any run', function () 
         'action' => 'closed',
         'pull_request' => ['number' => 999, 'merged' => true],
     ])->assertOk()->assertJson(['matched' => false]);
+});
+
+test('logs every delivery as a WebhookEvent including invalid signatures', function () {
+    $ws = Workspace::factory()->create();
+    $repo = Repo::factory()->for($ws)->create([
+        'provider' => RepoProvider::Github,
+        'webhook_secret' => 's3cret',
+    ]);
+    $run = webhookRun($repo, 7);
+
+    test()->postJson(route('webhooks.github', $repo), ['x' => 1])->assertStatus(401);
+    postWebhook($repo, 's3cret', 'pull_request', [
+        'action' => 'closed',
+        'pull_request' => ['number' => 7, 'merged' => true],
+    ])->assertOk();
+
+    $events = WebhookEvent::query()->where('repo_id', $repo->id)->orderBy('id')->get();
+    expect($events)->toHaveCount(2)
+        ->and($events[0]->signature_valid)->toBeFalse()
+        ->and($events[1]->signature_valid)->toBeTrue()
+        ->and($events[1]->event)->toBe('pull_request')
+        ->and($events[1]->action)->toBe('closed')
+        ->and($events[1]->matched_run_id)->toBe($run->id);
 });

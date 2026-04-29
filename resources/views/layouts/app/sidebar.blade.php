@@ -38,6 +38,9 @@
                     <flux:sidebar.item icon="clipboard-document-list" :href="route('runs.index')" :current="request()->routeIs('runs.*')" wire:navigate>
                         {{ __('Runs') }}
                     </flux:sidebar.item>
+                    <flux:sidebar.item icon="signal" :href="route('webhooks.index')" :current="request()->routeIs('webhooks.*')" wire:navigate>
+                        {{ __('Webhooks') }}
+                    </flux:sidebar.item>
                 </flux:sidebar.group>
             </flux:sidebar.nav>
 

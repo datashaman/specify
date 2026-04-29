@@ -18,6 +18,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::livewire('stories/create', 'pages::stories.create')->name('stories.create');
     Route::livewire('stories/{story}', 'pages::stories.show')->name('stories.show');
     Route::livewire('runs', 'pages::runs.index')->name('runs.index');
+    Route::livewire('webhooks', 'pages::webhooks.index')->name('webhooks.index');
 });
 
 require __DIR__.'/settings.php';

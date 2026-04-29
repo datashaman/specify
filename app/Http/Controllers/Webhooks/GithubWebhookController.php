@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Webhooks;
 use App\Http\Controllers\Controller;
 use App\Models\AgentRun;
 use App\Models\Repo;
+use App\Models\WebhookEvent;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -14,17 +15,30 @@ class GithubWebhookController extends Controller
     {
         $secret = $repo->webhook_secret;
         $signature = $request->header('X-Hub-Signature-256', '');
+        $signatureValid = $secret !== null && $secret !== ''
+            && $this->signatureValid($request->getContent(), $signature, $secret);
 
-        if ($secret === null || $secret === '' || ! $this->signatureValid($request->getContent(), $signature, $secret)) {
+        $event = $request->header('X-GitHub-Event', 'unknown');
+        $payload = $request->json()->all();
+        $action = $payload['action'] ?? null;
+
+        $log = WebhookEvent::create([
+            'repo_id' => $repo->getKey(),
+            'provider' => 'github',
+            'event' => $event,
+            'action' => $action,
+            'signature_valid' => $signatureValid,
+            'payload' => $payload,
+        ]);
+
+        if (! $signatureValid) {
             return response()->json(['error' => 'invalid signature'], 401);
         }
 
-        if ($request->header('X-GitHub-Event') !== 'pull_request') {
+        if ($event !== 'pull_request') {
             return response()->json(['ignored' => true]);
         }
 
-        $payload = $request->json()->all();
-        $action = $payload['action'] ?? null;
         $number = $payload['pull_request']['number'] ?? null;
 
         if ($number === null) {
@@ -51,6 +65,7 @@ class GithubWebhookController extends Controller
         }
 
         $run->forceFill(['output' => $output])->save();
+        $log->forceFill(['matched_run_id' => $run->getKey()])->save();
 
         return response()->json(['matched' => true, 'run_id' => $run->getKey()]);
     }
