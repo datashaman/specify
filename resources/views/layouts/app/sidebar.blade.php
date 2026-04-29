@@ -27,14 +27,14 @@
                             <flux:sidebar.item icon="rectangle-stack" :href="route('projects.show', auth()->user()->current_project_id)" :current="request()->routeIs('projects.show') || request()->routeIs('features.show')" wire:navigate>
                                 {{ __('Features') }}
                             </flux:sidebar.item>
+                            <flux:sidebar.item icon="bookmark" :href="route('stories.index')" :current="request()->routeIs('stories.index')" wire:navigate>
+                                {{ __('Stories') }}
+                            </flux:sidebar.item>
+                            <flux:sidebar.item icon="plus" :href="route('stories.create')" :current="request()->routeIs('stories.create')" wire:navigate>
+                                {{ __('New story') }}
+                            </flux:sidebar.item>
                         @endif
                     @endauth
-                    <flux:sidebar.item icon="bookmark" :href="route('stories.index')" :current="request()->routeIs('stories.index')" wire:navigate>
-                        {{ __('Stories') }}
-                    </flux:sidebar.item>
-                    <flux:sidebar.item icon="plus" :href="route('stories.create')" :current="request()->routeIs('stories.create')" wire:navigate>
-                        {{ __('New story') }}
-                    </flux:sidebar.item>
                     <flux:sidebar.item icon="clipboard-document-list" :href="route('runs.index')" :current="request()->routeIs('runs.*')" wire:navigate>
                         {{ __('Runs') }}
                     </flux:sidebar.item>
