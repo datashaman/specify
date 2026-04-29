@@ -18,6 +18,12 @@
                     <flux:sidebar.item icon="inbox" :href="route('inbox')" :current="request()->routeIs('inbox')" wire:navigate>
                         {{ __('Inbox') }}
                     </flux:sidebar.item>
+                    <flux:sidebar.item icon="folder" :href="route('projects.index')" :current="request()->routeIs('projects.*')" wire:navigate>
+                        {{ __('Projects') }}
+                    </flux:sidebar.item>
+                    <flux:sidebar.item icon="bookmark" :href="route('stories.index')" :current="request()->routeIs('stories.index')" wire:navigate>
+                        {{ __('Stories') }}
+                    </flux:sidebar.item>
                     <flux:sidebar.item icon="plus" :href="route('stories.create')" :current="request()->routeIs('stories.create')" wire:navigate>
                         {{ __('New story') }}
                     </flux:sidebar.item>

@@ -11,6 +11,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasManyThrough;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 
@@ -40,6 +41,11 @@ class Project extends Model
     public function features(): HasMany
     {
         return $this->hasMany(Feature::class);
+    }
+
+    public function stories(): HasManyThrough
+    {
+        return $this->hasManyThrough(Story::class, Feature::class);
     }
 
     public function defaultApprovalPolicy(): ?ApprovalPolicy
