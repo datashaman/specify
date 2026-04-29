@@ -35,6 +35,9 @@
                             </flux:sidebar.item>
                         @endif
                     @endauth
+                    <flux:sidebar.item icon="folder-open" :href="route('repos.index')" :current="request()->routeIs('repos.*')" wire:navigate>
+                        {{ __('Repos') }}
+                    </flux:sidebar.item>
                     <flux:sidebar.item icon="clipboard-document-list" :href="route('runs.index')" :current="request()->routeIs('runs.*')" wire:navigate>
                         {{ __('Runs') }}
                     </flux:sidebar.item>

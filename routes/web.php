@@ -27,6 +27,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::livewire('stories/{story}', 'pages::stories.show')->name('stories.show');
     Route::livewire('runs', 'pages::runs.index')->name('runs.index');
     Route::livewire('events', 'pages::events.index')->name('events.index');
+    Route::livewire('repos', 'pages::repos.index')->name('repos.index');
 });
 
 require __DIR__.'/settings.php';
