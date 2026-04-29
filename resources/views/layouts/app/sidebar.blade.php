@@ -10,11 +10,11 @@
                 <flux:sidebar.collapse class="lg:hidden" />
             </flux:sidebar.header>
 
-            @auth
-                <livewire:app-switcher />
-            @endauth
-
             <flux:sidebar.nav>
+                @auth
+                    <livewire:app-switcher />
+                @endauth
+
                 <flux:sidebar.group :heading="__('Platform')" class="grid">
                     <flux:sidebar.item icon="home" :href="route('dashboard')" :current="request()->routeIs('dashboard')" wire:navigate>
                         {{ __('Dashboard') }}

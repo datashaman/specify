@@ -61,7 +61,7 @@ new class extends Component {
     }
 }; ?>
 
-<flux:sidebar.nav>
+<div class="flex flex-col">
     @if ($this->workspaces->count() > 1)
         <flux:dropdown position="bottom" align="start">
             <flux:sidebar.item icon="building-office" icon-trailing="chevrons-up-down">
@@ -99,4 +99,4 @@ new class extends Component {
             </flux:menu.radio.group>
         </flux:menu>
     </flux:dropdown>
-</flux:sidebar.nav>
+</div>
