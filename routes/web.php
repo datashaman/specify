@@ -8,7 +8,7 @@ Route::view('/', 'welcome')->name('home');
 Route::post('webhooks/github/{repo}', GithubWebhookController::class)->name('webhooks.github');
 
 Route::middleware(['auth', 'verified'])->group(function () {
-    Route::view('dashboard', 'dashboard')->name('dashboard');
+    Route::livewire('dashboard', 'pages::dashboard')->name('dashboard');
     Route::livewire('inbox', 'pages::inbox')->name('inbox');
     Route::livewire('stories/create', 'pages::stories.create')->name('stories.create');
     Route::livewire('runs', 'pages::runs.index')->name('runs.index');
