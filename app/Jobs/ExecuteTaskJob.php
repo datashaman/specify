@@ -1,0 +1,120 @@
+<?php
+
+namespace App\Jobs;
+
+use App\Models\AgentRun;
+use App\Models\Task;
+use App\Services\ExecutionService;
+use App\Services\Executors\Executor;
+use App\Services\PullRequests\PullRequestManager;
+use App\Services\WorkspaceRunner;
+use Illuminate\Contracts\Queue\ShouldQueue;
+use Illuminate\Foundation\Queue\Queueable;
+use Throwable;
+
+class ExecuteTaskJob implements ShouldQueue
+{
+    use Queueable;
+
+    public function __construct(public int $agentRunId) {}
+
+    public function handle(
+        ExecutionService $execution,
+        Executor $executor,
+        WorkspaceRunner $workspace,
+        PullRequestManager $pullRequests,
+    ): void {
+        $run = AgentRun::findOrFail($this->agentRunId);
+        $task = $run->runnable;
+
+        if ($task === null) {
+            $execution->markFailed($run, 'Task for AgentRun not found.');
+
+            return;
+        }
+
+        $execution->markRunning($run);
+
+        $workingDir = null;
+        $commitSha = null;
+        $diff = null;
+
+        try {
+            $repo = $run->repo;
+
+            if ($executor->needsWorkingDirectory()) {
+                if ($repo === null) {
+                    throw new \RuntimeException('Executor requires a repo, but none is bound to this AgentRun.');
+                }
+
+                $workingDir = $workspace->prepare($repo, $run);
+                $workspace->checkoutBranch($workingDir, $run->working_branch ?? 'specify/run-'.$run->getKey(), baseBranch: $repo->default_branch);
+            }
+
+            $output = $executor->execute($task, $workingDir, $repo, $run->working_branch);
+
+            if ($workingDir !== null) {
+                $commitSha = $workspace->commit($workingDir, $output['commit_message'] ?: 'specify: agent run');
+                $diff = $workspace->diff($workingDir);
+
+                if ($commitSha !== null && config('specify.workspace.push_after_commit', true)) {
+                    $branch = $run->working_branch ?? 'specify/run-'.$run->getKey();
+                    $workspace->push($workingDir, $branch);
+                    $output['pushed'] = true;
+
+                    if (config('specify.workspace.open_pr_after_push', true)) {
+                        $output = array_merge($output, $this->openPullRequest($pullRequests, $run, $task, $branch, $output));
+                    }
+                }
+            } else {
+                $diff = $output['files_changed'] === [] ? null : implode("\n", $output['files_changed']);
+            }
+
+            $output['commit_sha'] = $commitSha;
+            $execution->markSucceeded($run, $output, $diff);
+        } catch (Throwable $e) {
+            $execution->markFailed($run, $e->getMessage());
+
+            throw $e;
+        }
+    }
+
+    /**
+     * @param  array<string, mixed>  $output
+     * @return array<string, mixed>
+     */
+    private function openPullRequest(
+        PullRequestManager $manager,
+        AgentRun $run,
+        Task $task,
+        string $branch,
+        array $output,
+    ): array {
+        $repo = $run->repo;
+        if ($repo === null) {
+            return [];
+        }
+
+        $provider = $manager->for($repo);
+        if ($provider === null) {
+            return ['pull_request_skipped' => 'unsupported_provider'];
+        }
+
+        try {
+            $pr = $provider->createPullRequest(
+                repo: $repo,
+                head: $branch,
+                base: $repo->default_branch,
+                title: 'Specify: '.$task->name,
+                body: trim((string) ($output['summary'] ?? '')),
+            );
+
+            return [
+                'pull_request_url' => $pr['url'],
+                'pull_request_number' => $pr['number'],
+            ];
+        } catch (Throwable $e) {
+            return ['pull_request_error' => $e->getMessage()];
+        }
+    }
+}
