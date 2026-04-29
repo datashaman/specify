@@ -3,7 +3,6 @@
 use App\Enums\StoryStatus;
 use App\Models\AcceptanceCriterion;
 use App\Models\Feature;
-use App\Models\Project;
 use App\Models\Story;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -14,8 +13,6 @@ use Livewire\Attributes\Validate;
 use Livewire\Component;
 
 new #[Title('New story')] class extends Component {
-    public ?int $project_id = null;
-
     #[Url(as: 'feature_id')]
     public ?int $feature_id = null;
 
@@ -36,37 +33,28 @@ new #[Title('New story')] class extends Component {
                 ->whereHas('project', fn ($q) => $q->whereIn('id', $user->accessibleProjectIds()))
                 ->find($this->feature_id);
             if ($feature) {
-                $this->project_id = $feature->project_id;
-
                 return;
             }
             $this->feature_id = null;
         }
 
-        $project = $user->current_project_id
-            ? Project::query()->whereIn('id', $user->accessibleProjectIds())->find($user->current_project_id)
-            : $user->accessibleProjectsInCurrentWorkspace()->first();
-        $this->project_id = $project?->id;
-        $this->feature_id = $project?->features()->orderBy('id')->first()?->id;
-    }
-
-    #[Computed]
-    public function projects()
-    {
-        return Auth::user()->accessibleProjectsInCurrentWorkspace()->load('features');
+        $projectId = $user->current_project_id;
+        if ($projectId) {
+            $this->feature_id = Feature::query()
+                ->where('project_id', $projectId)
+                ->orderBy('id')
+                ->first()?->id;
+        }
     }
 
     #[Computed]
     public function features()
     {
-        return $this->project_id
-            ? Feature::query()->where('project_id', $this->project_id)->orderBy('name')->get()
-            : collect();
-    }
+        $projectId = Auth::user()->current_project_id;
 
-    public function updatedProjectId(): void
-    {
-        $this->feature_id = $this->features->first()?->id;
+        return $projectId
+            ? Feature::query()->where('project_id', $projectId)->orderBy('name')->get()
+            : collect();
     }
 
     public function addCriterion(): void
@@ -130,12 +118,6 @@ new #[Title('New story')] class extends Component {
     <flux:heading size="xl">{{ __('New story') }}</flux:heading>
 
     <form wire:submit.prevent="save(false)" class="flex flex-col gap-4">
-        <flux:select wire:model.live="project_id" :label="__('Project')">
-            @foreach ($this->projects as $project)
-                <flux:select.option value="{{ $project->id }}">{{ $project->name }}</flux:select.option>
-            @endforeach
-        </flux:select>
-
         <flux:select wire:model="feature_id" :label="__('Feature')">
             @foreach ($this->features as $feature)
                 <flux:select.option value="{{ $feature->id }}">{{ $feature->name }}</flux:select.option>
