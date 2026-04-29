@@ -61,53 +61,42 @@ new class extends Component {
     }
 }; ?>
 
-<div class="flex flex-col gap-1 px-2 py-2">
+<flux:sidebar.nav>
     @if ($this->workspaces->count() > 1)
-        <flux:dropdown>
-            <flux:button variant="ghost" size="sm" icon-trailing="chevron-down" class="w-full justify-between">
-                <div class="flex flex-col items-start">
-                    <span class="text-[10px] uppercase tracking-wide text-zinc-500">{{ __('Workspace') }}</span>
-                    <span class="truncate text-xs font-medium">{{ $this->currentWorkspace?->name ?? __('None') }}</span>
-                </div>
-            </flux:button>
+        <flux:dropdown position="bottom" align="start">
+            <flux:sidebar.item icon="building-office" icon-trailing="chevrons-up-down">
+                {{ $this->currentWorkspace?->name ?? __('Select workspace') }}
+            </flux:sidebar.item>
             <flux:menu>
-                @foreach ($this->workspaces as $ws)
-                    <flux:menu.item wire:click="switchWorkspace({{ $ws->id }})">
-                        {{ $ws->name }}
-                        @if ($this->currentWorkspace?->id === $ws->id)
-                            <flux:badge size="sm" class="ml-2">{{ __('current') }}</flux:badge>
-                        @endif
-                    </flux:menu.item>
-                @endforeach
+                <flux:menu.radio.group>
+                    @foreach ($this->workspaces as $ws)
+                        <flux:menu.radio
+                            :checked="$this->currentWorkspace?->id === $ws->id"
+                            wire:click="switchWorkspace({{ $ws->id }})"
+                        >{{ $ws->name }}</flux:menu.radio>
+                    @endforeach
+                </flux:menu.radio.group>
             </flux:menu>
         </flux:dropdown>
     @endif
 
-    <flux:dropdown>
-        <flux:button variant="ghost" size="sm" icon-trailing="chevron-down" class="w-full justify-between">
-            <div class="flex flex-col items-start">
-                <span class="text-[10px] uppercase tracking-wide text-zinc-500">{{ __('Project') }}</span>
-                <span class="truncate text-xs font-medium">{{ $this->currentProject?->name ?? __('All projects') }}</span>
-            </div>
-        </flux:button>
+    <flux:dropdown position="bottom" align="start">
+        <flux:sidebar.item icon="folder" icon-trailing="chevrons-up-down">
+            {{ $this->currentProject?->name ?? __('All projects') }}
+        </flux:sidebar.item>
         <flux:menu>
-            <flux:menu.item wire:click="switchProject(null)">
-                {{ __('All projects') }}
-                @if ($this->currentProject === null)
-                    <flux:badge size="sm" class="ml-2">{{ __('current') }}</flux:badge>
-                @endif
-            </flux:menu.item>
-            <flux:menu.separator />
-            @forelse ($this->projects as $project)
-                <flux:menu.item wire:click="switchProject({{ $project->id }})">
-                    {{ $project->name }}
-                    @if ($this->currentProject?->id === $project->id)
-                        <flux:badge size="sm" class="ml-2">{{ __('current') }}</flux:badge>
-                    @endif
-                </flux:menu.item>
-            @empty
-                <flux:menu.item disabled>{{ __('No projects in this workspace') }}</flux:menu.item>
-            @endforelse
+            <flux:menu.radio.group>
+                <flux:menu.radio
+                    :checked="$this->currentProject === null"
+                    wire:click="switchProject(null)"
+                >{{ __('All projects') }}</flux:menu.radio>
+                @foreach ($this->projects as $project)
+                    <flux:menu.radio
+                        :checked="$this->currentProject?->id === $project->id"
+                        wire:click="switchProject({{ $project->id }})"
+                    >{{ $project->name }}</flux:menu.radio>
+                @endforeach
+            </flux:menu.radio.group>
         </flux:menu>
     </flux:dropdown>
-</div>
+</flux:sidebar.nav>
