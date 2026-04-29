@@ -12,6 +12,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::livewire('inbox', 'pages::inbox')->name('inbox');
     Route::livewire('stories/create', 'pages::stories.create')->name('stories.create');
     Route::livewire('runs', 'pages::runs.index')->name('runs.index');
+    Route::livewire('projects/{project}/repos', 'pages::projects.repos')->name('projects.repos');
 });
 
 require __DIR__.'/settings.php';
