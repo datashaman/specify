@@ -164,7 +164,6 @@ new #[Title('Dashboard')] class extends Component {
                     </flux:text>
                     <div class="mt-2 flex flex-wrap gap-3 text-sm">
                         <a href="{{ route('projects.show', $project) }}" wire:navigate class="underline">{{ __('Open') }}</a>
-                        <a href="{{ route('projects.repos', $project) }}" wire:navigate class="underline">{{ __('Repos') }}</a>
                     </div>
                 </flux:card>
             @empty

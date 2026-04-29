@@ -72,9 +72,6 @@ new #[Title('Project')] class extends Component {
                     {{ $this->project->team->workspace->name }} / {{ $this->project->team->name }}
                 </flux:text>
             </div>
-            <a href="{{ route('projects.repos', $this->project) }}" wire:navigate>
-                <flux:button>{{ __('Manage repos') }}</flux:button>
-            </a>
         </div>
 
         <section class="flex flex-col gap-3">
