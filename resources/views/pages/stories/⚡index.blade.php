@@ -22,16 +22,13 @@ new #[Title('Stories')] class extends Component {
     #[Computed]
     public function projects()
     {
-        return Project::query()
-            ->whereIn('id', Auth::user()->accessibleProjectIds())
-            ->orderBy('name')
-            ->get();
+        return Auth::user()->accessibleProjectsInCurrentWorkspace();
     }
 
     #[Computed]
     public function stories()
     {
-        $projectIds = Auth::user()->accessibleProjectIds();
+        $projectIds = Auth::user()->scopedProjectIds();
 
         return Story::query()
             ->whereHas('feature', fn ($q) => $q->whereIn('project_id', $projectIds))

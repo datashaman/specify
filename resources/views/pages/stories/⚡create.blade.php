@@ -30,9 +30,10 @@ new #[Title('New story')] class extends Component {
 
     public function mount(): void
     {
+        $user = Auth::user();
         if ($this->feature_id) {
             $feature = Feature::query()
-                ->whereHas('project', fn ($q) => $q->whereIn('id', Auth::user()->accessibleProjectIds()))
+                ->whereHas('project', fn ($q) => $q->whereIn('id', $user->accessibleProjectIds()))
                 ->find($this->feature_id);
             if ($feature) {
                 $this->project_id = $feature->project_id;
@@ -42,10 +43,9 @@ new #[Title('New story')] class extends Component {
             $this->feature_id = null;
         }
 
-        $project = Project::query()
-            ->whereIn('id', Auth::user()->accessibleProjectIds())
-            ->orderBy('id')
-            ->first();
+        $project = $user->current_project_id
+            ? Project::query()->whereIn('id', $user->accessibleProjectIds())->find($user->current_project_id)
+            : $user->accessibleProjectsInCurrentWorkspace()->first();
         $this->project_id = $project?->id;
         $this->feature_id = $project?->features()->orderBy('id')->first()?->id;
     }
@@ -53,11 +53,7 @@ new #[Title('New story')] class extends Component {
     #[Computed]
     public function projects()
     {
-        return Project::query()
-            ->whereIn('id', Auth::user()->accessibleProjectIds())
-            ->with('features')
-            ->orderBy('name')
-            ->get();
+        return Auth::user()->accessibleProjectsInCurrentWorkspace()->load('features');
     }
 
     #[Computed]

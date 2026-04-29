@@ -15,6 +15,7 @@ function storyIndexScene(): array
     $team = Team::factory()->for($ws)->create();
     $user = User::factory()->create();
     $team->addMember($user);
+    $user->forceFill(['current_team_id' => $team->id])->save();
     $project = Project::factory()->for($team)->create();
     $feature = Feature::factory()->for($project)->create();
 

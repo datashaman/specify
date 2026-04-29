@@ -17,7 +17,7 @@ new #[Title('Run history')] class extends Component {
     #[Computed]
     public function runs()
     {
-        $projectIds = Auth::user()->accessibleProjectIds();
+        $projectIds = Auth::user()->scopedProjectIds();
 
         return AgentRun::query()
             ->where(function ($q) use ($projectIds) {

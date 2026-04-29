@@ -11,6 +11,7 @@ test('lists accessible projects with feature, repo, story counts', function () {
     $team = Team::factory()->for($ws)->create();
     $user = User::factory()->create();
     $team->addMember($user);
+    $user->forceFill(['current_team_id' => $team->id])->save();
     Project::factory()->for($team)->create(['name' => 'Visible Project']);
 
     $other = Workspace::factory()->create();

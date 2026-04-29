@@ -33,6 +33,7 @@ test('dashboard counts pending stories, plans, executing plans, and failed runs 
     $team = Team::factory()->for($workspace)->create();
     $user = User::factory()->create();
     $team->addMember($user);
+    $user->forceFill(['current_team_id' => $team->id])->save();
     $project = Project::factory()->for($team)->create(['name' => 'Specify']);
     $feature = Feature::factory()->for($project)->create();
 
@@ -83,6 +84,7 @@ test('dashboard surfaces repos missing an access_token', function () {
     $team = Team::factory()->for($ws)->create();
     $user = User::factory()->create();
     $team->addMember($user);
+    $user->forceFill(['current_team_id' => $team->id])->save();
     $project = Project::factory()->for($team)->create();
     $repo = Repo::factory()->for($ws)->create(['access_token' => null]);
     $project->attachRepo($repo);

@@ -12,11 +12,12 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
 use InvalidArgumentException;
 use Laravel\Fortify\TwoFactorAuthenticatable;
 
-#[Fillable(['name', 'email', 'password', 'current_team_id'])]
+#[Fillable(['name', 'email', 'password', 'current_team_id', 'current_project_id'])]
 #[Hidden(['password', 'two_factor_secret', 'two_factor_recovery_codes', 'remember_token'])]
 class User extends Authenticatable
 {
@@ -48,6 +49,60 @@ class User extends Authenticatable
         return $this->belongsTo(Team::class, 'current_team_id');
     }
 
+    public function currentProject(): BelongsTo
+    {
+        return $this->belongsTo(Project::class, 'current_project_id');
+    }
+
+    public function currentWorkspace(): ?Workspace
+    {
+        return $this->currentTeam?->workspace;
+    }
+
+    /**
+     * @return Collection<int, Workspace>
+     */
+    public function accessibleWorkspaces(): Collection
+    {
+        $teamIds = $this->teams()->pluck('teams.id');
+
+        return Workspace::query()
+            ->whereHas('teams', fn ($q) => $q->whereIn('teams.id', $teamIds))
+            ->orderBy('name')
+            ->get();
+    }
+
+    /**
+     * @return \Illuminate\Database\Eloquent\Collection<int, Team>
+     */
+    public function accessibleTeamsIn(Workspace $workspace): \Illuminate\Database\Eloquent\Collection
+    {
+        return $this->teams()
+            ->where('teams.workspace_id', $workspace->getKey())
+            ->orderBy('teams.id')
+            ->get();
+    }
+
+    /**
+     * Projects in the current team's workspace, restricted to teams the user is a member of.
+     *
+     * @return \Illuminate\Database\Eloquent\Collection<int, Project>
+     */
+    public function accessibleProjectsInCurrentWorkspace(): \Illuminate\Database\Eloquent\Collection
+    {
+        $workspace = $this->currentWorkspace();
+        if ($workspace === null) {
+            return Project::query()->whereRaw('0=1')->get();
+        }
+
+        $teamIds = $this->teams()->where('teams.workspace_id', $workspace->getKey())->pluck('teams.id');
+
+        return Project::query()
+            ->whereIn('team_id', $teamIds)
+            ->orderBy('name')
+            ->get();
+    }
+
     /**
      * @return array<int>
      */
@@ -57,6 +112,25 @@ class User extends Authenticatable
             ->whereIn('team_id', $this->teams()->pluck('teams.id'))
             ->pluck('id')
             ->all();
+    }
+
+    /**
+     * Sticky scope: a single project when current_project_id is set,
+     * otherwise every project in the current workspace the user can access.
+     *
+     * @return array<int>
+     */
+    public function scopedProjectIds(): array
+    {
+        if ($this->current_project_id) {
+            $accessible = $this->accessibleProjectIds();
+
+            return in_array((int) $this->current_project_id, $accessible, true)
+                ? [(int) $this->current_project_id]
+                : [];
+        }
+
+        return $this->accessibleProjectsInCurrentWorkspace()->pluck('id')->all();
     }
 
     public function roleInTeam(int $teamId): ?TeamRole
@@ -84,6 +158,30 @@ class User extends Authenticatable
 
         $this->forceFill(['current_team_id' => $team->getKey()])->save();
         $this->setRelation('currentTeam', $team);
+    }
+
+    public function switchWorkspace(Workspace $workspace): void
+    {
+        $team = $this->accessibleTeamsIn($workspace)->first();
+        if ($team === null) {
+            throw new InvalidArgumentException('User has no team in this workspace.');
+        }
+
+        $this->forceFill([
+            'current_team_id' => $team->getKey(),
+            'current_project_id' => null,
+        ])->save();
+        $this->setRelation('currentTeam', $team);
+    }
+
+    public function switchProject(?Project $project): void
+    {
+        if ($project !== null && ! in_array((int) $project->getKey(), $this->accessibleProjectIds(), true)) {
+            throw new InvalidArgumentException('User cannot scope to this project.');
+        }
+
+        $this->forceFill(['current_project_id' => $project?->getKey()])->save();
+        $this->setRelation('currentProject', $project);
     }
 
     /**

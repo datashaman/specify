@@ -10,8 +10,10 @@ new #[Title('Projects')] class extends Component {
     #[Computed]
     public function projects()
     {
+        $ids = Auth::user()->accessibleProjectsInCurrentWorkspace()->pluck('id');
+
         return Project::query()
-            ->whereIn('id', Auth::user()->accessibleProjectIds())
+            ->whereIn('id', $ids)
             ->with('team.workspace')
             ->withCount(['features', 'repos', 'stories'])
             ->orderBy('name')

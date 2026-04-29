@@ -17,7 +17,7 @@ new #[Title('Inbox')] class extends Component {
     #[Computed]
     public function pendingStories()
     {
-        $projectIds = Auth::user()->accessibleProjectIds();
+        $projectIds = Auth::user()->scopedProjectIds();
 
         return Story::query()
             ->where('status', StoryStatus::PendingApproval)
@@ -30,7 +30,7 @@ new #[Title('Inbox')] class extends Component {
     #[Computed]
     public function pendingPlans()
     {
-        $projectIds = Auth::user()->accessibleProjectIds();
+        $projectIds = Auth::user()->scopedProjectIds();
 
         return Plan::query()
             ->where('status', PlanStatus::PendingApproval)
@@ -46,6 +46,8 @@ new #[Title('Inbox')] class extends Component {
         $service = app(ApprovalService::class);
         $note = $this->notes[$kind.':'.$id] ?? null;
         $decisionEnum = ApprovalDecision::from($decision);
+        // Authorization uses the broader set so deep links/actions on items
+        // outside the sticky scope still resolve when the user has permission.
         $accessible = $user->accessibleProjectIds();
 
         match ($kind) {

@@ -180,6 +180,25 @@ test('Members can view the inbox but cannot approve', function () {
     expect($story->fresh()->status)->toBe(StoryStatus::PendingApproval);
 });
 
+test('pinning a project narrows the inbox to that project only', function () {
+    ['user' => $user, 'project' => $projectA, 'feature' => $featureA] = inboxScene();
+    $projectB = Project::factory()->for($projectA->team)->create(['name' => 'Project B']);
+    $featureB = Feature::factory()->for($projectB)->create();
+    Story::factory()->for($featureA)->create([
+        'name' => 'in-A', 'status' => StoryStatus::PendingApproval,
+    ]);
+    Story::factory()->for($featureB)->create([
+        'name' => 'in-B', 'status' => StoryStatus::PendingApproval,
+    ]);
+
+    $user->switchProject($projectA);
+    $this->actingAs($user->fresh());
+
+    Livewire::test('pages::inbox')
+        ->assertSee('in-A')
+        ->assertDontSee('in-B');
+});
+
 test('deciding on an out-of-scope item 404s', function () {
     ['user' => $user] = inboxScene();
 

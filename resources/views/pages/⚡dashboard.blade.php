@@ -18,7 +18,7 @@ new #[Title('Dashboard')] class extends Component {
     #[Computed]
     public function projectIds()
     {
-        return Auth::user()->accessibleProjectIds();
+        return Auth::user()->scopedProjectIds();
     }
 
     #[Computed]
@@ -75,8 +75,10 @@ new #[Title('Dashboard')] class extends Component {
     #[Computed]
     public function projects()
     {
+        $ids = Auth::user()->accessibleProjectsInCurrentWorkspace()->pluck('id');
+
         return Project::query()
-            ->whereIn('id', $this->projectIds)
+            ->whereIn('id', $ids)
             ->withCount(['features', 'repos'])
             ->orderBy('name')
             ->get();
@@ -85,8 +87,10 @@ new #[Title('Dashboard')] class extends Component {
     #[Computed]
     public function reposNeedingToken()
     {
+        $ids = Auth::user()->accessibleProjectsInCurrentWorkspace()->pluck('id');
+
         return Repo::query()
-            ->whereHas('projects', fn ($q) => $q->whereIn('projects.id', $this->projectIds))
+            ->whereHas('projects', fn ($q) => $q->whereIn('projects.id', $ids))
             ->where(function ($q) {
                 $q->whereNull('access_token')->orWhere('access_token', '');
             })
