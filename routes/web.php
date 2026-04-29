@@ -11,6 +11,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::view('dashboard', 'dashboard')->name('dashboard');
     Route::livewire('inbox', 'pages::inbox')->name('inbox');
     Route::livewire('stories/create', 'pages::stories.create')->name('stories.create');
+    Route::livewire('runs', 'pages::runs.index')->name('runs.index');
 });
 
 require __DIR__.'/settings.php';

@@ -21,6 +21,9 @@
                     <flux:sidebar.item icon="plus" :href="route('stories.create')" :current="request()->routeIs('stories.create')" wire:navigate>
                         {{ __('New story') }}
                     </flux:sidebar.item>
+                    <flux:sidebar.item icon="clipboard-document-list" :href="route('runs.index')" :current="request()->routeIs('runs.*')" wire:navigate>
+                        {{ __('Runs') }}
+                    </flux:sidebar.item>
                 </flux:sidebar.group>
             </flux:sidebar.nav>
 
