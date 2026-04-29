@@ -16,6 +16,11 @@ uses(RefreshDatabase::class);
 
 beforeEach(function () {
     config(['queue.default' => 'sync']);
+    TaskExecutor::fake(fn () => [
+        'summary' => 'noop',
+        'files_changed' => [],
+        'commit_message' => 'noop',
+    ]);
 });
 
 function approvedPlanInProjectWithRepo(): Plan
