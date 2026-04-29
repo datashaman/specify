@@ -154,7 +154,7 @@ new class extends Component {
             <form wire:submit.prevent="createProject" class="flex flex-col gap-4">
                 <div>
                     <flux:heading size="lg">{{ __('New project') }}</flux:heading>
-                    <flux:text class="mt-1">{{ __('Created in your current team. You can manage repos and features after creation.') }}</flux:text>
+                    <flux:text class="mt-1">{{ __('Created in :workspace. You can manage repos and features after creation.', ['workspace' => $this->currentWorkspace?->name ?? __('your workspace')]) }}</flux:text>
                 </div>
                 <flux:input wire:model="newProjectName" :label="__('Name')" required />
                 <flux:textarea wire:model="newProjectDescription" :label="__('Description (optional)')" rows="2" />
