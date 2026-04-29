@@ -101,7 +101,7 @@ test('approving a plan flips its status', function () {
     Livewire::test('pages::inbox')
         ->call('decide', 'plan', $plan->id, 'approve');
 
-    expect($plan->fresh()->status)->toBe(PlanStatus::Approved);
+    expect($plan->fresh()->status)->toBe(PlanStatus::Executing);
 });
 
 test('deciding on an out-of-scope item 404s', function () {

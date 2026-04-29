@@ -166,7 +166,7 @@ test('plan regeneration starts fresh approval cycle', function () {
     $planV1->submitForApproval();
     $approver = User::factory()->create();
     app(ApprovalService::class)->recordDecision($planV1, $approver, ApprovalDecision::Approve);
-    expect($planV1->fresh()->status)->toBe(PlanStatus::Approved);
+    expect($planV1->fresh()->status)->toBe(PlanStatus::Executing);
 
     $planV2 = Plan::factory()->for($story)->create(['version' => 2]);
     expect($planV2->status)->toBe(PlanStatus::Draft);
@@ -187,7 +187,7 @@ test('plan policy resolves Project then Workspace, ignoring Story-level policy',
 
     $approver = User::factory()->create();
     app(ApprovalService::class)->recordDecision($plan, $approver, ApprovalDecision::Approve);
-    expect($plan->fresh()->status)->toBe(PlanStatus::Approved);
+    expect($plan->fresh()->status)->toBe(PlanStatus::Executing);
 });
 
 test('approval rows are immutable', function () {

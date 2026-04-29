@@ -178,6 +178,7 @@ class ApprovalService
         if ($policy->auto_approve || $count >= $policy->required_approvals) {
             if ($plan->status !== PlanStatus::Draft) {
                 $plan->forceFill(['status' => PlanStatus::Approved->value])->save();
+                app(ExecutionService::class)->startPlanExecution($plan->fresh());
             }
 
             return;

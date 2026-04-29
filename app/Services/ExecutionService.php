@@ -64,14 +64,26 @@ class ExecutionService
 
     public function startPlanExecution(Plan $plan, ?PlanApproval $approval = null): void
     {
-        if ($plan->status !== PlanStatus::Approved) {
+        if (in_array($plan->status, [PlanStatus::Done, PlanStatus::Rejected], true)) {
+            return;
+        }
+
+        if (! in_array($plan->status, [PlanStatus::Approved, PlanStatus::Executing], true)) {
             throw new RuntimeException('Plan must be Approved before execution starts.');
         }
 
         DB::transaction(function () use ($plan, $approval) {
-            $plan->forceFill(['status' => PlanStatus::Executing->value])->save();
+            if ($plan->status !== PlanStatus::Executing) {
+                $plan->forceFill(['status' => PlanStatus::Executing->value])->save();
+            }
 
             foreach ($plan->nextActionableTasks() as $task) {
+                $hasOpenRun = $task->agentRuns()
+                    ->whereIn('status', [AgentRunStatus::Queued->value, AgentRunStatus::Running->value])
+                    ->exists();
+                if ($hasOpenRun) {
+                    continue;
+                }
                 $this->dispatchTaskExecution($task, $approval);
             }
         });
