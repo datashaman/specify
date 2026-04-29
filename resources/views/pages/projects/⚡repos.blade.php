@@ -122,6 +122,7 @@ new #[Title('Repositories')] class extends Component {
         <section class="flex flex-col gap-3">
             <flux:heading size="lg">{{ __('Attached') }}</flux:heading>
             @forelse ($this->repos as $repo)
+                @php($commit = $repo->latestCommit())
                 <flux:card>
                     <div class="flex flex-wrap items-center gap-2">
                         <flux:badge variant="solid">{{ $repo->name }}</flux:badge>
@@ -137,6 +138,17 @@ new #[Title('Repositories')] class extends Component {
                         @endif
                         @if (! $repo->webhook_secret)
                             <flux:badge>{{ __('no webhook') }}</flux:badge>
+                        @endif
+                        @if ($commit)
+                            @if ($commit['html_url'] ?? null)
+                                <a href="{{ $commit['html_url'] }}" target="_blank" rel="noopener">
+                                    <flux:badge color="green">{{ $repo->default_branch }}@{{ $commit['short'] }}</flux:badge>
+                                </a>
+                            @else
+                                <flux:badge color="green">{{ $repo->default_branch }}@{{ $commit['short'] }}</flux:badge>
+                            @endif
+                        @elseif ($repo->access_token && $repo->provider->value === 'github')
+                            <flux:badge color="red">{{ __('token check failed') }}</flux:badge>
                         @endif
                     </div>
                     <flux:text class="mt-1 text-sm">{{ $repo->url }}</flux:text>
