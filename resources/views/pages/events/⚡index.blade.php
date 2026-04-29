@@ -8,7 +8,7 @@ use Livewire\Attributes\Title;
 use Livewire\Component;
 use Livewire\WithPagination;
 
-new #[Title('Webhooks')] class extends Component {
+new #[Title('Events')] class extends Component {
     use WithPagination;
 
     public ?string $event = null;
@@ -41,7 +41,7 @@ new #[Title('Webhooks')] class extends Component {
 }; ?>
 
 <div class="flex flex-col gap-6 p-6">
-    <flux:heading size="xl">{{ __('Webhooks') }}</flux:heading>
+    <flux:heading size="xl">{{ __('Events') }}</flux:heading>
 
     <div class="flex flex-wrap gap-2">
         <flux:select wire:model.live="repo_id" :placeholder="__('All repos')">
@@ -50,8 +50,8 @@ new #[Title('Webhooks')] class extends Component {
                 <flux:select.option value="{{ $repo->id }}">{{ $repo->name }}</flux:select.option>
             @endforeach
         </flux:select>
-        <flux:select wire:model.live="event" :placeholder="__('All events')">
-            <flux:select.option value="">{{ __('All events') }}</flux:select.option>
+        <flux:select wire:model.live="event" :placeholder="__('All event types')">
+            <flux:select.option value="">{{ __('All event types') }}</flux:select.option>
             <flux:select.option value="pull_request">pull_request</flux:select.option>
             <flux:select.option value="push">push</flux:select.option>
             <flux:select.option value="ping">ping</flux:select.option>
@@ -86,7 +86,7 @@ new #[Title('Webhooks')] class extends Component {
                 </details>
             </flux:card>
         @empty
-            <flux:text class="text-zinc-500">{{ __('No webhook deliveries yet.') }}</flux:text>
+            <flux:text class="text-zinc-500">{{ __('No events yet.') }}</flux:text>
         @endforelse
     </div>
 
