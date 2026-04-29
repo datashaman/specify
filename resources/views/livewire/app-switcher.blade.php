@@ -43,7 +43,7 @@ new class extends Component {
         abort_unless($workspace, 403);
 
         $this->user->switchWorkspace($workspace);
-        $this->redirect(request()->path(), navigate: true);
+        $this->redirect(request()->header('Referer') ?? route('dashboard'), navigate: true);
     }
 
     public function switchProject(?int $projectId): void
@@ -57,7 +57,7 @@ new class extends Component {
         }
 
         $this->user->switchProject($project);
-        $this->redirect(request()->path(), navigate: true);
+        $this->redirect(request()->header('Referer') ?? route('dashboard'), navigate: true);
     }
 }; ?>
 
