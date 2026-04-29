@@ -12,11 +12,18 @@ use Symfony\Component\HttpFoundation\RedirectResponse as SymfonyRedirectResponse
 
 class SocialiteController extends Controller
 {
+    /** @var array<string, array<int, string>> */
+    private const SCOPES = [
+        'github' => ['read:user', 'user:email', 'repo'],
+    ];
+
     public function redirect(string $provider): SymfonyRedirectResponse
     {
         abort_unless($this->supports($provider), 404);
 
-        return Socialite::driver($provider)->redirect();
+        return Socialite::driver($provider)
+            ->scopes(self::SCOPES[$provider])
+            ->redirect();
     }
 
     public function callback(string $provider): RedirectResponse
@@ -30,21 +37,26 @@ class SocialiteController extends Controller
             ->orWhere('email', $oauth->getEmail())
             ->first();
 
+        $tokenAttrs = [
+            $provider.'_id' => $oauth->getId(),
+            'avatar_url' => $oauth->getAvatar(),
+            $provider.'_token' => $oauth->token ?? null,
+            $provider.'_refresh_token' => $oauth->refreshToken ?? null,
+            $provider.'_token_expires_at' => isset($oauth->expiresIn) ? now()->addSeconds((int) $oauth->expiresIn) : null,
+            $provider.'_scopes' => isset($oauth->approvedScopes) ? (array) $oauth->approvedScopes : self::SCOPES[$provider],
+        ];
+
         if ($user === null) {
-            $user = User::create([
+            $user = User::create(array_merge([
                 'name' => $oauth->getName() ?: $oauth->getNickname() ?: 'GitHub user',
                 'email' => $oauth->getEmail() ?: $oauth->getId().'@users.noreply.github.com',
                 'password' => bcrypt(Str::random(40)),
-                $provider.'_id' => $oauth->getId(),
-                'avatar_url' => $oauth->getAvatar(),
-            ]);
+            ], $tokenAttrs));
             $user->forceFill(['email_verified_at' => now()])->save();
         } else {
-            $user->forceFill([
-                $provider.'_id' => $oauth->getId(),
-                'avatar_url' => $oauth->getAvatar(),
+            $user->forceFill(array_merge($tokenAttrs, [
                 'email_verified_at' => $user->email_verified_at ?? now(),
-            ])->save();
+            ]))->save();
         }
 
         Auth::login($user, remember: true);
@@ -54,6 +66,6 @@ class SocialiteController extends Controller
 
     private function supports(string $provider): bool
     {
-        return in_array($provider, ['github'], true);
+        return array_key_exists($provider, self::SCOPES);
     }
 }

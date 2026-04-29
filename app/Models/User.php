@@ -17,23 +17,22 @@ use Illuminate\Support\Str;
 use InvalidArgumentException;
 use Laravel\Fortify\TwoFactorAuthenticatable;
 
-#[Fillable(['name', 'email', 'password', 'current_team_id', 'current_project_id', 'github_id', 'avatar_url'])]
-#[Hidden(['password', 'two_factor_secret', 'two_factor_recovery_codes', 'remember_token'])]
+#[Fillable(['name', 'email', 'password', 'current_team_id', 'current_project_id', 'github_id', 'avatar_url', 'github_token', 'github_refresh_token', 'github_token_expires_at', 'github_scopes'])]
+#[Hidden(['password', 'two_factor_secret', 'two_factor_recovery_codes', 'remember_token', 'github_token', 'github_refresh_token'])]
 class User extends Authenticatable
 {
     /** @use HasFactory<UserFactory> */
     use HasFactory, Notifiable, TwoFactorAuthenticatable;
 
-    /**
-     * Get the attributes that should be cast.
-     *
-     * @return array<string, string>
-     */
     protected function casts(): array
     {
         return [
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
+            'github_token' => 'encrypted',
+            'github_refresh_token' => 'encrypted',
+            'github_token_expires_at' => 'datetime',
+            'github_scopes' => 'array',
         ];
     }
 
