@@ -73,6 +73,32 @@ test('detach removes the repo from the project pivot', function () {
     expect($project->fresh()->repos()->count())->toBe(0);
 });
 
+test('reattaching a previously detached repo reuses the existing row', function () {
+    ['user' => $user, 'project' => $project, 'workspace' => $ws] = repoScene();
+    $repo = Repo::factory()->for($ws)->create([
+        'url' => 'https://github.com/datashaman/specify.git',
+        'access_token' => 'kept_token',
+    ]);
+    $project->attachRepo($repo);
+
+    $this->actingAs($user);
+
+    Livewire::test('pages::projects.repos', ['project' => $project->id])
+        ->call('detach', $repo->id);
+
+    Livewire::test('pages::projects.repos', ['project' => $project->id])
+        ->set('name', 'backend')
+        ->set('url', 'https://github.com/datashaman/specify.git')
+        ->set('provider', 'github')
+        ->set('default_branch', 'main')
+        ->call('attach')
+        ->assertHasNoErrors();
+
+    expect(Repo::where('url', 'https://github.com/datashaman/specify.git')->count())->toBe(1)
+        ->and($project->fresh()->repos()->first()->id)->toBe($repo->id)
+        ->and($project->fresh()->repos()->first()->access_token)->toBe('kept_token');
+});
+
 test('Member role cannot attach a repo', function () {
     ['user' => $user, 'project' => $project] = repoScene(TeamRole::Member);
 

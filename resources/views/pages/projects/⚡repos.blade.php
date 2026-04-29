@@ -66,15 +66,31 @@ new #[Title('Repositories')] class extends Component {
 
         $this->validate();
 
-        $repo = Repo::create([
-            'workspace_id' => $project->team->workspace_id,
+        $workspaceId = $project->team->workspace_id;
+        $repo = Repo::query()
+            ->where('workspace_id', $workspaceId)
+            ->where('url', $this->url)
+            ->first();
+
+        $attrs = [
+            'workspace_id' => $workspaceId,
             'name' => $this->name,
             'provider' => RepoProvider::from($this->provider),
             'url' => $this->url,
             'default_branch' => $this->default_branch ?: 'main',
-            'access_token' => $this->access_token ?: null,
-            'webhook_secret' => $this->webhook_secret ?: null,
-        ]);
+        ];
+        if ($this->access_token !== '') {
+            $attrs['access_token'] = $this->access_token;
+        }
+        if ($this->webhook_secret !== '') {
+            $attrs['webhook_secret'] = $this->webhook_secret;
+        }
+
+        if ($repo) {
+            $repo->fill($attrs)->save();
+        } else {
+            $repo = Repo::create($attrs);
+        }
 
         $project->attachRepo($repo, role: $this->role ?: null, primary: $this->is_primary);
 
