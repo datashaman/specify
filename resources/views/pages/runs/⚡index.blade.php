@@ -51,15 +51,40 @@ new #[Title('Run history')] class extends Component {
 
     <div class="flex flex-col gap-3">
         @forelse ($this->runs as $run)
+            @php
+                $duration = $run->started_at && $run->finished_at
+                    ? $run->started_at->diffInSeconds($run->finished_at)
+                    : null;
+                $prMerged = $run->output['pull_request_merged'] ?? null;
+                $prAction = $run->output['pull_request_action'] ?? null;
+                $tokensIn = $run->tokens_input;
+                $tokensOut = $run->tokens_output;
+            @endphp
             <flux:card>
                 <div class="flex flex-wrap items-center gap-2">
                     <flux:badge variant="solid">#{{ $run->id }}</flux:badge>
                     <flux:badge>{{ $run->status->value }}</flux:badge>
+                    @if ($run->repo)
+                        <flux:badge>{{ $run->repo->name }}</flux:badge>
+                    @endif
                     @if ($run->working_branch)
                         <flux:badge>{{ $run->working_branch }}</flux:badge>
                     @endif
                     @if ($sha = $run->output['commit_sha'] ?? null)
                         <flux:badge>{{ substr($sha, 0, 7) }}</flux:badge>
+                    @endif
+                    @if ($prMerged === true)
+                        <flux:badge>{{ __('PR merged') }}</flux:badge>
+                    @elseif ($prAction === 'closed' && $prMerged === false)
+                        <flux:badge>{{ __('PR closed') }}</flux:badge>
+                    @elseif ($prAction !== null)
+                        <flux:badge>{{ __('PR') }} {{ $prAction }}</flux:badge>
+                    @endif
+                    @if ($duration !== null)
+                        <flux:badge>{{ $duration }}s</flux:badge>
+                    @endif
+                    @if ($tokensIn || $tokensOut)
+                        <flux:badge>{{ $tokensIn ?? 0 }}/{{ $tokensOut ?? 0 }} {{ __('tok') }}</flux:badge>
                     @endif
                     @if ($run->finished_at)
                         <flux:text class="ml-auto text-xs text-zinc-500">{{ $run->finished_at->diffForHumans() }}</flux:text>
@@ -76,6 +101,15 @@ new #[Title('Run history')] class extends Component {
                     @endif
                 </flux:heading>
 
+                @if ($run->runnable instanceof App\Models\Task && $run->runnable->plan?->story)
+                    <flux:text class="mt-1 text-xs text-zinc-500">
+                        {{ $run->runnable->plan->story->feature?->project?->name }}
+                        &middot; {{ $run->runnable->plan->story->name }}
+                        &middot; {{ __('plan v') }}{{ $run->runnable->plan->version }}
+                        &middot; {{ __('task') }} #{{ $run->runnable->position }}
+                    </flux:text>
+                @endif
+
                 @if ($url = $run->output['pull_request_url'] ?? null)
                     <flux:text class="mt-1">
                         <a href="{{ $url }}" target="_blank" rel="noopener" class="underline">{{ $url }}</a>
@@ -86,10 +120,21 @@ new #[Title('Run history')] class extends Component {
                     <flux:text class="mt-1 text-red-600">{{ $run->error_message }}</flux:text>
                 @endif
 
+                @if ($prError = $run->output['pull_request_error'] ?? null)
+                    <flux:text class="mt-1 text-amber-600">{{ __('PR error') }}: {{ $prError }}</flux:text>
+                @endif
+
                 @if ($run->diff)
                     <details class="mt-3">
                         <summary class="cursor-pointer text-sm text-zinc-500">{{ __('Diff') }}</summary>
                         <pre class="mt-2 max-h-96 overflow-auto rounded bg-zinc-100 p-3 text-xs dark:bg-zinc-900">{{ $run->diff }}</pre>
+                    </details>
+                @endif
+
+                @if ($run->input)
+                    <details class="mt-2">
+                        <summary class="cursor-pointer text-sm text-zinc-500">{{ __('Prompt') }}</summary>
+                        <pre class="mt-2 max-h-96 overflow-auto rounded bg-zinc-100 p-3 text-xs dark:bg-zinc-900">{{ json_encode($run->input, JSON_PRETTY_PRINT) }}</pre>
                     </details>
                 @endif
             </flux:card>

@@ -5,6 +5,7 @@ use App\Models\AgentRun;
 use App\Models\Feature;
 use App\Models\Plan;
 use App\Models\Project;
+use App\Models\Repo;
 use App\Models\Story;
 use App\Models\Task;
 use App\Models\Team;
@@ -70,6 +71,50 @@ test('does not show runs from outside the user\'s teams', function () {
     $this->actingAs($user);
 
     Livewire::test('pages::runs.index')->assertDontSee('hidden-task');
+});
+
+test('shows PR merged badge when webhook recorded a merge', function () {
+    ['user' => $user, 'plan' => $plan] = runScene();
+    $task = Task::factory()->for($plan)->create(['name' => 'merged-task']);
+    AgentRun::factory()->create([
+        'runnable_type' => Task::class,
+        'runnable_id' => $task->id,
+        'status' => AgentRunStatus::Succeeded,
+        'output' => [
+            'pull_request_url' => 'https://github.com/o/r/pull/9',
+            'pull_request_merged' => true,
+            'pull_request_action' => 'closed',
+        ],
+    ]);
+
+    $this->actingAs($user);
+
+    Livewire::test('pages::runs.index')
+        ->assertSee('merged-task')
+        ->assertSee('PR merged');
+});
+
+test('shows repo name and tokens on the run card', function () {
+    ['user' => $user, 'plan' => $plan, 'project' => $project] = runScene();
+    $workspace = $project->team->workspace;
+    $repo = Repo::factory()->for($workspace)->create(['name' => 'backend']);
+    $project->attachRepo($repo);
+
+    $task = Task::factory()->for($plan)->create(['name' => 'cost-task']);
+    AgentRun::factory()->create([
+        'runnable_type' => Task::class,
+        'runnable_id' => $task->id,
+        'repo_id' => $repo->id,
+        'status' => AgentRunStatus::Succeeded,
+        'tokens_input' => 1234,
+        'tokens_output' => 567,
+    ]);
+
+    $this->actingAs($user);
+
+    Livewire::test('pages::runs.index')
+        ->assertSee('backend')
+        ->assertSee('1234/567 tok');
 });
 
 test('status filter narrows the list', function () {
