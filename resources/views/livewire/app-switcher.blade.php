@@ -1,16 +1,37 @@
 <?php
 
+use App\Enums\ProjectStatus;
+use App\Enums\TeamRole;
 use App\Models\Project;
 use App\Models\Workspace;
 use Illuminate\Support\Facades\Auth;
 use Livewire\Attributes\Computed;
+use Livewire\Attributes\Validate;
 use Livewire\Component;
 
 new class extends Component {
+    #[Validate('required|string|max:255')]
+    public string $newProjectName = '';
+
+    #[Validate('nullable|string|max:1000')]
+    public string $newProjectDescription = '';
+
     #[Computed]
     public function user()
     {
         return Auth::user();
+    }
+
+    #[Computed]
+    public function canCreateProject(): bool
+    {
+        $teamId = $this->user->current_team_id;
+        if (! $teamId) {
+            return false;
+        }
+        $role = $this->user->roleInTeam($teamId);
+
+        return in_array($role, [TeamRole::Owner, TeamRole::Admin], true);
     }
 
     #[Computed]
@@ -59,6 +80,27 @@ new class extends Component {
         $this->user->switchProject($project);
         $this->redirect(request()->header('Referer') ?? route('dashboard'), navigate: true);
     }
+
+    public function createProject(): void
+    {
+        abort_unless($this->canCreateProject, 403);
+
+        $teamId = $this->user->current_team_id;
+        $this->validate();
+
+        $project = Project::create([
+            'team_id' => $teamId,
+            'created_by_id' => $this->user->id,
+            'name' => $this->newProjectName,
+            'description' => $this->newProjectDescription ?: null,
+            'status' => ProjectStatus::Active,
+        ]);
+
+        $this->user->switchProject($project);
+        $this->reset(['newProjectName', 'newProjectDescription']);
+
+        $this->redirectRoute('projects.show', $project, navigate: true);
+    }
 }; ?>
 
 <div class="flex flex-col">
@@ -97,6 +139,33 @@ new class extends Component {
                     >{{ $project->name }}</flux:menu.radio>
                 @endforeach
             </flux:menu.radio.group>
+
+            @if ($this->canCreateProject)
+                <flux:menu.separator />
+                <flux:modal.trigger name="new-project-modal">
+                    <flux:menu.item icon="plus">{{ __('New project…') }}</flux:menu.item>
+                </flux:modal.trigger>
+            @endif
         </flux:menu>
     </flux:dropdown>
+
+    @if ($this->canCreateProject)
+        <flux:modal name="new-project-modal" class="md:w-96">
+            <form wire:submit.prevent="createProject" class="flex flex-col gap-4">
+                <div>
+                    <flux:heading size="lg">{{ __('New project') }}</flux:heading>
+                    <flux:text class="mt-1">{{ __('Created in your current team. You can manage repos and features after creation.') }}</flux:text>
+                </div>
+                <flux:input wire:model="newProjectName" :label="__('Name')" required />
+                <flux:textarea wire:model="newProjectDescription" :label="__('Description (optional)')" rows="2" />
+                <div class="flex gap-2">
+                    <flux:spacer />
+                    <flux:modal.close>
+                        <flux:button type="button" variant="ghost">{{ __('Cancel') }}</flux:button>
+                    </flux:modal.close>
+                    <flux:button type="submit" variant="primary">{{ __('Create') }}</flux:button>
+                </div>
+            </form>
+        </flux:modal>
+    @endif
 </div>

@@ -85,6 +85,36 @@ test('app-switcher component switches workspace via UI action', function () {
     expect($user->fresh()->current_team_id)->toBe($teams[1]->id);
 });
 
+test('Admin can create a project from the switcher', function () {
+    [$user] = switcherUserAcross(1);
+    // Promote to Admin so canCreateProject is true.
+    $user->teams()->updateExistingPivot($user->current_team_id, ['role' => 'admin']);
+
+    $this->actingAs($user);
+
+    Livewire::test('app-switcher')
+        ->set('newProjectName', 'Brand new')
+        ->set('newProjectDescription', 'desc')
+        ->call('createProject');
+
+    $created = Project::where('name', 'Brand new')->firstOrFail();
+    expect($created->team_id)->toBe($user->current_team_id)
+        ->and($user->fresh()->current_project_id)->toBe($created->id);
+});
+
+test('Member cannot create a project from the switcher', function () {
+    [$user] = switcherUserAcross(1);
+
+    $this->actingAs($user);
+
+    Livewire::test('app-switcher')
+        ->set('newProjectName', 'Sneaky')
+        ->call('createProject')
+        ->assertStatus(403);
+
+    expect(Project::where('name', 'Sneaky')->exists())->toBeFalse();
+});
+
 test('app-switcher component sets and clears the project pin', function () {
     [$user, , $projects] = switcherUserAcross(1);
 
