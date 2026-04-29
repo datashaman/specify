@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Auth;
 
+use App\Actions\Workspaces\BootstrapPersonalWorkspace;
 use App\Http\Controllers\Controller;
 use App\Models\User;
 use Illuminate\Http\RedirectResponse;
@@ -57,6 +58,10 @@ class SocialiteController extends Controller
             $user->forceFill(array_merge($tokenAttrs, [
                 'email_verified_at' => $user->email_verified_at ?? now(),
             ]))->save();
+        }
+
+        if ($user->current_team_id === null && $user->teams()->doesntExist()) {
+            app(BootstrapPersonalWorkspace::class)->handle($user);
         }
 
         Auth::login($user, remember: true);

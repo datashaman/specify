@@ -34,7 +34,9 @@ test('github callback creates a new user when none matches', function () {
         ->and($user->avatar_url)->toBe('https://avatar/x.png')
         ->and($user->email_verified_at)->not->toBeNull()
         ->and($user->github_token)->toBe('gho_test_token')
-        ->and($user->github_scopes)->toContain('repo');
+        ->and($user->github_scopes)->toContain('repo')
+        ->and($user->current_team_id)->not->toBeNull()
+        ->and($user->teams()->count())->toBe(1);
     $this->assertAuthenticatedAs($user);
 });
 
