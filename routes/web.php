@@ -1,11 +1,19 @@
 <?php
 
+use App\Http\Controllers\Auth\SocialiteController;
 use App\Http\Controllers\Webhooks\GithubWebhookController;
 use Illuminate\Support\Facades\Route;
 
 Route::view('/', 'welcome')->name('home');
 
 Route::post('webhooks/github/{repo}', GithubWebhookController::class)->name('webhooks.github');
+
+Route::get('auth/{provider}/redirect', [SocialiteController::class, 'redirect'])
+    ->whereIn('provider', ['github'])
+    ->name('socialite.redirect');
+Route::get('auth/{provider}/callback', [SocialiteController::class, 'callback'])
+    ->whereIn('provider', ['github'])
+    ->name('socialite.callback');
 
 Route::middleware(['auth', 'verified'])->group(function () {
     Route::livewire('dashboard', 'pages::dashboard')->name('dashboard');

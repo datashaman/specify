@@ -17,7 +17,7 @@ use Illuminate\Support\Str;
 use InvalidArgumentException;
 use Laravel\Fortify\TwoFactorAuthenticatable;
 
-#[Fillable(['name', 'email', 'password', 'current_team_id', 'current_project_id'])]
+#[Fillable(['name', 'email', 'password', 'current_team_id', 'current_project_id', 'github_id', 'avatar_url'])]
 #[Hidden(['password', 'two_factor_secret', 'two_factor_recovery_codes', 'remember_token'])]
 class User extends Authenticatable
 {

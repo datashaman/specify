@@ -49,6 +49,16 @@
             </div>
         </form>
 
+        @if (config('services.github.client_id'))
+            <div class="relative">
+                <div class="absolute inset-0 flex items-center"><div class="w-full border-t border-zinc-200 dark:border-zinc-700"></div></div>
+                <div class="relative flex justify-center text-xs"><span class="bg-white px-2 text-zinc-500 dark:bg-zinc-900">{{ __('or') }}</span></div>
+            </div>
+            <a href="{{ route('socialite.redirect', 'github') }}" class="w-full">
+                <flux:button variant="ghost" class="w-full" icon="github">{{ __('Continue with GitHub') }}</flux:button>
+            </a>
+        @endif
+
         @if (Route::has('register'))
             <div class="space-x-1 text-sm text-center rtl:space-x-reverse text-zinc-600 dark:text-zinc-400">
                 <span>{{ __('Don\'t have an account?') }}</span>
