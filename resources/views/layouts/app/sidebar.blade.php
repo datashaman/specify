@@ -5,12 +5,12 @@
     </head>
     <body class="min-h-screen bg-white dark:bg-zinc-800">
         <flux:sidebar sticky collapsible="mobile" class="border-e border-zinc-200 bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-900">
-            <flux:sidebar.header class="!pb-0">
+            <flux:sidebar.header class="!pb-0 !mb-0">
                 <x-app-logo :sidebar="true" href="{{ route('dashboard') }}" wire:navigate />
                 <flux:sidebar.collapse class="lg:hidden" />
             </flux:sidebar.header>
 
-            <flux:sidebar.nav class="!pt-2">
+            <flux:sidebar.nav class="!pt-0 !mt-0">
                 @auth
                     <livewire:app-switcher />
                 @endauth
