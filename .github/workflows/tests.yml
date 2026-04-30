@@ -1,26 +1,21 @@
+---
 name: tests
 
 on:
-  push:
-    branches:
-      - develop
-      - main
-      - master
-      - workos
   pull_request:
     branches:
-      - develop
       - main
-      - master
-      - workos
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   ci:
     runs-on: ubuntu-latest
-    environment: Testing
     strategy:
       matrix:
-        php-version: ['8.3', '8.4', '8.5']
+        php-version: ['8.4', '8.5']
 
     steps:
       - name: Checkout code
