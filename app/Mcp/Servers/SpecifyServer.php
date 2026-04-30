@@ -4,10 +4,16 @@ namespace App\Mcp\Servers;
 
 use App\Mcp\Tools\CreateFeatureTool;
 use App\Mcp\Tools\CreateStoryTool;
+use App\Mcp\Tools\CurrentContextTool;
+use App\Mcp\Tools\GetFeatureTool;
+use App\Mcp\Tools\GetProjectTool;
+use App\Mcp\Tools\GetStoryTool;
 use App\Mcp\Tools\ListFeaturesTool;
 use App\Mcp\Tools\ListProjectsTool;
 use App\Mcp\Tools\ListStoriesTool;
+use App\Mcp\Tools\SwitchProjectTool;
 use App\Mcp\Tools\UpdateFeatureTool;
+use App\Mcp\Tools\UpdateStoryTool;
 use Laravel\Mcp\Server;
 use Laravel\Mcp\Server\Attributes\Instructions;
 use Laravel\Mcp\Server\Attributes\Name;
@@ -21,12 +27,18 @@ TXT)]
 class SpecifyServer extends Server
 {
     protected array $tools = [
+        CurrentContextTool::class,
+        SwitchProjectTool::class,
         ListProjectsTool::class,
+        GetProjectTool::class,
         ListFeaturesTool::class,
+        GetFeatureTool::class,
         CreateFeatureTool::class,
         UpdateFeatureTool::class,
         ListStoriesTool::class,
+        GetStoryTool::class,
         CreateStoryTool::class,
+        UpdateStoryTool::class,
     ];
 
     protected array $resources = [
