@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\AgentRun;
 use App\Models\Repo;
+use App\Models\Subtask;
 use Illuminate\Support\Facades\File;
 use RuntimeException;
 use Symfony\Component\Process\Process;
@@ -23,7 +24,18 @@ class WorkspaceRunner
 
     public function workingDirFor(AgentRun $run): string
     {
-        return rtrim($this->basePath, '/').'/'.$run->getKey();
+        $base = rtrim($this->basePath, '/');
+
+        if ($run->runnable_type === Subtask::class) {
+            $subtask = $run->runnable;
+            $story = $subtask?->task?->story;
+            $feature = $story?->feature;
+            if ($feature && $story && $feature->slug && $story->slug) {
+                return $base.'/specify/'.$feature->slug.'/'.$story->slug;
+            }
+        }
+
+        return $base.'/run-'.$run->getKey();
     }
 
     /**
