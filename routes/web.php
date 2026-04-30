@@ -20,6 +20,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::livewire('dashboard', 'pages::dashboard')->name('dashboard');
     Route::livewire('inbox', 'pages::inbox')->name('inbox');
     Route::livewire('projects', 'pages::projects.index')->name('projects.index');
+    Route::livewire('projects/{project}/context', 'pages::projects.context.index')->name('projects.context.index');
     Route::get('projects/{project}/context-items', ProjectContextItemController::class)->name('projects.context-items.index');
     Route::livewire('projects/{project}', 'pages::projects.show')->name('projects.show');
     Route::livewire('projects/{project}/features/{feature}', 'pages::features.show')->name('features.show');

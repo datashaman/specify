@@ -41,6 +41,12 @@ new #[Title('Project')] class extends Component {
             : collect();
     }
 
+    #[Computed]
+    public function canManage(): bool
+    {
+        return $this->project && Auth::user()->canApproveInProject($this->project);
+    }
+
     public function createFeature(): void
     {
         $project = $this->project;
@@ -66,7 +72,16 @@ new #[Title('Project')] class extends Component {
         <flux:text class="text-zinc-500">{{ __('Project not found.') }}</flux:text>
     @else
         <section class="flex flex-col gap-3">
-            <flux:heading size="xl">{{ __('Features') }}</flux:heading>
+            <div class="flex flex-wrap items-center justify-between gap-3">
+                <flux:heading size="xl">{{ __('Features') }}</flux:heading>
+
+                @if ($this->canManage)
+                    <a href="{{ route('projects.context.index', $this->project) }}" wire:navigate>
+                        <flux:button icon="document-text">{{ __('Context') }}</flux:button>
+                    </a>
+                @endif
+            </div>
+
             @forelse ($this->features as $feature)
                 <flux:card>
                     <div class="flex items-center justify-between gap-2">

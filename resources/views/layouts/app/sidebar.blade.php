@@ -27,6 +27,11 @@
                             <flux:sidebar.item icon="rectangle-stack" :href="route('projects.show', auth()->user()->current_project_id)" :current="request()->routeIs('projects.show') || request()->routeIs('features.show')" wire:navigate>
                                 {{ __('Features') }}
                             </flux:sidebar.item>
+                            @if (($currentProject = auth()->user()->currentProject) && auth()->user()->canApproveInProject($currentProject))
+                                <flux:sidebar.item icon="document-text" :href="route('projects.context.index', $currentProject)" :current="request()->routeIs('projects.context.*')" wire:navigate>
+                                    {{ __('Context') }}
+                                </flux:sidebar.item>
+                            @endif
                             <flux:sidebar.item icon="bookmark" :href="route('stories.index')" :current="request()->routeIs('stories.index')" wire:navigate>
                                 {{ __('Stories') }}
                             </flux:sidebar.item>
