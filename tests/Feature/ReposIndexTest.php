@@ -1,18 +1,21 @@
 <?php
 
+use App\Enums\RepoProvider;
 use App\Enums\TeamRole;
 use App\Models\Project;
 use App\Models\Repo;
 use App\Models\Team;
 use App\Models\User;
 use App\Models\Workspace;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Http;
 use Livewire\Livewire;
 
 function repoScene(TeamRole $role = TeamRole::Admin, bool $pin = true): array
 {
     $workspace = Workspace::factory()->create();
     $team = Team::factory()->for($workspace)->create();
-    $user = User::factory()->create();
+    $user = User::factory()->create(['github_token' => 'gho_user_token']);
     $team->addMember($user, $role);
     $project = Project::factory()->for($team)->create(['name' => 'Specify']);
     $user->forceFill([
@@ -23,114 +26,123 @@ function repoScene(TeamRole $role = TeamRole::Admin, bool $pin = true): array
     return compact('user', 'project', 'workspace');
 }
 
-test('admin saves a workspace repo without a pinned project', function () {
-    ['user' => $user, 'workspace' => $ws] = repoScene(pin: false);
+afterEach(function () {
+    Cache::flush();
+});
+
+test('shows the prompt to select a project when none is pinned', function () {
+    ['user' => $user] = repoScene(pin: false);
     $this->actingAs($user);
 
     Livewire::test('pages::repos.index')
-        ->set('name', 'backend')
-        ->set('url', 'https://github.com/datashaman/specify.git')
-        ->set('access_token', 'ghp_xxx')
-        ->call('save')
+        ->assertSee('Select a project to manage its repositories.');
+});
+
+test('lists project repos with a no-webhook badge by default', function () {
+    ['user' => $user, 'project' => $project, 'workspace' => $ws] = repoScene();
+    $repo = Repo::factory()->for($ws)->create([
+        'name' => 'backend',
+        'webhook_secret' => null,
+    ]);
+    $project->attachRepo($repo);
+    $this->actingAs($user);
+
+    Livewire::test('pages::repos.index')
+        ->assertSee('backend')
+        ->assertSee('no webhook');
+});
+
+test('admin can mark a repo primary; setPrimary flips the pivot flag', function () {
+    ['user' => $user, 'project' => $project, 'workspace' => $ws] = repoScene();
+    $a = Repo::factory()->for($ws)->create();
+    $b = Repo::factory()->for($ws)->create();
+    $project->attachRepo($a, primary: true);
+    $project->attachRepo($b);
+    $this->actingAs($user);
+
+    Livewire::test('pages::repos.index')
+        ->call('setPrimary', $b->id)
         ->assertHasNoErrors();
 
-    $repo = Repo::where('workspace_id', $ws->id)->first();
-    expect($repo)->not->toBeNull()
-        ->and($repo->access_token)->toBe('ghp_xxx');
+    expect((bool) $project->repos()->find($b->id)->pivot->is_primary)->toBeTrue()
+        ->and((bool) $project->repos()->find($a->id)->pivot->is_primary)->toBeFalse();
 });
 
-test('with project pinned, attach links the existing workspace repo to the project', function () {
-    ['user' => $user, 'project' => $project, 'workspace' => $ws] = repoScene();
-    $repo = Repo::factory()->for($ws)->create(['name' => 'backend']);
-    $this->actingAs($user);
-
-    Livewire::test('pages::repos.index')
-        ->call('attach', $repo->id);
-
-    expect($project->fresh()->repos()->pluck('id')->all())->toContain($repo->id);
-});
-
-test('detach removes the project pivot but keeps the workspace repo', function () {
-    ['user' => $user, 'project' => $project, 'workspace' => $ws] = repoScene();
+test('member cannot setPrimary', function () {
+    ['user' => $user, 'project' => $project, 'workspace' => $ws] = repoScene(TeamRole::Member);
     $repo = Repo::factory()->for($ws)->create();
     $project->attachRepo($repo);
     $this->actingAs($user);
 
     Livewire::test('pages::repos.index')
-        ->call('detach', $repo->id);
+        ->call('setPrimary', $repo->id)
+        ->assertStatus(403);
+});
+
+test('remove detaches the project pivot AND deletes the workspace repo', function () {
+    ['user' => $user, 'project' => $project, 'workspace' => $ws] = repoScene();
+    $repo = Repo::factory()->for($ws)->create([
+        'provider' => RepoProvider::Generic,
+        'webhook_secret' => null,
+    ]);
+    $project->attachRepo($repo);
+    $this->actingAs($user);
+
+    Livewire::test('pages::repos.index')
+        ->call('remove', $repo->id)
+        ->assertHasNoErrors();
 
     expect($project->fresh()->repos()->count())->toBe(0)
-        ->and(Repo::where('id', $repo->id)->exists())->toBeTrue();
+        ->and(Repo::where('id', $repo->id)->exists())->toBeFalse();
 });
 
-test('delete refuses while the repo is attached to any project', function () {
-    ['user' => $user, 'project' => $project, 'workspace' => $ws] = repoScene(pin: false);
+test('member cannot remove a repo', function () {
+    ['user' => $user, 'project' => $project, 'workspace' => $ws] = repoScene(TeamRole::Member);
     $repo = Repo::factory()->for($ws)->create();
     $project->attachRepo($repo);
     $this->actingAs($user);
 
     Livewire::test('pages::repos.index')
-        ->call('delete', $repo->id)
-        ->assertHasErrors(['repos']);
+        ->call('remove', $repo->id)
+        ->assertStatus(403);
 
     expect(Repo::where('id', $repo->id)->exists())->toBeTrue();
 });
 
-test('delete removes the repo when no project is attached', function () {
-    ['user' => $user, 'workspace' => $ws] = repoScene(pin: false);
-    $repo = Repo::factory()->for($ws)->create();
+test('addGithubRepo creates a workspace repo and attaches it to the project', function () {
+    ['user' => $user, 'project' => $project, 'workspace' => $ws] = repoScene();
     $this->actingAs($user);
 
-    Livewire::test('pages::repos.index')
-        ->call('delete', $repo->id)
-        ->assertHasNoErrors();
-
-    expect(Repo::where('id', $repo->id)->exists())->toBeFalse();
-});
-
-test('edit prefills the form, save updates the row, token left blank is preserved', function () {
-    ['user' => $user, 'workspace' => $ws] = repoScene(pin: false);
-    $repo = Repo::factory()->for($ws)->create([
-        'name' => 'old',
-        'url' => 'https://github.com/datashaman/specify.git',
-        'access_token' => 'kept_token',
+    Http::fake([
+        'api.github.com/user/repos*' => Http::response([
+            [
+                'full_name' => 'datashaman/specify',
+                'name' => 'specify',
+                'html_url' => 'https://github.com/datashaman/specify',
+                'default_branch' => 'main',
+                'private' => false,
+            ],
+        ], 200),
+        'api.github.com/repos/datashaman/specify/hooks*' => Http::response(['id' => 1], 201),
     ]);
-    $this->actingAs($user);
 
     Livewire::test('pages::repos.index')
-        ->call('edit', $repo->id)
-        ->assertSet('name', 'old')
-        ->set('name', 'new')
-        ->call('save')
+        ->call('addGithubRepo', 'datashaman/specify')
         ->assertHasNoErrors();
 
-    $fresh = $repo->fresh();
-    expect($fresh->name)->toBe('new')
-        ->and($fresh->access_token)->toBe('kept_token');
+    $repo = Repo::where('workspace_id', $ws->id)->first();
+    expect($repo)->not->toBeNull()
+        ->and($repo->url)->toBe('https://github.com/datashaman/specify.git')
+        ->and($project->fresh()->repos()->pluck('id')->all())->toContain($repo->id);
 });
 
-test('member cannot save a repo', function () {
-    ['user' => $user] = repoScene(TeamRole::Member, pin: false);
+test('member cannot addGithubRepo', function () {
+    ['user' => $user] = repoScene(TeamRole::Member);
     $this->actingAs($user);
 
     Livewire::test('pages::repos.index')
-        ->set('name', 'backend')
-        ->set('url', 'https://github.com/datashaman/specify.git')
-        ->call('save')
+        ->call('addGithubRepo', 'datashaman/specify')
         ->assertStatus(403);
 
     expect(Repo::count())->toBe(0);
-});
-
-test('shows missing-token and no-webhook badges', function () {
-    ['user' => $user, 'workspace' => $ws] = repoScene(pin: false);
-    Repo::factory()->for($ws)->create([
-        'access_token' => null,
-        'webhook_secret' => null,
-    ]);
-    $this->actingAs($user);
-
-    Livewire::test('pages::repos.index')
-        ->assertSee('missing token')
-        ->assertSee('no webhook');
 });
