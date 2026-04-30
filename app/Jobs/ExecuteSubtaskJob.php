@@ -57,13 +57,32 @@ class ExecuteSubtaskJob implements ShouldQueue
                 $commitSha = $workspace->commit($workingDir, $output['commit_message'] ?: 'specify: agent run');
                 $diff = $workspace->diff($workingDir);
 
-                if ($commitSha !== null && config('specify.workspace.push_after_commit', true)) {
+                if ($commitSha === null) {
+                    $summary = trim((string) ($output['summary'] ?? ''));
+                    $reason = 'Agent produced no diff. The subtask was not executed.';
+                    if ($summary !== '') {
+                        $reason .= ' Agent summary: '.$summary;
+                    }
+                    $execution->markFailed($run, $reason);
+
+                    return;
+                }
+
+                if (config('specify.workspace.push_after_commit', true)) {
                     $branch = $run->working_branch ?? 'specify/run-'.$run->getKey();
                     $workspace->push($workingDir, $branch);
                     $output['pushed'] = true;
 
                     if (config('specify.workspace.open_pr_after_push', true)) {
-                        $output = array_merge($output, $this->openPullRequest($pullRequests, $run, $subtask, $branch, $output));
+                        $prResult = $this->openPullRequest($pullRequests, $run, $subtask, $branch, $output);
+                        $output = array_merge($output, $prResult);
+
+                        if (isset($prResult['pull_request_error'])) {
+                            $output['commit_sha'] = $commitSha;
+                            $execution->markFailed($run, 'Pull request creation failed: '.$prResult['pull_request_error']);
+
+                            return;
+                        }
                     }
                 }
             } else {

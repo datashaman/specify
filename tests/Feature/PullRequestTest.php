@@ -205,10 +205,9 @@ test('full pipeline records pull_request_url after a successful run on a github 
         ->where('runnable_type', Subtask::class)
         ->latest('id')->firstOrFail();
 
-    expect($run->status)->toBe(AgentRunStatus::Succeeded)
-        ->and($run->output['pushed'] ?? null)->toBeTrue()
-        ->and($run->output)->toHaveKey('pull_request_error')
-        ->and($run->output['pull_request_error'])->toContain('parse');
+    expect($run->status)->toBe(AgentRunStatus::Failed)
+        ->and($run->error_message)->toContain('Pull request creation failed')
+        ->and($run->error_message)->toContain('parse');
 
     @unlink($bin);
     File::deleteDirectory($bare);

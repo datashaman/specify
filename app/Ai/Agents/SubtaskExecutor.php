@@ -41,7 +41,11 @@ class SubtaskExecutor implements Agent, HasStructuredOutput, HasTools
     public function tools(): iterable
     {
         if ($this->workingDir === null) {
-            return [];
+            throw new \RuntimeException(
+                'SubtaskExecutor::tools() called without a working directory. '
+                .'The executor that constructed this agent must set workingDir; '
+                .'otherwise the model has no way to inspect or mutate the repo.'
+            );
         }
 
         $sandbox = new Sandbox($this->workingDir);
