@@ -16,11 +16,6 @@ class Ls implements Tool
 
     public function __construct(public Sandbox $sandbox) {}
 
-    public function name(): string
-    {
-        return 'ls';
-    }
-
     public function description(): Stringable|string
     {
         return 'List entries in a directory. Marks directories with a trailing slash.';

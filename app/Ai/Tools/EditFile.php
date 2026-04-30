@@ -12,11 +12,6 @@ class EditFile implements Tool
 {
     public function __construct(public Sandbox $sandbox) {}
 
-    public function name(): string
-    {
-        return 'edit';
-    }
-
     public function description(): Stringable|string
     {
         return 'Apply one or more exact-string replacements to a file. Each edit is matched against '

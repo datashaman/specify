@@ -16,11 +16,6 @@ class ReadFile implements Tool
 
     public function __construct(public Sandbox $sandbox) {}
 
-    public function name(): string
-    {
-        return 'read';
-    }
-
     public function description(): Stringable|string
     {
         return 'Read a file from the working tree. Optional offset (1-based line) and limit (line count). '

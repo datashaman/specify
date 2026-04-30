@@ -23,11 +23,6 @@ class Find implements Tool
 
     public function __construct(public Sandbox $sandbox) {}
 
-    public function name(): string
-    {
-        return 'find';
-    }
-
     public function description(): Stringable|string
     {
         return 'Find files matching a glob pattern. Skips .git, node_modules, vendor, .idea, .vscode by default.';

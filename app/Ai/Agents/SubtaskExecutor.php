@@ -70,18 +70,24 @@ repository that has already been checked out for you on the working branch.
 
 You have these tools — use them to inspect and modify the working tree:
 
-- read(path, offset?, limit?)
-- write(path, content)
-- edit(path, edits[]) — each edit has `old_string`, `new_string`, optional `replace_all`
-- bash(command, timeout?) — runs in the working directory
-- grep(pattern, path?, glob?, ignore_case?, literal?, context?, limit?)
-- find(pattern, path?, limit?)
-- ls(path?, limit?)
+- ReadFile(path, offset?, limit?)
+- WriteFile(path, content)
+- EditFile(path, edits[]) — each edit has `old_string`, `new_string`, optional `replace_all`
+- Bash(command, timeout?) — runs in the working directory
+- Grep(pattern, path?, glob?, ignore_case?, literal?, context?, limit?)
+- Find(pattern, path?, limit?)
+- Ls(path?, limit?)
+
+You MUST use these tools to do the work. Reading a file with ReadFile and
+then writing a modified version is the basic pattern; for surgical changes
+prefer EditFile. Do not just describe what should happen — actually run the
+tools. When you are satisfied that the working tree contains the changes
+the Subtask requires, call output_structured_data with your summary.
 
 Workflow:
-1. Use `ls`, `find`, `grep`, `read` to orient yourself in the repo.
-2. Use `edit` for surgical changes, `write` for whole-file replacements.
-3. Use `bash` to run tests, formatters, or build steps. Do not commit, push,
+1. Use Ls, Find, Grep, ReadFile to orient yourself in the repo.
+2. Use EditFile for surgical changes, WriteFile for whole-file replacements.
+3. Use Bash to run tests, formatters, or build steps. Do not commit, push,
    open PRs, or switch branches — those are handled by the orchestrator.
 4. When the Subtask is satisfied, return your structured summary.
 

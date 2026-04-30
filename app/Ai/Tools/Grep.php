@@ -18,11 +18,6 @@ class Grep implements Tool
 
     public function __construct(public Sandbox $sandbox) {}
 
-    public function name(): string
-    {
-        return 'grep';
-    }
-
     public function description(): Stringable|string
     {
         return 'Search file contents (uses ripgrep when available, falls back to grep -r). '

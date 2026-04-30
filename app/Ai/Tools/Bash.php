@@ -19,11 +19,6 @@ class Bash implements Tool
 
     public function __construct(public Sandbox $sandbox) {}
 
-    public function name(): string
-    {
-        return 'bash';
-    }
-
     public function description(): Stringable|string
     {
         return 'Run a shell command in the working directory. Default timeout '.self::DEFAULT_TIMEOUT

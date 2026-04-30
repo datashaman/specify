@@ -12,11 +12,6 @@ class WriteFile implements Tool
 {
     public function __construct(public Sandbox $sandbox) {}
 
-    public function name(): string
-    {
-        return 'write';
-    }
-
     public function description(): Stringable|string
     {
         return 'Write a file. Overwrites if it exists, creates parent dirs if missing. '
