@@ -3,10 +3,12 @@
 namespace App\Mcp\Servers;
 
 use App\Mcp\Tools\AddAcceptanceCriterionTool;
+use App\Mcp\Tools\AddGithubRepoToProjectTool;
 use App\Mcp\Tools\AddStoryDependencyTool;
 use App\Mcp\Tools\ApproveStoryTool;
 use App\Mcp\Tools\CreateFeatureTool;
 use App\Mcp\Tools\CreatePlanTool;
+use App\Mcp\Tools\CreateProjectTool;
 use App\Mcp\Tools\CreateStoryTool;
 use App\Mcp\Tools\CurrentContextTool;
 use App\Mcp\Tools\GetFeatureTool;
@@ -23,7 +25,9 @@ use App\Mcp\Tools\ListReposTool;
 use App\Mcp\Tools\ListRunsTool;
 use App\Mcp\Tools\ListStoriesTool;
 use App\Mcp\Tools\RejectStoryTool;
+use App\Mcp\Tools\RemoveProjectRepoTool;
 use App\Mcp\Tools\RequestStoryChangesTool;
+use App\Mcp\Tools\SetPrimaryRepoTool;
 use App\Mcp\Tools\StartRunTool;
 use App\Mcp\Tools\SubmitStoryTool;
 use App\Mcp\Tools\SwitchProjectTool;
@@ -46,6 +50,10 @@ class SpecifyServer extends Server
         SwitchProjectTool::class,
         ListProjectsTool::class,
         GetProjectTool::class,
+        CreateProjectTool::class,
+        AddGithubRepoToProjectTool::class,
+        RemoveProjectRepoTool::class,
+        SetPrimaryRepoTool::class,
         ListFeaturesTool::class,
         GetFeatureTool::class,
         CreateFeatureTool::class,
