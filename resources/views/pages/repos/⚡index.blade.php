@@ -5,37 +5,14 @@ use App\Enums\TeamRole;
 use App\Models\Project;
 use App\Models\Repo;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Http;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Title;
-use Livewire\Attributes\Validate;
 use Livewire\Component;
 
 new #[Title('Repositories')] class extends Component {
-    public ?int $editing_id = null;
-
-    #[Validate('required|string|max:255')]
-    public string $name = '';
-
-    #[Validate('required|string|url|max:1024')]
-    public string $url = '';
-
-    #[Validate('required|string')]
-    public string $provider = 'github';
-
-    #[Validate('required|string|max:255')]
-    public string $default_branch = 'main';
-
-    #[Validate('nullable|string|max:1024')]
-    public string $access_token = '';
-
-    #[Validate('nullable|string|max:1024')]
-    public string $webhook_secret = '';
-
-    #[Computed]
-    public function workspace()
-    {
-        return Auth::user()->currentWorkspace();
-    }
+    public string $githubRepoSearch = '';
 
     #[Computed]
     public function project(): ?Project
@@ -67,263 +44,281 @@ new #[Title('Repositories')] class extends Component {
      */
     public function repos()
     {
-        $workspace = $this->workspace;
-        if (! $workspace) {
+        if (! $this->project) {
             return collect();
         }
 
-        return Repo::query()
-            ->where('workspace_id', $workspace->id)
-            ->orderBy('name')
-            ->get();
-    }
-
-    /**
-     * @return array<int, array{role: ?string, is_primary: bool}>
-     */
-    public function attachedToProject(): array
-    {
-        if (! $this->project) {
-            return [];
-        }
-
-        return $this->project->repos()->withPivot('role', 'is_primary')->get()
-            ->mapWithKeys(fn ($r) => [$r->id => [
-                'role' => $r->pivot->role,
-                'is_primary' => (bool) $r->pivot->is_primary,
-            ]])
-            ->all();
-    }
-
-    public function edit(int $repoId): void
-    {
-        $repo = $this->workspaceRepo($repoId);
-        $this->editing_id = $repo->id;
-        $this->name = $repo->name;
-        $this->url = $repo->url;
-        $this->provider = $repo->provider->value;
-        $this->default_branch = $repo->default_branch ?: 'main';
-        $this->access_token = '';
-        $this->webhook_secret = '';
-    }
-
-    public function cancelEdit(): void
-    {
-        $this->editing_id = null;
-        $this->reset(['name', 'url', 'access_token', 'webhook_secret']);
-        $this->provider = 'github';
-        $this->default_branch = 'main';
-    }
-
-    public function save(): void
-    {
-        abort_unless($this->canManage, 403);
-        abort_unless($this->workspace, 422);
-
-        $this->validate();
-
-        $attrs = [
-            'workspace_id' => $this->workspace->id,
-            'name' => $this->name,
-            'provider' => RepoProvider::from($this->provider),
-            'url' => $this->url,
-            'default_branch' => $this->default_branch ?: 'main',
-        ];
-        if ($this->access_token !== '') {
-            $attrs['access_token'] = $this->access_token;
-        }
-        if ($this->webhook_secret !== '') {
-            $attrs['webhook_secret'] = $this->webhook_secret;
-        }
-
-        if ($this->editing_id) {
-            $repo = $this->workspaceRepo($this->editing_id);
-            $repo->fill($attrs)->save();
-        } else {
-            $existing = Repo::query()
-                ->where('workspace_id', $this->workspace->id)
-                ->where('url', $this->url)
-                ->first();
-            $existing
-                ? $existing->fill($attrs)->save()
-                : Repo::create($attrs);
-        }
-
-        $this->cancelEdit();
-    }
-
-    public function attach(int $repoId): void
-    {
-        abort_unless($this->project, 422);
-        abort_unless($this->canManage, 403);
-
-        $repo = $this->workspaceRepo($repoId);
-        $this->project->attachRepo($repo, role: null, primary: false);
-    }
-
-    public function detach(int $repoId): void
-    {
-        abort_unless($this->project, 422);
-        abort_unless($this->canManage, 403);
-
-        $this->project->repos()->detach($repoId);
+        return $this->project->repos()->orderBy('name')->get();
     }
 
     public function setPrimary(int $repoId): void
     {
-        abort_unless($this->project, 422);
         abort_unless($this->canManage, 403);
+        abort_unless($this->project, 422);
 
-        $repo = $this->project->repos()->findOrFail($repoId);
+        $repo = $this->project->repos()->find($repoId);
+        abort_unless($repo, 404);
+
         $this->project->setPrimaryRepo($repo);
     }
 
-    public function delete(int $repoId): void
+    public function remove(int $repoId): void
     {
         abort_unless($this->canManage, 403);
+        abort_unless($this->project, 422);
 
-        $repo = $this->workspaceRepo($repoId);
-        if ($repo->projects()->exists()) {
-            $this->addError('repos', __('Detach this repo from all projects before deleting.'));
+        $repo = $this->project->repos()->find($repoId);
+        abort_unless($repo, 404);
 
-            return;
+        if ($repo->provider === RepoProvider::Github) {
+            $repo->deleteGithubWebhook();
         }
 
+        $repo->projects()->detach();
         $repo->delete();
     }
 
-    public function useGithubToken(): void
+    public function installWebhook(int $repoId): void
     {
-        $token = Auth::user()->github_token;
-        abort_unless($token, 422);
-        $this->access_token = $token;
-    }
+        abort_unless($this->canManage, 403);
+        abort_unless($this->project, 422);
 
-    private function workspaceRepo(int $repoId): Repo
-    {
-        $repo = Repo::query()->where('workspace_id', $this->workspace?->id)->find($repoId);
+        $repo = $this->project->repos()->find($repoId);
         abort_unless($repo, 404);
 
-        return $repo;
+        $result = $repo->installGithubWebhook();
+        if (! $result['ok']) {
+            $this->addError('repos', __('Webhook install failed: :error', ['error' => $result['error']]));
+        }
+    }
+
+    /**
+     * Repos the authenticated user can access on github.com. Cached 5 minutes.
+     *
+     * @return array<int, array{full_name:string, name:string, html_url:string, default_branch:string, private:bool}>
+     */
+    public function githubRepos(): array
+    {
+        $user = Auth::user();
+        $token = $user?->github_token;
+        if (! $token) {
+            return [];
+        }
+
+        return Cache::remember("user:{$user->id}:github-repos", now()->addMinutes(5), function () use ($token) {
+            $repos = [];
+            for ($page = 1; $page <= 5; $page++) {
+                $response = Http::withToken($token)
+                    ->withHeaders(['Accept' => 'application/vnd.github+json'])
+                    ->get('https://api.github.com/user/repos', [
+                        'per_page' => 100,
+                        'page' => $page,
+                        'sort' => 'pushed',
+                        'affiliation' => 'owner,collaborator,organization_member',
+                    ]);
+
+                if (! $response->ok()) {
+                    break;
+                }
+
+                $batch = (array) $response->json();
+                if (empty($batch)) {
+                    break;
+                }
+
+                foreach ($batch as $r) {
+                    $repos[] = [
+                        'full_name' => (string) data_get($r, 'full_name'),
+                        'name' => (string) data_get($r, 'name'),
+                        'html_url' => (string) data_get($r, 'html_url'),
+                        'default_branch' => (string) (data_get($r, 'default_branch') ?: 'main'),
+                        'private' => (bool) data_get($r, 'private'),
+                    ];
+                }
+
+                if (count($batch) < 100) {
+                    break;
+                }
+            }
+
+            return $repos;
+        });
+    }
+
+    /**
+     * Filtered GitHub repo options, excluding ones already attached to this project.
+     *
+     * @return array<int, array{full_name:string, name:string, html_url:string, default_branch:string, private:bool}>
+     */
+    public function githubRepoOptions(): array
+    {
+        $existingSlugs = $this->repos()
+            ->map(fn ($r) => trim(preg_replace('/\.git$/', '', (string) parse_url($r->url, PHP_URL_PATH)), '/'))
+            ->filter()
+            ->all();
+
+        $needle = strtolower(trim($this->githubRepoSearch));
+
+        return collect($this->githubRepos())
+            ->reject(fn ($r) => in_array($r['full_name'], $existingSlugs, true))
+            ->when($needle !== '', fn ($c) => $c->filter(fn ($r) => str_contains(strtolower($r['full_name']), $needle)))
+            ->take(10)
+            ->values()
+            ->all();
+    }
+
+    public function addGithubRepo(string $fullName): void
+    {
+        abort_unless($this->canManage, 403);
+        abort_unless($this->project, 422);
+
+        $token = Auth::user()->github_token;
+        abort_unless($token, 422);
+
+        $match = collect($this->githubRepos())->firstWhere('full_name', $fullName);
+        abort_unless($match, 404);
+
+        $workspaceId = $this->project->team?->workspace_id;
+        abort_unless($workspaceId, 422);
+
+        $url = $match['html_url'].'.git';
+
+        $repo = Repo::query()->where('workspace_id', $workspaceId)->where('url', $url)->first()
+            ?? Repo::create([
+                'workspace_id' => $workspaceId,
+                'name' => $match['name'],
+                'provider' => RepoProvider::Github,
+                'url' => $url,
+                'default_branch' => $match['default_branch'],
+                'access_token' => $token,
+            ]);
+
+        if (! $repo->webhook_secret) {
+            $result = $repo->installGithubWebhook();
+            if (! $result['ok'] && $result['error'] !== null && ! str_contains($result['error'], 'admin:repo_hook')) {
+                $this->addError('repos', __('Webhook auto-install failed: :error', ['error' => $result['error']]));
+            }
+        }
+
+        $this->project->attachRepo($repo, role: null, primary: false);
+
+        $this->reset(['githubRepoSearch']);
     }
 }; ?>
 
 <div class="flex flex-col gap-6 p-6">
     <flux:heading size="xl">{{ __('Repos') }}</flux:heading>
 
-    @if ($this->project)
-        <flux:text class="text-sm text-zinc-500">{{ __('Attach / detach to') }} {{ $this->project->name }}. {{ __('Edit and delete affect the workspace.') }}</flux:text>
-    @endif
+    @if (! $this->project)
+        <flux:text class="text-sm text-zinc-500">{{ __('Select a project to manage its repositories.') }}</flux:text>
+    @else
+        <flux:text class="text-sm text-zinc-500">{{ __('Repositories for :project.', ['project' => $this->project->name]) }}</flux:text>
 
-    @error('repos')
-        <flux:text class="text-red-600">{{ $message }}</flux:text>
-    @enderror
+        @error('repos')
+            <flux:text class="text-red-600">{{ $message }}</flux:text>
+        @enderror
 
-    @php($attachments = $this->attachedToProject())
-
-    <section class="flex flex-col gap-3">
-        @forelse ($this->repos() as $repo)
-            @php($commit = $repo->latestCommit())
-            @php($attached = $attachments[$repo->id] ?? null)
-            <flux:card>
-                <div class="flex flex-wrap items-center gap-2">
-                    <flux:badge variant="solid">{{ $repo->name }}</flux:badge>
-                    <flux:badge>{{ $repo->provider->value }}</flux:badge>
-                    @if ($attached)
-                        <flux:badge color="green">{{ __('attached') }}</flux:badge>
-                        @if ($attached['is_primary'])
-                            <flux:badge>{{ __('primary') }}</flux:badge>
-                        @endif
-                        @if ($attached['role'])
-                            <flux:badge>{{ $attached['role'] }}</flux:badge>
-                        @endif
-                    @endif
-                    @if (! $repo->access_token)
-                        <flux:badge>{{ __('missing token') }}</flux:badge>
-                    @endif
-                    @if (! $repo->webhook_secret)
-                        <flux:badge>{{ __('no webhook') }}</flux:badge>
-                    @endif
-                    @if ($commit)
-                        @if ($commit['html_url'] ?? null)
-                            <a href="{{ $commit['html_url'] }}" target="_blank" rel="noopener">
-                                <flux:badge color="green">{{ $repo->default_branch }}@{{ $commit['short'] }}</flux:badge>
-                            </a>
-                        @else
-                            <flux:badge color="green">{{ $repo->default_branch }}@{{ $commit['short'] }}</flux:badge>
-                        @endif
-                    @elseif ($repo->access_token && $repo->provider->value === 'github')
-                        <flux:badge color="red">{{ __('token check failed') }}</flux:badge>
-                    @endif
-                    @php($projectCount = $repo->projects()->count())
-                    @if ($projectCount && ! $this->project)
-                        <flux:badge>{{ trans_choice(':count project|:count projects', $projectCount) }}</flux:badge>
-                    @endif
-                </div>
-                <flux:text class="mt-1 text-sm">{{ $repo->url }}</flux:text>
-                <flux:text class="text-xs text-zinc-500">{{ __('default branch') }}: {{ $repo->default_branch }}</flux:text>
-                @if ($this->canManage)
-                    <div class="mt-3 flex flex-wrap gap-2">
-                        @if ($this->project)
-                            @if ($attached)
-                                @unless ($attached['is_primary'])
-                                    <flux:button wire:click="setPrimary({{ $repo->id }})">{{ __('Make primary') }}</flux:button>
-                                @endunless
-                                <flux:button variant="ghost" wire:click="detach({{ $repo->id }})">{{ __('Detach') }}</flux:button>
-                            @else
-                                <flux:button wire:click="attach({{ $repo->id }})">{{ __('Attach') }}</flux:button>
-                            @endif
-                        @endif
-                        <flux:button variant="ghost" wire:click="edit({{ $repo->id }})">{{ __('Edit') }}</flux:button>
-                        <flux:button variant="danger" wire:click="delete({{ $repo->id }})">{{ __('Delete') }}</flux:button>
-                    </div>
-                @endif
-            </flux:card>
-        @empty
-            <flux:text class="text-zinc-500">{{ __('No repositories yet. Add one below.') }}</flux:text>
-        @endforelse
-    </section>
-
-    @if ($this->canManage)
+        @php($projectRepos = $this->repos())
+        @php($multipleRepos = $projectRepos->count() > 1)
         <section class="flex flex-col gap-3">
-            <flux:heading size="lg">
-                {{ $editing_id ? __('Edit repository') : __('Add a repository') }}
-            </flux:heading>
-            <form wire:submit.prevent="save" class="flex flex-col gap-3">
-                <flux:input wire:model="name" :label="__('Name')" required />
-                <flux:input wire:model="url" :label="__('URL')" placeholder="https://github.com/owner/repo.git" required />
-                <flux:select wire:model="provider" :label="__('Provider')">
-                    <flux:select.option value="github">GitHub</flux:select.option>
-                    <flux:select.option value="gitlab">GitLab</flux:select.option>
-                    <flux:select.option value="bitbucket">Bitbucket</flux:select.option>
-                    <flux:select.option value="generic">Generic</flux:select.option>
-                </flux:select>
-                <flux:input wire:model="default_branch" :label="__('Default branch')" />
-                <div class="flex flex-col gap-1">
-                    <flux:input
-                        type="password"
-                        wire:model="access_token"
-                        :label="$editing_id ? __('Access token (leave blank to keep)') : __('Access token')"
-                    />
-                    <flux:text class="text-xs text-zinc-500">{{ __('Used by the agent to clone, push, and open PRs. GitHub: needs repo scope (and admin:repo_hook for webhook install).') }}</flux:text>
-                    @if (auth()->user()->github_id && $provider === 'github' && ! $access_token)
-                        <flux:button type="button" variant="ghost" size="sm" wire:click="useGithubToken" class="self-start">
-                            {{ __('Use my GitHub token') }}
-                        </flux:button>
-                    @endif
-                </div>
-                <flux:input
-                    type="password"
-                    wire:model="webhook_secret"
-                    :label="$editing_id ? __('Webhook secret (leave blank to keep)') : __('Webhook secret')"
-                />
-                <div class="flex gap-2">
-                    <flux:button type="submit" variant="primary">{{ $editing_id ? __('Save changes') : __('Save') }}</flux:button>
-                    @if ($editing_id)
-                        <flux:button type="button" variant="ghost" wire:click="cancelEdit">{{ __('Cancel') }}</flux:button>
-                    @endif
-                </div>
-            </form>
+            @forelse ($projectRepos as $repo)
+                @php($commit = $repo->latestCommit())
+                @php($isPrimary = (bool) ($repo->pivot->is_primary ?? false))
+                <flux:card>
+                    <div class="flex flex-wrap items-start justify-between gap-4">
+                        <div class="flex min-w-0 flex-1 flex-col gap-1">
+                            <div class="flex flex-wrap items-center gap-2">
+                                <flux:badge variant="solid">{{ $repo->name }}</flux:badge>
+                                @if ($multipleRepos && $isPrimary)
+                                    <flux:badge color="green">{{ __('primary') }}</flux:badge>
+                                @endif
+                                @if ($repo->webhook_secret)
+                                    <flux:badge color="green">{{ __('webhook installed') }}</flux:badge>
+                                @else
+                                    <flux:badge>{{ __('no webhook') }}</flux:badge>
+                                @endif
+                                @if ($commit)
+                                    @if ($commit['html_url'] ?? null)
+                                        <a href="{{ $commit['html_url'] }}" target="_blank" rel="noopener">
+                                            <flux:badge color="green">{{ $repo->default_branch }}{{ '@'.$commit['short'] }}</flux:badge>
+                                        </a>
+                                    @else
+                                        <flux:badge color="green">{{ $repo->default_branch }}{{ '@'.$commit['short'] }}</flux:badge>
+                                    @endif
+                                @elseif ($repo->access_token && $repo->provider === RepoProvider::Github)
+                                    <flux:tooltip :content="$repo->latestCommitError() ?? __('token check failed')">
+                                        <flux:badge color="red">{{ __('token check failed') }}</flux:badge>
+                                    </flux:tooltip>
+                                @endif
+                            </div>
+                            @php($homeUrl = preg_replace('/\.git$/', '', $repo->url))
+                            <a href="{{ $homeUrl }}" target="_blank" rel="noopener" class="text-sm text-zinc-500 hover:underline">{{ $homeUrl }}</a>
+                        </div>
+                        @if ($this->canManage)
+                            <div class="flex shrink-0 flex-wrap items-center justify-end gap-2">
+                                @if ($multipleRepos && ! $isPrimary)
+                                    <flux:button wire:click="setPrimary({{ $repo->id }})">{{ __('Make primary') }}</flux:button>
+                                @endif
+                                @if (! $repo->webhook_secret && $repo->provider === RepoProvider::Github && $repo->access_token)
+                                    <flux:button wire:click="installWebhook({{ $repo->id }})">{{ __('Install webhook') }}</flux:button>
+                                @endif
+                                <flux:button
+                                    variant="danger"
+                                    wire:click="remove({{ $repo->id }})"
+                                    wire:confirm="{{ __('Remove :name from this project?', ['name' => $repo->name]) }}"
+                                >
+                                    {{ __('Remove') }}
+                                </flux:button>
+                            </div>
+                        @endif
+                    </div>
+                </flux:card>
+            @empty
+                <flux:text class="text-zinc-500">{{ __('No repositories yet. Add one below.') }}</flux:text>
+            @endforelse
         </section>
+
+        @if ($this->canManage)
+            <section class="flex flex-col gap-3">
+                <flux:heading size="lg">{{ __('Add a repository') }}</flux:heading>
+
+                @if (auth()->user()->github_token)
+                    @php($options = $this->githubRepoOptions())
+                    <div class="flex flex-col gap-2">
+                        <flux:input
+                            wire:model.live.debounce.200ms="githubRepoSearch"
+                            icon="magnifying-glass"
+                            :placeholder="__('Search your GitHub repositories…')"
+                        />
+                        <div class="flex flex-col gap-1">
+                            @forelse ($options as $option)
+                                <button
+                                    type="button"
+                                    wire:click="addGithubRepo('{{ $option['full_name'] }}')"
+                                    class="flex cursor-pointer items-center justify-between gap-3 rounded-md border border-zinc-200 px-3 py-2 text-left text-sm hover:bg-zinc-50 dark:border-zinc-700 dark:hover:bg-zinc-800"
+                                >
+                                    <span class="flex items-center gap-2">
+                                        <flux:icon name="folder" class="size-4 text-zinc-500" />
+                                        <span>{{ $option['full_name'] }}</span>
+                                        @if ($option['private'])
+                                            <flux:badge size="sm">{{ __('private') }}</flux:badge>
+                                        @endif
+                                    </span>
+                                    <flux:text class="text-xs text-zinc-500">{{ $option['default_branch'] }}</flux:text>
+                                </button>
+                            @empty
+                                <flux:text class="text-sm text-zinc-500">
+                                    {{ $githubRepoSearch !== '' ? __('No matching repositories.') : __('All your GitHub repositories are already added.') }}
+                                </flux:text>
+                            @endforelse
+                        </div>
+                    </div>
+                @else
+                    <flux:text class="text-sm text-zinc-500">
+                        {{ __('Connect your GitHub account from Settings to add repositories.') }}
+                    </flux:text>
+                @endif
+            </section>
+        @endif
     @endif
 </div>
