@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Auth\SocialiteController;
+use App\Http\Controllers\ProjectContextItemController;
 use App\Http\Controllers\Webhooks\GithubWebhookController;
 use Illuminate\Support\Facades\Route;
 
@@ -19,6 +20,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::livewire('dashboard', 'pages::dashboard')->name('dashboard');
     Route::livewire('inbox', 'pages::inbox')->name('inbox');
     Route::livewire('projects', 'pages::projects.index')->name('projects.index');
+    Route::get('projects/{project}/context-items', ProjectContextItemController::class)->name('projects.context-items.index');
     Route::livewire('projects/{project}', 'pages::projects.show')->name('projects.show');
     Route::livewire('projects/{project}/features/{feature}', 'pages::features.show')->name('features.show');
     Route::livewire('stories', 'pages::stories.index')->name('stories.index');
