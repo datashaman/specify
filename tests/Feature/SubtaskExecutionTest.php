@@ -13,6 +13,7 @@ use App\Models\Subtask;
 use App\Models\Task;
 use App\Services\ExecutionService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Str;
 
 uses(RefreshDatabase::class);
 
@@ -84,8 +85,9 @@ test('dispatch picks the project primary repo by default and sets working_branch
     $run = AgentRun::where('runnable_id', $subtask->id)
         ->where('runnable_type', Subtask::class)
         ->latest('id')->firstOrFail();
+    $expectedBranch = 'specify/'.Str::slug($story->feature->project->name).'/'.Str::slug($story->name);
     expect($run->repo_id)->toBe($primary->id)
-        ->and($run->working_branch)->toBe('specify/story-'.$story->id);
+        ->and($run->working_branch)->toBe($expectedBranch);
 });
 
 test('dispatch accepts an explicit repo override', function () {
@@ -163,6 +165,6 @@ test('agent prompt includes repo URL and working branch', function () {
 
     SubtaskExecutor::assertPrompted(function ($prompt) {
         return str_contains($prompt->prompt, 'https://github.com/')
-            && str_contains($prompt->prompt, 'specify/story-');
+            && str_contains($prompt->prompt, 'specify/');
     });
 });

@@ -15,6 +15,7 @@ use App\Models\Subtask;
 use App\Models\Task;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use RuntimeException;
 
 class ExecutionService
@@ -56,9 +57,19 @@ class ExecutionService
     private function workingBranchFor(Subtask $subtask): string
     {
         $story = $subtask->task?->story;
-        $storyId = $story?->getKey() ?? 'orphan';
+        $project = $story?->feature?->project;
 
-        return "specify/story-{$storyId}";
+        $projectSlug = $this->slug($project?->name, 'project-'.($project?->getKey() ?? 'orphan'));
+        $storySlug = $this->slug($story?->name, 'story-'.($story?->getKey() ?? 'orphan'));
+
+        return "specify/{$projectSlug}/{$storySlug}";
+    }
+
+    private function slug(?string $name, string $fallback): string
+    {
+        $slug = Str::slug((string) $name);
+
+        return $slug !== '' ? $slug : $fallback;
     }
 
     public function startStoryExecution(Story $story, ?StoryApproval $approval = null): void
