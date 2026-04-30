@@ -57,6 +57,22 @@ return [
     |
     */
 
+    /*
+    |--------------------------------------------------------------------------
+    | MCP server
+    |--------------------------------------------------------------------------
+    |
+    | Local MCP servers (mcp:start) run without an HTTP request, so there is
+    | no authenticated user. Set MCP_USER_EMAIL to the email of an existing
+    | user to act as that user when serving local MCP tool calls. Web MCP
+    | servers continue to use whatever auth middleware is on the route.
+    |
+    */
+
+    'mcp' => [
+        'user_email' => env('MCP_USER_EMAIL'),
+    ],
+
     'executor' => [
         'driver' => env('SPECIFY_EXECUTOR', 'laravel-ai'),
 
