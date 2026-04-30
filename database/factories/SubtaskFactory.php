@@ -19,7 +19,7 @@ class SubtaskFactory extends Factory
     {
         return [
             'task_id' => Task::factory(),
-            'position' => 0,
+            'position' => 1,
             'name' => fake()->sentence(4),
             'description' => fake()->paragraph(),
             'status' => TaskStatus::Pending,

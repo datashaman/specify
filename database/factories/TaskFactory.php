@@ -20,7 +20,7 @@ class TaskFactory extends Factory
         return [
             'story_id' => Story::factory(),
             'acceptance_criterion_id' => null,
-            'position' => 0,
+            'position' => 1,
             'name' => fake()->sentence(4),
             'description' => fake()->paragraph(),
             'status' => TaskStatus::Pending,

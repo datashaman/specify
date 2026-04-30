@@ -22,6 +22,22 @@ class Story extends Model
 
     protected static bool $suppressRevisionBump = false;
 
+    /**
+     * Force a status/revision change without firing the model's updated-hook
+     * recompute. Use when the caller has already decided the new state and
+     * explicitly does NOT want auto-approve / auto-execute to kick in
+     * (e.g. plan generation reopens approval and must wait for human review).
+     */
+    public function silentlyForceFill(array $attributes): void
+    {
+        self::$suppressRevisionBump = true;
+        try {
+            $this->forceFill($attributes)->save();
+        } finally {
+            self::$suppressRevisionBump = false;
+        }
+    }
+
     protected static function booted(): void
     {
         static::updating(function (self $story) {

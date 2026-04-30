@@ -29,14 +29,14 @@ class SetTasksTool extends Tool
         $validated = $request->validate([
             'story_id' => ['required', 'integer'],
             'tasks' => ['required', 'array', 'min:1'],
-            'tasks.*.position' => ['required', 'integer', 'min:0'],
+            'tasks.*.position' => ['required', 'integer', 'min:1'],
             'tasks.*.name' => ['required', 'string', 'max:255'],
             'tasks.*.description' => ['nullable', 'string'],
             'tasks.*.acceptance_criterion_id' => ['nullable', 'integer'],
             'tasks.*.depends_on_positions' => ['nullable', 'array'],
-            'tasks.*.depends_on_positions.*' => ['integer', 'min:0'],
+            'tasks.*.depends_on_positions.*' => ['integer', 'min:1'],
             'tasks.*.subtasks' => ['required', 'array', 'min:1'],
-            'tasks.*.subtasks.*.position' => ['required', 'integer', 'min:0'],
+            'tasks.*.subtasks.*.position' => ['required', 'integer', 'min:1'],
             'tasks.*.subtasks.*.name' => ['required', 'string', 'max:255'],
             'tasks.*.subtasks.*.description' => ['nullable', 'string'],
         ]);
@@ -107,12 +107,12 @@ class SetTasksTool extends Tool
             }
 
             if ($story->status === StoryStatus::Approved) {
-                $story->forceFill([
+                $story->silentlyForceFill([
                     'status' => StoryStatus::PendingApproval->value,
                     'revision' => ($story->revision ?? 1) + 1,
-                ])->save();
+                ]);
             } elseif ($story->status === StoryStatus::ChangesRequested) {
-                $story->forceFill(['status' => StoryStatus::PendingApproval->value])->save();
+                $story->silentlyForceFill(['status' => StoryStatus::PendingApproval->value]);
             }
 
             return [
@@ -137,7 +137,7 @@ class SetTasksTool extends Tool
         return [
             'story_id' => $schema->integer()->description('Story whose task list to replace.')->required(),
             'tasks' => $schema->array()
-                ->description('Ordered list. Each item: {position:int (>=0), name:string, description?:string (markdown), acceptance_criterion_id?:int, depends_on_positions?:int[], subtasks: [{position:int (>=0), name:string, description?:string (markdown)}]}. Each task must have at least one subtask. Position values must be unique within their parent.')
+                ->description('Ordered list. Each item: {position:int (>=1), name:string, description?:string (markdown), acceptance_criterion_id?:int, depends_on_positions?:int[], subtasks: [{position:int (>=1), name:string, description?:string (markdown)}]}. Each task must have at least one subtask. Position values must be unique within their parent.')
                 ->required(),
         ];
     }

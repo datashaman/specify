@@ -6,16 +6,21 @@ use App\Ai\Agents\SubtaskExecutor;
 use App\Models\Repo;
 use App\Models\Subtask;
 
-class LaravelAiExecutor implements Executor
+/**
+ * Test/no-op executor: invokes the agent (so SubtaskExecutor::fake() interception works)
+ * without requiring a working directory. Used in feature tests where we only care about
+ * orchestration, not the actual filesystem mutations.
+ */
+class FakeExecutor implements Executor
 {
     public function needsWorkingDirectory(): bool
     {
-        return true;
+        return false;
     }
 
     public function execute(Subtask $subtask, ?string $workingDir, ?Repo $repo, ?string $workingBranch): array
     {
-        $agent = new SubtaskExecutor($subtask, $repo, $workingBranch, $workingDir);
+        $agent = new SubtaskExecutor($subtask, $repo, $workingBranch);
         $response = $agent->prompt($agent->buildPrompt());
         $output = $response->toArray();
 

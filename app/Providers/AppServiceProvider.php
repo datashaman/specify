@@ -4,6 +4,7 @@ namespace App\Providers;
 
 use App\Services\Executors\CliExecutor;
 use App\Services\Executors\Executor;
+use App\Services\Executors\FakeExecutor;
 use App\Services\Executors\LaravelAiExecutor;
 use App\Services\WorkspaceRunner;
 use Carbon\CarbonImmutable;
@@ -31,6 +32,7 @@ class AppServiceProvider extends ServiceProvider
                     command: (array) config('specify.executor.cli.command'),
                     timeout: (int) config('specify.executor.cli.timeout', 1800),
                 ),
+                'fake' => new FakeExecutor,
                 default => throw new InvalidArgumentException("Unknown executor driver [{$driver}]."),
             };
         });

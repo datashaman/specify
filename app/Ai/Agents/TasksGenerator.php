@@ -6,7 +6,6 @@ use App\Models\Story;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Laravel\Ai\Attributes\MaxTokens;
 use Laravel\Ai\Attributes\Provider;
-use Laravel\Ai\Attributes\Temperature;
 use Laravel\Ai\Attributes\UseSmartestModel;
 use Laravel\Ai\Contracts\Agent;
 use Laravel\Ai\Contracts\HasStructuredOutput;
@@ -16,7 +15,6 @@ use Laravel\Ai\Promptable;
 #[Provider(Lab::Anthropic)]
 #[UseSmartestModel]
 #[MaxTokens(4096)]
-#[Temperature(0.2)]
 class TasksGenerator implements Agent, HasStructuredOutput
 {
     use Promptable;
@@ -33,11 +31,12 @@ Subtasks that the executor will run one at a time.
 
 Constraints:
 - Produce exactly one Task per Acceptance Criterion. Reference the criterion by
-  its position (0-based) using `acceptance_criterion_position`.
+  the exact position number shown next to it in the prompt, using
+  `acceptance_criterion_position`. Do not renumber.
 - Each Subtask must be self-contained and small enough for a coding agent to
   execute in a single run (≤ 30 minutes of focused work).
-- Use Subtask `position` to give a stable in-task ordering (0-based, ascending).
-- Use Task `position` for the overall task ordering (0-based, ascending).
+- Use Subtask `position` to give a stable in-task ordering (1-based, ascending).
+- Use Task `position` for the overall task ordering (1-based, ascending).
 - Use Task `depends_on` to record blocking dependencies between tasks. A Task
   may only start once every Task whose position is listed has finished. Subtasks
   themselves run sequentially within their parent Task — there are no subtask
@@ -86,16 +85,16 @@ PROMPT;
                     $schema->object(fn ($schema) => [
                         'name' => $schema->string()->required(),
                         'description' => $schema->string()->required(),
-                        'position' => $schema->integer()->min(0)->required(),
-                        'acceptance_criterion_position' => $schema->integer()->min(0)->required(),
+                        'position' => $schema->integer()->min(1)->required(),
+                        'acceptance_criterion_position' => $schema->integer()->min(1)->required(),
                         'depends_on' => $schema->array()
-                            ->items($schema->integer()->min(0)),
+                            ->items($schema->integer()->min(1)),
                         'subtasks' => $schema->array()
                             ->items(
                                 $schema->object(fn ($schema) => [
                                     'name' => $schema->string()->required(),
                                     'description' => $schema->string()->required(),
-                                    'position' => $schema->integer()->min(0)->required(),
+                                    'position' => $schema->integer()->min(1)->required(),
                                 ])
                             )
                             ->required(),

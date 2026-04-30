@@ -74,7 +74,7 @@ return [
     ],
 
     'executor' => [
-        'driver' => env('SPECIFY_EXECUTOR', 'laravel-ai'),
+        'driver' => env('SPECIFY_EXECUTOR_DRIVER', env('SPECIFY_EXECUTOR', 'laravel-ai')),
 
         'cli' => [
             'command' => array_values(array_filter(explode(' ', (string) env('SPECIFY_CLI_COMMAND', 'claude -p')))),

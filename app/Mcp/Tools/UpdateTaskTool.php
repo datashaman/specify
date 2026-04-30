@@ -32,7 +32,7 @@ class UpdateTaskTool extends Tool
             'status' => ['nullable', 'string'],
             'acceptance_criterion_id' => ['nullable', 'integer'],
             'depends_on_positions' => ['nullable', 'array'],
-            'depends_on_positions.*' => ['integer', 'min:0'],
+            'depends_on_positions.*' => ['integer', 'min:1'],
         ]);
 
         $task = Task::query()->with('story.feature', 'story.acceptanceCriteria:id,story_id', 'story.tasks:id,story_id,position')->find($validated['task_id']);
@@ -96,12 +96,12 @@ class UpdateTaskTool extends Tool
 
         if ($structuralChange) {
             if ($task->story->status === StoryStatus::Approved) {
-                $task->story->forceFill([
+                $task->story->silentlyForceFill([
                     'status' => StoryStatus::PendingApproval->value,
                     'revision' => ($task->story->revision ?? 1) + 1,
-                ])->save();
+                ]);
             } elseif ($task->story->status === StoryStatus::ChangesRequested) {
-                $task->story->forceFill(['status' => StoryStatus::PendingApproval->value])->save();
+                $task->story->silentlyForceFill(['status' => StoryStatus::PendingApproval->value]);
             }
         }
 

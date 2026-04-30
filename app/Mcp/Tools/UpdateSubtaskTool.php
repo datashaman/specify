@@ -29,7 +29,7 @@ class UpdateSubtaskTool extends Tool
             'name' => ['nullable', 'string', 'max:255'],
             'description' => ['nullable', 'string'],
             'status' => ['nullable', 'string'],
-            'position' => ['nullable', 'integer', 'min:0'],
+            'position' => ['nullable', 'integer', 'min:1'],
         ]);
 
         $subtask = Subtask::query()->with('task.story.feature')->find($validated['subtask_id']);
@@ -75,12 +75,12 @@ class UpdateSubtaskTool extends Tool
 
         if ($structuralChange) {
             if ($story->status === StoryStatus::Approved) {
-                $story->forceFill([
+                $story->silentlyForceFill([
                     'status' => StoryStatus::PendingApproval->value,
                     'revision' => ($story->revision ?? 1) + 1,
-                ])->save();
+                ]);
             } elseif ($story->status === StoryStatus::ChangesRequested) {
-                $story->forceFill(['status' => StoryStatus::PendingApproval->value])->save();
+                $story->silentlyForceFill(['status' => StoryStatus::PendingApproval->value]);
             }
         }
 
@@ -106,7 +106,7 @@ class UpdateSubtaskTool extends Tool
             'name' => $schema->string()->description('New subtask name.'),
             'description' => $schema->string()->description('New subtask description (markdown supported).'),
             'status' => $schema->string()->description('Status: pending|in_progress|done|blocked.'),
-            'position' => $schema->integer()->description('New ordering position within the parent task (0-based).'),
+            'position' => $schema->integer()->description('New ordering position within the parent task (1-based).'),
         ];
     }
 }

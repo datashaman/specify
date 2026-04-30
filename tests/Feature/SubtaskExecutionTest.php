@@ -85,8 +85,7 @@ test('dispatch picks the project primary repo by default and sets working_branch
         ->where('runnable_type', Subtask::class)
         ->latest('id')->firstOrFail();
     expect($run->repo_id)->toBe($primary->id)
-        ->and($run->working_branch)->toContain('specify/story-')
-        ->and($run->working_branch)->toContain('-task-0-sub-0');
+        ->and($run->working_branch)->toBe('specify/story-'.$story->id);
 });
 
 test('dispatch accepts an explicit repo override', function () {

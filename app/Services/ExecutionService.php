@@ -55,12 +55,10 @@ class ExecutionService
 
     private function workingBranchFor(Subtask $subtask): string
     {
-        $task = $subtask->task;
-        $story = $task?->story;
+        $story = $subtask->task?->story;
         $storyId = $story?->getKey() ?? 'orphan';
-        $taskPos = $task?->position ?? 0;
 
-        return "specify/story-{$storyId}-task-{$taskPos}-sub-{$subtask->position}";
+        return "specify/story-{$storyId}";
     }
 
     public function startStoryExecution(Story $story, ?StoryApproval $approval = null): void

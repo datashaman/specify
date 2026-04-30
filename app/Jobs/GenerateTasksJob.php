@@ -81,12 +81,12 @@ class GenerateTasksJob implements ShouldQueue
                 }
 
                 if ($story->status === StoryStatus::Approved) {
-                    $story->forceFill([
+                    $story->silentlyForceFill([
                         'status' => StoryStatus::PendingApproval->value,
                         'revision' => ($story->revision ?? 1) + 1,
-                    ])->save();
+                    ]);
                 } elseif ($story->status === StoryStatus::ChangesRequested) {
-                    $story->forceFill(['status' => StoryStatus::PendingApproval->value])->save();
+                    $story->silentlyForceFill(['status' => StoryStatus::PendingApproval->value]);
                 }
 
                 return [
