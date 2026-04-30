@@ -2,6 +2,9 @@
 
 namespace App\Mcp\Servers;
 
+use App\Mcp\Tools\AddAcceptanceCriterionTool;
+use App\Mcp\Tools\AddStoryDependencyTool;
+use App\Mcp\Tools\ApproveStoryTool;
 use App\Mcp\Tools\CreateFeatureTool;
 use App\Mcp\Tools\CreateStoryTool;
 use App\Mcp\Tools\CurrentContextTool;
@@ -11,6 +14,9 @@ use App\Mcp\Tools\GetStoryTool;
 use App\Mcp\Tools\ListFeaturesTool;
 use App\Mcp\Tools\ListProjectsTool;
 use App\Mcp\Tools\ListStoriesTool;
+use App\Mcp\Tools\RejectStoryTool;
+use App\Mcp\Tools\RequestStoryChangesTool;
+use App\Mcp\Tools\SubmitStoryTool;
 use App\Mcp\Tools\SwitchProjectTool;
 use App\Mcp\Tools\UpdateFeatureTool;
 use App\Mcp\Tools\UpdateStoryTool;
@@ -39,6 +45,12 @@ class SpecifyServer extends Server
         GetStoryTool::class,
         CreateStoryTool::class,
         UpdateStoryTool::class,
+        AddAcceptanceCriterionTool::class,
+        AddStoryDependencyTool::class,
+        SubmitStoryTool::class,
+        ApproveStoryTool::class,
+        RequestStoryChangesTool::class,
+        RejectStoryTool::class,
     ];
 
     protected array $resources = [
