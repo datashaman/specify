@@ -85,7 +85,7 @@ test('dispatch picks the project primary repo by default and sets working_branch
     $run = AgentRun::where('runnable_id', $subtask->id)
         ->where('runnable_type', Subtask::class)
         ->latest('id')->firstOrFail();
-    $expectedBranch = 'specify/'.Str::slug($story->feature->project->name).'/'.Str::slug($story->name);
+    $expectedBranch = 'specify/'.Str::slug($story->feature->name).'/'.Str::slug($story->name);
     expect($run->repo_id)->toBe($primary->id)
         ->and($run->working_branch)->toBe($expectedBranch);
 });

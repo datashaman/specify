@@ -57,12 +57,12 @@ class ExecutionService
     private function workingBranchFor(Subtask $subtask): string
     {
         $story = $subtask->task?->story;
-        $project = $story?->feature?->project;
+        $feature = $story?->feature;
 
-        $projectSlug = $this->slug($project?->name, 'project-'.($project?->getKey() ?? 'orphan'));
+        $featureSlug = $this->slug($feature?->name, 'feature-'.($feature?->getKey() ?? 'orphan'));
         $storySlug = $this->slug($story?->name, 'story-'.($story?->getKey() ?? 'orphan'));
 
-        return "specify/{$projectSlug}/{$storySlug}";
+        return "specify/{$featureSlug}/{$storySlug}";
     }
 
     private function slug(?string $name, string $fallback): string
