@@ -27,6 +27,7 @@ class CreateFeatureTool extends Tool
             'project_id' => ['nullable', 'integer'],
             'name' => ['required', 'string', 'max:255'],
             'description' => ['nullable', 'string'],
+            'notes' => ['nullable', 'string'],
             'status' => ['nullable', 'string', 'in:'.implode(',', array_column(FeatureStatus::cases(), 'value'))],
         ]);
 
@@ -44,6 +45,7 @@ class CreateFeatureTool extends Tool
         $feature = $project->features()->create([
             'name' => $validated['name'],
             'description' => $validated['description'] ?? null,
+            'notes' => $validated['notes'] ?? null,
             'status' => isset($validated['status']) ? FeatureStatus::from($validated['status']) : FeatureStatus::Proposed,
         ]);
 
@@ -52,6 +54,7 @@ class CreateFeatureTool extends Tool
             'project_id' => $feature->project_id,
             'name' => $feature->name,
             'description' => $feature->description,
+            'notes' => $feature->notes,
             'status' => $feature->status?->value,
         ]);
     }
@@ -70,7 +73,9 @@ class CreateFeatureTool extends Tool
                 ->description('Feature name. Required.')
                 ->required(),
             'description' => $schema->string()
-                ->description('Feature description. Optional.'),
+                ->description('Product-owner framing of the capability — what users get and why it matters. Not implementation detail (no schemas, classes, file paths). Markdown supported.'),
+            'notes' => $schema->string()
+                ->description('Anything that doesn’t fit the product-owner framing — caveats, links, scope reminders, references. Implementation steps still belong in a plan. Markdown supported.'),
             'status' => $schema->string()
                 ->description('Feature status. Defaults to "proposed". One of: '.implode(', ', $statuses)),
         ];

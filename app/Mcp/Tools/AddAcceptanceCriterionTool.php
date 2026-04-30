@@ -43,7 +43,6 @@ class AddAcceptanceCriterionTool extends Tool
         $ac = $story->acceptanceCriteria()->create([
             'criterion' => $validated['criterion'],
             'position' => $position,
-            'met' => false,
         ]);
 
         return Response::json([
@@ -62,7 +61,7 @@ class AddAcceptanceCriterionTool extends Tool
     {
         return [
             'story_id' => $schema->integer()->description('Story to add the criterion to.')->required(),
-            'criterion' => $schema->string()->description('Acceptance criterion text.')->required(),
+            'criterion' => $schema->string()->description('Observable behaviour the story must satisfy. Phrase as a "given/when/then" or plain "the system X when Y." Not an implementation step.')->required(),
             'position' => $schema->integer()->description('Position in the list. Defaults to last + 1.'),
         ];
     }

@@ -9,10 +9,10 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
-use Illuminate\Database\Eloquent\Relations\MorphMany;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use InvalidArgumentException;
 
-#[Fillable(['plan_id', 'position', 'name', 'description', 'status'])]
+#[Fillable(['story_id', 'acceptance_criterion_id', 'position', 'name', 'description', 'status'])]
 class Task extends Model
 {
     /** @use HasFactory<TaskFactory> */
@@ -25,19 +25,19 @@ class Task extends Model
         ];
     }
 
-    public function plan(): BelongsTo
+    public function story(): BelongsTo
     {
-        return $this->belongsTo(Plan::class);
+        return $this->belongsTo(Story::class);
     }
 
-    public function agentRuns(): MorphMany
+    public function acceptanceCriterion(): BelongsTo
     {
-        return $this->morphMany(AgentRun::class, 'runnable');
+        return $this->belongsTo(AcceptanceCriterion::class);
     }
 
-    public function latestRun(): ?AgentRun
+    public function subtasks(): HasMany
     {
-        return $this->agentRuns()->latest('id')->first();
+        return $this->hasMany(Subtask::class)->orderBy('position');
     }
 
     public function dependencies(): BelongsToMany
@@ -56,8 +56,8 @@ class Task extends Model
             throw new InvalidArgumentException('A task cannot depend on itself.');
         }
 
-        if ($this->plan_id !== $other->plan_id) {
-            throw new InvalidArgumentException('Task dependencies must live in the same plan.');
+        if ($this->story_id !== $other->story_id) {
+            throw new InvalidArgumentException('Task dependencies must live in the same story.');
         }
 
         if ($other->dependsOnTransitively($this)) {

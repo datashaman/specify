@@ -3,7 +3,7 @@
 namespace App\Mcp\Tools;
 
 use App\Mcp\Auth;
-use App\Models\Plan;
+use App\Models\Story;
 use App\Services\ExecutionService;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Laravel\Mcp\Request;
@@ -11,7 +11,7 @@ use Laravel\Mcp\Response;
 use Laravel\Mcp\Server\Attributes\Description;
 use Laravel\Mcp\Server\Tool;
 
-#[Description('Start (or resume) execution of an Approved plan. Dispatches agent runs for tasks whose dependencies are satisfied. Plan must already be Approved.')]
+#[Description('Start (or resume) execution of an Approved story. Dispatches agent runs for the next actionable subtasks (parent task dependencies satisfied AND lower-position siblings done). The story must already be Approved.')]
 class StartRunTool extends Tool
 {
     protected string $name = 'start-run';
@@ -23,31 +23,31 @@ class StartRunTool extends Tool
             return Response::error('Authentication required.');
         }
 
-        $planId = $request->integer('plan_id');
-        if (! $planId) {
-            return Response::error('plan_id is required.');
+        $storyId = $request->integer('story_id');
+        if (! $storyId) {
+            return Response::error('story_id is required.');
         }
 
-        $plan = Plan::query()->with('story.feature')->find($planId);
-        if (! $plan) {
-            return Response::error('Plan not found.');
+        $story = Story::query()->with('feature')->find($storyId);
+        if (! $story) {
+            return Response::error('Story not found.');
         }
 
-        if (! in_array($plan->story->feature->project_id, $user->accessibleProjectIds(), true)) {
-            return Response::error('Plan not accessible.');
+        if (! in_array($story->feature->project_id, $user->accessibleProjectIds(), true)) {
+            return Response::error('Story not accessible.');
         }
 
         try {
-            $execution->startPlanExecution($plan);
+            $execution->startStoryExecution($story);
         } catch (\RuntimeException $e) {
             return Response::error($e->getMessage());
         }
 
-        $plan->refresh();
+        $story->refresh();
 
         return Response::json([
-            'plan_id' => $plan->id,
-            'status' => $plan->status?->value,
+            'story_id' => $story->id,
+            'status' => $story->status?->value,
         ]);
     }
 
@@ -57,7 +57,7 @@ class StartRunTool extends Tool
     public function schema(JsonSchema $schema): array
     {
         return [
-            'plan_id' => $schema->integer()->description('Plan to execute. Must be Approved.')->required(),
+            'story_id' => $schema->integer()->description('Story to execute. Must be Approved.')->required(),
         ];
     }
 }

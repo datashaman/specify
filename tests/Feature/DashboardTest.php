@@ -1,14 +1,14 @@
 <?php
 
 use App\Enums\AgentRunStatus;
-use App\Enums\PlanStatus;
 use App\Enums\StoryStatus;
+use App\Enums\TaskStatus;
 use App\Models\AgentRun;
 use App\Models\Feature;
-use App\Models\Plan;
 use App\Models\Project;
 use App\Models\Repo;
 use App\Models\Story;
+use App\Models\Subtask;
 use App\Models\Task;
 use App\Models\Team;
 use App\Models\User;
@@ -28,7 +28,7 @@ test('authenticated users can visit the dashboard', function () {
     $response->assertOk();
 });
 
-test('dashboard counts pending stories, plans, executing plans, and failed runs in scope', function () {
+test('dashboard counts pending stories, executing stories, and failed runs in scope', function () {
     $workspace = Workspace::factory()->create();
     $team = Team::factory()->for($workspace)->create();
     $user = User::factory()->create();
@@ -39,16 +39,15 @@ test('dashboard counts pending stories, plans, executing plans, and failed runs 
 
     Story::factory()->count(2)->for($feature)->create(['status' => StoryStatus::PendingApproval]);
     $approved = Story::factory()->for($feature)->create(['status' => StoryStatus::Approved]);
+    $task = Task::factory()->for($approved)->create();
+    Subtask::factory()->for($task)->create(['status' => TaskStatus::InProgress]);
 
-    Plan::factory()->for($approved)->create(['status' => PlanStatus::PendingApproval]);
-    Plan::factory()->for($approved)->create(['status' => PlanStatus::Executing]);
-
-    $taskWithFailedRun = Task::factory()->for(
-        Plan::factory()->for($approved)->create(['status' => PlanStatus::Executing])
-    )->create();
+    $approved2 = Story::factory()->for($feature)->create(['status' => StoryStatus::Approved]);
+    $taskWithFailedRun = Task::factory()->for($approved2)->create();
+    $subtaskWithFailedRun = Subtask::factory()->for($taskWithFailedRun)->create();
     AgentRun::factory()->create([
-        'runnable_type' => Task::class,
-        'runnable_id' => $taskWithFailedRun->id,
+        'runnable_type' => Subtask::class,
+        'runnable_id' => $subtaskWithFailedRun->id,
         'status' => AgentRunStatus::Failed,
     ]);
 
@@ -56,13 +55,12 @@ test('dashboard counts pending stories, plans, executing plans, and failed runs 
 
     Livewire::test('pages::dashboard')
         ->assertSet('pendingStoryCount', 2)
-        ->assertSet('pendingPlanCount', 1)
-        ->assertSet('executingPlanCount', 2)
+        ->assertSet('executingStoryCount', 2)
         ->assertSet('failedRunCount', 1)
         ->assertSee('Specify');
 });
 
-test('dashboard ignores stories, plans, and runs from other teams', function () {
+test('dashboard ignores stories and runs from other teams', function () {
     $ws = Workspace::factory()->create();
     $team = Team::factory()->for($ws)->create();
     $user = User::factory()->create();

@@ -3,7 +3,7 @@
 namespace App\Services\Executors;
 
 use App\Models\Repo;
-use App\Models\Task;
+use App\Models\Subtask;
 use RuntimeException;
 use Symfony\Component\Process\Process;
 
@@ -27,13 +27,13 @@ class CliExecutor implements Executor
         return true;
     }
 
-    public function execute(Task $task, ?string $workingDir, ?Repo $repo, ?string $workingBranch): array
+    public function execute(Subtask $subtask, ?string $workingDir, ?Repo $repo, ?string $workingBranch): array
     {
         if ($workingDir === null) {
             throw new RuntimeException('CliExecutor requires a working directory.');
         }
 
-        $prompt = $this->buildPrompt($task, $repo, $workingBranch);
+        $prompt = $this->buildPrompt($subtask, $repo, $workingBranch);
 
         $process = new Process($this->command, $workingDir);
         $process->setTimeout($this->timeout);
@@ -56,14 +56,16 @@ class CliExecutor implements Executor
         return [
             'summary' => trim($stdout),
             'files_changed' => $files,
-            'commit_message' => $this->commitMessageFor($task),
+            'commit_message' => $this->commitMessageFor($subtask),
         ];
     }
 
-    private function buildPrompt(Task $task, ?Repo $repo, ?string $workingBranch): string
+    private function buildPrompt(Subtask $subtask, ?Repo $repo, ?string $workingBranch): string
     {
-        $task->loadMissing('plan.story');
-        $story = $task->plan?->story;
+        $subtask->loadMissing('task.story', 'task.acceptanceCriterion');
+        $task = $subtask->task;
+        $story = $task?->story;
+        $criterion = $task?->acceptanceCriterion?->criterion;
 
         $repoLine = $repo
             ? "Repository: {$repo->url} (branch: ".($workingBranch ?? $repo->default_branch).')'
@@ -71,12 +73,14 @@ class CliExecutor implements Executor
 
         return implode("\n", array_filter([
             $story ? "Story: {$story->name}" : null,
-            "Task: {$task->name}",
+            $criterion ? "Acceptance Criterion: {$criterion}" : null,
+            $task ? "Task: {$task->name}" : null,
+            "Subtask: {$subtask->name}",
             $repoLine,
             '',
-            (string) $task->description,
+            (string) $subtask->description,
             '',
-            'Make the changes required by this Task. Stay on the working branch. Do not commit, push, or open a PR — that is handled outside.',
+            'Make the changes required by this Subtask. Stay on the working branch. Do not commit, push, or open a PR — that is handled outside.',
         ]));
     }
 
@@ -103,9 +107,9 @@ class CliExecutor implements Executor
         return $files;
     }
 
-    private function commitMessageFor(Task $task): string
+    private function commitMessageFor(Subtask $subtask): string
     {
-        $name = trim((string) $task->name);
+        $name = trim((string) $subtask->name);
 
         return $name === '' ? 'specify: agent run' : 'feat: '.$name;
     }

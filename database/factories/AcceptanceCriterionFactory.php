@@ -22,7 +22,6 @@ class AcceptanceCriterionFactory extends Factory
             'story_id' => Story::factory(),
             'position' => 0,
             'criterion' => fake()->sentence(),
-            'met' => false,
         ];
     }
 }

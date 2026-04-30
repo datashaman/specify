@@ -3,14 +3,14 @@
 namespace Database\Factories;
 
 use App\Enums\TaskStatus;
-use App\Models\Story;
+use App\Models\Subtask;
 use App\Models\Task;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
- * @extends Factory<Task>
+ * @extends Factory<Subtask>
  */
-class TaskFactory extends Factory
+class SubtaskFactory extends Factory
 {
     /**
      * @return array<string, mixed>
@@ -18,8 +18,7 @@ class TaskFactory extends Factory
     public function definition(): array
     {
         return [
-            'story_id' => Story::factory(),
-            'acceptance_criterion_id' => null,
+            'task_id' => Task::factory(),
             'position' => 0,
             'name' => fake()->sentence(4),
             'description' => fake()->paragraph(),

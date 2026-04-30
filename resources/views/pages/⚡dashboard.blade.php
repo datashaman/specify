@@ -1,14 +1,13 @@
 <?php
 
 use App\Enums\AgentRunStatus;
-use App\Enums\PlanStatus;
 use App\Enums\StoryStatus;
+use App\Enums\TaskStatus;
 use App\Models\AgentRun;
-use App\Models\Plan;
 use App\Models\Project;
 use App\Models\Repo;
 use App\Models\Story;
-use App\Models\Task;
+use App\Models\Subtask;
 use Illuminate\Support\Facades\Auth;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Title;
@@ -31,20 +30,12 @@ new #[Title('Dashboard')] class extends Component {
     }
 
     #[Computed]
-    public function pendingPlanCount()
+    public function executingStoryCount()
     {
-        return Plan::query()
-            ->where('status', PlanStatus::PendingApproval)
-            ->whereHas('story.feature', fn ($q) => $q->whereIn('project_id', $this->projectIds))
-            ->count();
-    }
-
-    #[Computed]
-    public function executingPlanCount()
-    {
-        return Plan::query()
-            ->where('status', PlanStatus::Executing)
-            ->whereHas('story.feature', fn ($q) => $q->whereIn('project_id', $this->projectIds))
+        return Story::query()
+            ->where('status', StoryStatus::Approved)
+            ->whereHas('feature', fn ($q) => $q->whereIn('project_id', $this->projectIds))
+            ->whereHas('tasks.subtasks', fn ($q) => $q->whereIn('status', [TaskStatus::InProgress, TaskStatus::Pending]))
             ->count();
     }
 
@@ -53,8 +44,8 @@ new #[Title('Dashboard')] class extends Component {
     {
         return AgentRun::query()
             ->where('status', AgentRunStatus::Failed)
-            ->whereHasMorph('runnable', [Task::class], function ($q) {
-                $q->whereHas('plan.story.feature', fn ($qq) => $qq->whereIn('project_id', $this->projectIds));
+            ->whereHasMorph('runnable', [Subtask::class], function ($q) {
+                $q->whereHas('task.story.feature', fn ($qq) => $qq->whereIn('project_id', $this->projectIds));
             })
             ->count();
     }
@@ -63,10 +54,10 @@ new #[Title('Dashboard')] class extends Component {
     public function recentRuns()
     {
         return AgentRun::query()
-            ->whereHasMorph('runnable', [Task::class], function ($q) {
-                $q->whereHas('plan.story.feature', fn ($qq) => $qq->whereIn('project_id', $this->projectIds));
+            ->whereHasMorph('runnable', [Subtask::class], function ($q) {
+                $q->whereHas('task.story.feature', fn ($qq) => $qq->whereIn('project_id', $this->projectIds));
             })
-            ->with('runnable.plan.story.feature.project', 'repo')
+            ->with('runnable.task.story.feature.project', 'repo')
             ->latest('id')
             ->limit(5)
             ->get();
@@ -101,18 +92,14 @@ new #[Title('Dashboard')] class extends Component {
 <div class="flex flex-col gap-6 p-6">
     <flux:heading size="xl">{{ __('Dashboard') }}</flux:heading>
 
-    <div class="grid grid-cols-1 gap-3 md:grid-cols-4">
+    <div class="grid grid-cols-1 gap-3 md:grid-cols-3">
         <a href="{{ route('inbox') }}" wire:navigate class="rounded-xl border border-zinc-200 p-4 hover:bg-zinc-50 dark:border-zinc-700 dark:hover:bg-zinc-900">
             <div class="text-xs uppercase tracking-wide text-zinc-500">{{ __('Pending stories') }}</div>
             <div class="mt-1 text-3xl font-semibold">{{ $this->pendingStoryCount }}</div>
         </a>
-        <a href="{{ route('inbox') }}" wire:navigate class="rounded-xl border border-zinc-200 p-4 hover:bg-zinc-50 dark:border-zinc-700 dark:hover:bg-zinc-900">
-            <div class="text-xs uppercase tracking-wide text-zinc-500">{{ __('Pending plans') }}</div>
-            <div class="mt-1 text-3xl font-semibold">{{ $this->pendingPlanCount }}</div>
-        </a>
         <a href="{{ route('runs.index') }}" wire:navigate class="rounded-xl border border-zinc-200 p-4 hover:bg-zinc-50 dark:border-zinc-700 dark:hover:bg-zinc-900">
-            <div class="text-xs uppercase tracking-wide text-zinc-500">{{ __('Executing plans') }}</div>
-            <div class="mt-1 text-3xl font-semibold">{{ $this->executingPlanCount }}</div>
+            <div class="text-xs uppercase tracking-wide text-zinc-500">{{ __('Executing stories') }}</div>
+            <div class="mt-1 text-3xl font-semibold">{{ $this->executingStoryCount }}</div>
         </a>
         <a href="{{ route('runs.index', ['status' => 'failed']) }}" wire:navigate class="rounded-xl border border-zinc-200 p-4 hover:bg-zinc-50 dark:border-zinc-700 dark:hover:bg-zinc-900">
             <div class="text-xs uppercase tracking-wide text-zinc-500">{{ __('Failed runs') }}</div>

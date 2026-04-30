@@ -4,8 +4,8 @@ namespace App\Mcp\Tools;
 
 use App\Mcp\Auth;
 use App\Models\AgentRun;
-use App\Models\Plan;
 use App\Models\Story;
+use App\Models\Subtask;
 use App\Models\Task;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Laravel\Mcp\Request;
@@ -67,10 +67,10 @@ class GetRunTool extends Tool
     private function resolveProjectId(AgentRun $run): ?int
     {
         return match ($run->runnable_type) {
+            Subtask::class => Subtask::query()
+                ->with('task.story.feature:id,project_id')
+                ->find($run->runnable_id)?->task?->story?->feature?->project_id,
             Task::class => Task::query()
-                ->with('plan.story.feature:id,project_id')
-                ->find($run->runnable_id)?->plan?->story?->feature?->project_id,
-            Plan::class => Plan::query()
                 ->with('story.feature:id,project_id')
                 ->find($run->runnable_id)?->story?->feature?->project_id,
             Story::class => Story::query()

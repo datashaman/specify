@@ -3,7 +3,7 @@
 namespace App\Jobs;
 
 use App\Models\AgentRun;
-use App\Models\Task;
+use App\Models\Subtask;
 use App\Services\ExecutionService;
 use App\Services\Executors\Executor;
 use App\Services\PullRequests\PullRequestManager;
@@ -12,7 +12,7 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Throwable;
 
-class ExecuteTaskJob implements ShouldQueue
+class ExecuteSubtaskJob implements ShouldQueue
 {
     use Queueable;
 
@@ -25,10 +25,10 @@ class ExecuteTaskJob implements ShouldQueue
         PullRequestManager $pullRequests,
     ): void {
         $run = AgentRun::findOrFail($this->agentRunId);
-        $task = $run->runnable;
+        $subtask = $run->runnable;
 
-        if ($task === null) {
-            $execution->markFailed($run, 'Task for AgentRun not found.');
+        if (! $subtask instanceof Subtask) {
+            $execution->markFailed($run, 'Subtask for AgentRun not found.');
 
             return;
         }
@@ -51,7 +51,7 @@ class ExecuteTaskJob implements ShouldQueue
                 $workspace->checkoutBranch($workingDir, $run->working_branch ?? 'specify/run-'.$run->getKey(), baseBranch: $repo->default_branch);
             }
 
-            $output = $executor->execute($task, $workingDir, $repo, $run->working_branch);
+            $output = $executor->execute($subtask, $workingDir, $repo, $run->working_branch);
 
             if ($workingDir !== null) {
                 $commitSha = $workspace->commit($workingDir, $output['commit_message'] ?: 'specify: agent run');
@@ -63,7 +63,7 @@ class ExecuteTaskJob implements ShouldQueue
                     $output['pushed'] = true;
 
                     if (config('specify.workspace.open_pr_after_push', true)) {
-                        $output = array_merge($output, $this->openPullRequest($pullRequests, $run, $task, $branch, $output));
+                        $output = array_merge($output, $this->openPullRequest($pullRequests, $run, $subtask, $branch, $output));
                     }
                 }
             } else {
@@ -86,7 +86,7 @@ class ExecuteTaskJob implements ShouldQueue
     private function openPullRequest(
         PullRequestManager $manager,
         AgentRun $run,
-        Task $task,
+        Subtask $subtask,
         string $branch,
         array $output,
     ): array {
@@ -105,7 +105,7 @@ class ExecuteTaskJob implements ShouldQueue
                 repo: $repo,
                 head: $branch,
                 base: $repo->default_branch,
-                title: 'Specify: '.$task->name,
+                title: 'Specify: '.$subtask->name,
                 body: trim((string) ($output['summary'] ?? '')),
             );
 

@@ -3,23 +3,23 @@
 namespace App\Services;
 
 use App\Enums\AgentRunStatus;
-use App\Enums\PlanStatus;
+use App\Enums\StoryStatus;
 use App\Enums\TaskStatus;
-use App\Jobs\ExecuteTaskJob;
-use App\Jobs\GeneratePlanJob;
+use App\Jobs\ExecuteSubtaskJob;
+use App\Jobs\GenerateTasksJob;
 use App\Models\AgentRun;
-use App\Models\Plan;
-use App\Models\PlanApproval;
 use App\Models\Repo;
 use App\Models\Story;
 use App\Models\StoryApproval;
+use App\Models\Subtask;
 use App\Models\Task;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
 
 class ExecutionService
 {
-    public function dispatchPlanGeneration(Story $story, ?StoryApproval $approval = null): AgentRun
+    public function dispatchTaskGeneration(Story $story, ?StoryApproval $approval = null): AgentRun
     {
         $run = AgentRun::create([
             'runnable_type' => $story->getMorphClass(),
@@ -29,64 +29,85 @@ class ExecutionService
             'status' => AgentRunStatus::Queued,
         ]);
 
-        GeneratePlanJob::dispatch($run->getKey());
+        GenerateTasksJob::dispatch($run->getKey());
 
         return $run;
     }
 
-    public function dispatchTaskExecution(Task $task, ?PlanApproval $approval = null, ?Repo $repo = null): AgentRun
+    public function dispatchSubtaskExecution(Subtask $subtask, ?StoryApproval $approval = null, ?Repo $repo = null): AgentRun
     {
-        $repo ??= $task->plan?->story?->feature?->project?->primaryRepo();
+        $repo ??= $subtask->task?->story?->feature?->project?->primaryRepo();
 
         $run = AgentRun::create([
-            'runnable_type' => $task->getMorphClass(),
-            'runnable_id' => $task->getKey(),
+            'runnable_type' => $subtask->getMorphClass(),
+            'runnable_id' => $subtask->getKey(),
             'repo_id' => $repo?->getKey(),
-            'working_branch' => $this->workingBranchFor($task),
+            'working_branch' => $this->workingBranchFor($subtask),
             'authorizing_approval_type' => $approval?->getMorphClass(),
             'authorizing_approval_id' => $approval?->getKey(),
             'status' => AgentRunStatus::Queued,
         ]);
 
-        ExecuteTaskJob::dispatch($run->getKey());
+        ExecuteSubtaskJob::dispatch($run->getKey());
 
         return $run;
     }
 
-    private function workingBranchFor(Task $task): string
+    private function workingBranchFor(Subtask $subtask): string
     {
-        $story = $task->plan?->story;
+        $task = $subtask->task;
+        $story = $task?->story;
         $storyId = $story?->getKey() ?? 'orphan';
-        $version = $task->plan?->version ?? 0;
+        $taskPos = $task?->position ?? 0;
 
-        return "specify/story-{$storyId}-v{$version}-task-{$task->position}";
+        return "specify/story-{$storyId}-task-{$taskPos}-sub-{$subtask->position}";
     }
 
-    public function startPlanExecution(Plan $plan, ?PlanApproval $approval = null): void
+    public function startStoryExecution(Story $story, ?StoryApproval $approval = null): void
     {
-        if (in_array($plan->status, [PlanStatus::Done, PlanStatus::Rejected], true)) {
+        if (in_array($story->status, [StoryStatus::Done, StoryStatus::Cancelled, StoryStatus::Rejected], true)) {
             return;
         }
 
-        if (! in_array($plan->status, [PlanStatus::Approved, PlanStatus::Executing], true)) {
-            throw new RuntimeException('Plan must be Approved before execution starts.');
+        if ($story->status !== StoryStatus::Approved) {
+            throw new RuntimeException('Story must be Approved before execution starts.');
         }
 
-        DB::transaction(function () use ($plan, $approval) {
-            if ($plan->status !== PlanStatus::Executing) {
-                $plan->forceFill(['status' => PlanStatus::Executing->value])->save();
-            }
-
-            foreach ($plan->nextActionableTasks() as $task) {
-                $hasOpenRun = $task->agentRuns()
+        DB::transaction(function () use ($story, $approval) {
+            foreach ($this->nextActionableSubtasks($story) as $subtask) {
+                $hasOpenRun = $subtask->agentRuns()
                     ->whereIn('status', [AgentRunStatus::Queued->value, AgentRunStatus::Running->value])
                     ->exists();
                 if ($hasOpenRun) {
                     continue;
                 }
-                $this->dispatchTaskExecution($task, $approval);
+                $this->dispatchSubtaskExecution($subtask, $approval);
             }
         });
+    }
+
+    /**
+     * Subtasks ready to run: parent task's task-deps all Done AND
+     * in-task siblings at lower positions all Done.
+     *
+     * @return Collection<int, Subtask>
+     */
+    public function nextActionableSubtasks(Story $story): Collection
+    {
+        return $story->tasks()
+            ->with(['dependencies:id,status', 'subtasks:id,task_id,position,status'])
+            ->get()
+            ->filter(fn (Task $task) => $task->dependencies->every(fn (Task $d) => $d->status === TaskStatus::Done))
+            ->flatMap(function (Task $task) {
+                $sorted = $task->subtasks->sortBy('position')->values();
+                $next = $sorted->first(fn (Subtask $s) => $s->status !== TaskStatus::Done);
+                if (! $next || $next->status !== TaskStatus::Pending) {
+                    return [];
+                }
+
+                return [$next];
+            })
+            ->values();
     }
 
     public function markRunning(AgentRun $run): void
@@ -106,11 +127,11 @@ class ExecutionService
             'finished_at' => now(),
         ])->save();
 
-        if ($run->runnable_type === Task::class) {
-            $task = Task::find($run->runnable_id);
-            if ($task) {
-                $task->forceFill(['status' => TaskStatus::Done->value])->save();
-                $this->advancePlan($task->plan, $run->authorizingApproval);
+        if ($run->runnable_type === Subtask::class) {
+            $subtask = Subtask::find($run->runnable_id);
+            if ($subtask) {
+                $subtask->forceFill(['status' => TaskStatus::Done->value])->save();
+                $this->advanceFromSubtask($subtask->fresh(), $run->authorizingApproval);
             }
         }
     }
@@ -123,9 +144,9 @@ class ExecutionService
             'finished_at' => now(),
         ])->save();
 
-        if ($run->runnable_type === Task::class) {
-            $task = Task::find($run->runnable_id);
-            $task?->forceFill(['status' => TaskStatus::Blocked->value])->save();
+        if ($run->runnable_type === Subtask::class) {
+            $subtask = Subtask::find($run->runnable_id);
+            $subtask?->forceFill(['status' => TaskStatus::Blocked->value])->save();
         }
     }
 
@@ -138,30 +159,44 @@ class ExecutionService
         ])->save();
     }
 
-    private function advancePlan(?Plan $plan, $authorizingApproval): void
+    private function advanceFromSubtask(?Subtask $subtask, $authorizingApproval): void
     {
-        if (! $plan) {
+        if (! $subtask) {
             return;
         }
 
-        $approval = $authorizingApproval instanceof PlanApproval ? $authorizingApproval : null;
+        $task = $subtask->task;
+        if (! $task) {
+            return;
+        }
 
-        $remaining = $plan->tasks()->where('status', '!=', TaskStatus::Done->value)->count();
+        $remainingInTask = $task->subtasks()->where('status', '!=', TaskStatus::Done->value)->count();
+        if ($remainingInTask === 0) {
+            $task->forceFill(['status' => TaskStatus::Done->value])->save();
+        }
 
-        if ($remaining === 0) {
-            $plan->forceFill(['status' => PlanStatus::Done->value])->save();
+        $story = $task->story;
+        if (! $story) {
+            return;
+        }
+
+        $remainingTasks = $story->tasks()->where('status', '!=', TaskStatus::Done->value)->count();
+        if ($remainingTasks === 0) {
+            $story->forceFill(['status' => StoryStatus::Done->value])->save();
 
             return;
         }
 
-        foreach ($plan->nextActionableTasks() as $task) {
-            $hasOpenRun = $task->agentRuns()
+        $approval = $authorizingApproval instanceof StoryApproval ? $authorizingApproval : null;
+
+        foreach ($this->nextActionableSubtasks($story->fresh()) as $next) {
+            $hasOpenRun = $next->agentRuns()
                 ->whereIn('status', [AgentRunStatus::Queued->value, AgentRunStatus::Running->value])
                 ->exists();
             if ($hasOpenRun) {
                 continue;
             }
-            $this->dispatchTaskExecution($task, $approval);
+            $this->dispatchSubtaskExecution($next, $approval);
         }
     }
 }

@@ -2,9 +2,9 @@
 
 namespace App\Services\Executors;
 
-use App\Ai\Agents\TaskExecutor;
+use App\Ai\Agents\SubtaskExecutor;
 use App\Models\Repo;
-use App\Models\Task;
+use App\Models\Subtask;
 
 class LaravelAiExecutor implements Executor
 {
@@ -13,9 +13,9 @@ class LaravelAiExecutor implements Executor
         return false;
     }
 
-    public function execute(Task $task, ?string $workingDir, ?Repo $repo, ?string $workingBranch): array
+    public function execute(Subtask $subtask, ?string $workingDir, ?Repo $repo, ?string $workingBranch): array
     {
-        $agent = new TaskExecutor($task, $repo, $workingBranch);
+        $agent = new SubtaskExecutor($subtask, $repo, $workingBranch);
         $response = $agent->prompt($agent->buildPrompt());
         $output = $response->toArray();
 

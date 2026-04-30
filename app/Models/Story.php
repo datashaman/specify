@@ -14,7 +14,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
 use InvalidArgumentException;
 
-#[Fillable(['feature_id', 'current_plan_id', 'created_by_id', 'name', 'description', 'status', 'revision'])]
+#[Fillable(['feature_id', 'created_by_id', 'name', 'description', 'notes', 'status', 'revision'])]
 class Story extends Model
 {
     /** @use HasFactory<StoryFactory> */
@@ -70,14 +70,9 @@ class Story extends Model
         return $this->belongsTo(Feature::class);
     }
 
-    public function plans(): HasMany
+    public function tasks(): HasMany
     {
-        return $this->hasMany(Plan::class);
-    }
-
-    public function currentPlan(): BelongsTo
-    {
-        return $this->belongsTo(Plan::class, 'current_plan_id');
+        return $this->hasMany(Task::class)->orderBy('position');
     }
 
     public function creator(): BelongsTo
@@ -127,6 +122,9 @@ class Story extends Model
     {
         if ($this->status === StoryStatus::Rejected) {
             throw new \RuntimeException('Cannot submit a rejected story.');
+        }
+        if ($this->acceptanceCriteria()->count() === 0) {
+            throw new \RuntimeException('Add at least one acceptance criterion before submitting.');
         }
         $this->status = StoryStatus::PendingApproval;
         $this->save();

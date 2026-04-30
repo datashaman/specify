@@ -2,6 +2,7 @@
 
 namespace App\Mcp\Tools;
 
+use App\Enums\TaskStatus;
 use App\Mcp\Auth;
 use App\Models\Story;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
@@ -10,7 +11,7 @@ use Laravel\Mcp\Response;
 use Laravel\Mcp\Server\Attributes\Description;
 use Laravel\Mcp\Server\Tool;
 
-#[Description('Get a story in detail, including its acceptance criteria and current plan id.')]
+#[Description('Get a story in detail, including its acceptance criteria and task progress counts.')]
 class GetStoryTool extends Tool
 {
     protected string $name = 'get-story';
@@ -27,7 +28,7 @@ class GetStoryTool extends Tool
             return Response::error('story_id is required.');
         }
 
-        $story = Story::query()->with(['feature', 'acceptanceCriteria'])->find($storyId);
+        $story = Story::query()->with(['feature', 'acceptanceCriteria.task:id,acceptance_criterion_id,status', 'tasks:id,story_id,status'])->find($storyId);
         if (! $story) {
             return Response::error('Story not found.');
         }
@@ -36,6 +37,9 @@ class GetStoryTool extends Tool
             return Response::error('Story not accessible.');
         }
 
+        $tasksTotal = $story->tasks->count();
+        $tasksDone = $story->tasks->filter(fn ($t) => $t->status === TaskStatus::Done)->count();
+
         return Response::json([
             'id' => $story->id,
             'feature_id' => $story->feature_id,
@@ -43,14 +47,17 @@ class GetStoryTool extends Tool
             'project_id' => $story->feature->project_id,
             'name' => $story->name,
             'description' => $story->description,
+            'notes' => $story->notes,
             'status' => $story->status?->value,
             'revision' => $story->revision,
-            'current_plan_id' => $story->current_plan_id,
+            'tasks_count' => $tasksTotal,
+            'tasks_done_count' => $tasksDone,
             'acceptance_criteria' => $story->acceptanceCriteria->map(fn ($ac) => [
                 'id' => $ac->id,
                 'position' => $ac->position,
                 'criterion' => $ac->criterion,
                 'met' => (bool) $ac->met,
+                'task_id' => $ac->task?->id,
             ])->all(),
         ]);
     }

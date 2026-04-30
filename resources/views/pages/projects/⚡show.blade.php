@@ -75,7 +75,7 @@ new #[Title('Project')] class extends Component {
                                 <flux:heading>{{ $feature->name }}</flux:heading>
                             </a>
                             @if ($feature->description)
-                                <flux:text class="mt-1 text-sm">{{ $feature->description }}</flux:text>
+                                <x-markdown :content="$feature->description" class="mt-1" />
                             @endif
                         </div>
                         <flux:badge>{{ $feature->stories_count }} {{ __('stories') }}</flux:badge>

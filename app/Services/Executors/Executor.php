@@ -3,7 +3,7 @@
 namespace App\Services\Executors;
 
 use App\Models\Repo;
-use App\Models\Task;
+use App\Models\Subtask;
 
 interface Executor
 {
@@ -14,9 +14,9 @@ interface Executor
     public function needsWorkingDirectory(): bool;
 
     /**
-     * Run the executor against a Task.
+     * Run the executor against a Subtask.
      *
      * @return array{summary: string, files_changed: array<int, string>, commit_message: string}
      */
-    public function execute(Task $task, ?string $workingDir, ?Repo $repo, ?string $workingBranch): array;
+    public function execute(Subtask $subtask, ?string $workingDir, ?Repo $repo, ?string $workingBranch): array;
 }

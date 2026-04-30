@@ -3,10 +3,10 @@
 use App\Enums\AgentRunStatus;
 use App\Models\AgentRun;
 use App\Models\Feature;
-use App\Models\Plan;
 use App\Models\Project;
 use App\Models\Repo;
 use App\Models\Story;
+use App\Models\Subtask;
 use App\Models\Task;
 use App\Models\Team;
 use App\Models\User;
@@ -26,9 +26,9 @@ function runScene(): array
     $project = Project::factory()->for($team)->create();
     $feature = Feature::factory()->for($project)->create();
     $story = Story::factory()->for($feature)->create();
-    $plan = Plan::factory()->for($story)->create();
+    $task = Task::factory()->for($story)->create();
 
-    return compact('user', 'project', 'feature', 'story', 'plan');
+    return compact('user', 'project', 'feature', 'story', 'task');
 }
 
 test('runs page redirects unauthenticated users', function () {
@@ -36,11 +36,11 @@ test('runs page redirects unauthenticated users', function () {
 });
 
 test('lists runs scoped to the user\'s teams', function () {
-    ['user' => $user, 'plan' => $plan] = runScene();
-    $task = Task::factory()->for($plan)->create(['name' => 'visible-task']);
+    ['user' => $user, 'task' => $task] = runScene();
+    $subtask = Subtask::factory()->for($task)->create(['name' => 'visible-sub']);
     AgentRun::factory()->create([
-        'runnable_type' => Task::class,
-        'runnable_id' => $task->id,
+        'runnable_type' => Subtask::class,
+        'runnable_id' => $subtask->id,
         'status' => AgentRunStatus::Succeeded,
         'output' => ['pull_request_url' => 'https://github.com/o/r/pull/1'],
     ]);
@@ -48,7 +48,7 @@ test('lists runs scoped to the user\'s teams', function () {
     $this->actingAs($user);
 
     Livewire::test('pages::runs.index')
-        ->assertSee('visible-task')
+        ->assertSee('visible-sub')
         ->assertSee('https://github.com/o/r/pull/1');
 });
 
@@ -60,25 +60,25 @@ test('does not show runs from outside the user\'s teams', function () {
     $otherProject = Project::factory()->for($otherTeam)->create();
     $otherFeature = Feature::factory()->for($otherProject)->create();
     $otherStory = Story::factory()->for($otherFeature)->create();
-    $otherPlan = Plan::factory()->for($otherStory)->create();
-    $hiddenTask = Task::factory()->for($otherPlan)->create(['name' => 'hidden-task']);
+    $otherTask = Task::factory()->for($otherStory)->create();
+    $hiddenSub = Subtask::factory()->for($otherTask)->create(['name' => 'hidden-sub']);
     AgentRun::factory()->create([
-        'runnable_type' => Task::class,
-        'runnable_id' => $hiddenTask->id,
+        'runnable_type' => Subtask::class,
+        'runnable_id' => $hiddenSub->id,
         'status' => AgentRunStatus::Succeeded,
     ]);
 
     $this->actingAs($user);
 
-    Livewire::test('pages::runs.index')->assertDontSee('hidden-task');
+    Livewire::test('pages::runs.index')->assertDontSee('hidden-sub');
 });
 
 test('shows PR merged badge when webhook recorded a merge', function () {
-    ['user' => $user, 'plan' => $plan] = runScene();
-    $task = Task::factory()->for($plan)->create(['name' => 'merged-task']);
+    ['user' => $user, 'task' => $task] = runScene();
+    $sub = Subtask::factory()->for($task)->create(['name' => 'merged-sub']);
     AgentRun::factory()->create([
-        'runnable_type' => Task::class,
-        'runnable_id' => $task->id,
+        'runnable_type' => Subtask::class,
+        'runnable_id' => $sub->id,
         'status' => AgentRunStatus::Succeeded,
         'output' => [
             'pull_request_url' => 'https://github.com/o/r/pull/9',
@@ -90,20 +90,20 @@ test('shows PR merged badge when webhook recorded a merge', function () {
     $this->actingAs($user);
 
     Livewire::test('pages::runs.index')
-        ->assertSee('merged-task')
+        ->assertSee('merged-sub')
         ->assertSee('PR merged');
 });
 
 test('shows repo name and tokens on the run card', function () {
-    ['user' => $user, 'plan' => $plan, 'project' => $project] = runScene();
+    ['user' => $user, 'task' => $task, 'project' => $project] = runScene();
     $workspace = $project->team->workspace;
     $repo = Repo::factory()->for($workspace)->create(['name' => 'backend']);
     $project->attachRepo($repo);
 
-    $task = Task::factory()->for($plan)->create(['name' => 'cost-task']);
+    $sub = Subtask::factory()->for($task)->create(['name' => 'cost-sub']);
     AgentRun::factory()->create([
-        'runnable_type' => Task::class,
-        'runnable_id' => $task->id,
+        'runnable_type' => Subtask::class,
+        'runnable_id' => $sub->id,
         'repo_id' => $repo->id,
         'status' => AgentRunStatus::Succeeded,
         'tokens_input' => 1234,
@@ -118,16 +118,16 @@ test('shows repo name and tokens on the run card', function () {
 });
 
 test('status filter narrows the list', function () {
-    ['user' => $user, 'plan' => $plan] = runScene();
-    $a = Task::factory()->for($plan)->create(['name' => 'task-running']);
-    $b = Task::factory()->for($plan)->create(['name' => 'task-failed']);
+    ['user' => $user, 'task' => $task] = runScene();
+    $a = Subtask::factory()->for($task)->create(['name' => 'sub-running']);
+    $b = Subtask::factory()->for($task)->create(['name' => 'sub-failed']);
     AgentRun::factory()->create([
-        'runnable_type' => Task::class,
+        'runnable_type' => Subtask::class,
         'runnable_id' => $a->id,
         'status' => AgentRunStatus::Running,
     ]);
     AgentRun::factory()->create([
-        'runnable_type' => Task::class,
+        'runnable_type' => Subtask::class,
         'runnable_id' => $b->id,
         'status' => AgentRunStatus::Failed,
     ]);
@@ -135,9 +135,9 @@ test('status filter narrows the list', function () {
     $this->actingAs($user);
 
     Livewire::test('pages::runs.index')
-        ->assertSee('task-running')
-        ->assertSee('task-failed')
+        ->assertSee('sub-running')
+        ->assertSee('sub-failed')
         ->set('status', 'failed')
-        ->assertSee('task-failed')
-        ->assertDontSee('task-running');
+        ->assertSee('sub-failed')
+        ->assertDontSee('sub-running');
 });

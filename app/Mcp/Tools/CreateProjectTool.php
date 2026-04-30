@@ -141,7 +141,7 @@ class CreateProjectTool extends Tool
             'team_id' => $schema->integer()
                 ->description('Team to create the project under. Defaults to the user’s current team. Caller must be Owner or Admin.'),
             'name' => $schema->string()->description('Project name.')->required(),
-            'description' => $schema->string()->description('Project description.'),
+            'description' => $schema->string()->description('Project description. Markdown supported.'),
             'repos' => $schema->array()
                 ->description('Optional GitHub repos to attach. Each entry: {full_name: "owner/name", primary?: bool}. At most one may be primary.'),
         ];

@@ -61,7 +61,7 @@ test('save & submit transitions the story for approval', function () {
         ->set('feature_id', $feature->id)
         ->set('name', 'Submit me')
         ->set('description', 'desc')
-        ->set('criteria', [])
+        ->set('criteria', ['Renders'])
         ->call('save', true);
 
     $story = Story::where('name', 'Submit me')->firstOrFail();

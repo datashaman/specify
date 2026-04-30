@@ -27,6 +27,7 @@ class UpdateFeatureTool extends Tool
             'feature_id' => ['required', 'integer'],
             'name' => ['nullable', 'string', 'max:255'],
             'description' => ['nullable', 'string'],
+            'notes' => ['nullable', 'string'],
             'status' => ['nullable', 'string', 'in:'.implode(',', array_column(FeatureStatus::cases(), 'value'))],
         ]);
 
@@ -42,11 +43,12 @@ class UpdateFeatureTool extends Tool
         $changes = array_filter([
             'name' => $validated['name'] ?? null,
             'description' => $validated['description'] ?? null,
+            'notes' => $validated['notes'] ?? null,
             'status' => isset($validated['status']) ? FeatureStatus::from($validated['status']) : null,
         ], fn ($v) => $v !== null);
 
         if (! $changes) {
-            return Response::error('Provide at least one of: name, description, status.');
+            return Response::error('Provide at least one of: name, description, notes, status.');
         }
 
         $feature->fill($changes)->save();
@@ -56,6 +58,7 @@ class UpdateFeatureTool extends Tool
             'project_id' => $feature->project_id,
             'name' => $feature->name,
             'description' => $feature->description,
+            'notes' => $feature->notes,
             'status' => $feature->status?->value,
         ]);
     }
@@ -72,7 +75,8 @@ class UpdateFeatureTool extends Tool
                 ->description('Feature to update.')
                 ->required(),
             'name' => $schema->string()->description('New name.'),
-            'description' => $schema->string()->description('New description.'),
+            'description' => $schema->string()->description('Product-owner framing — what users get, why it matters. No implementation detail. Markdown supported.'),
+            'notes' => $schema->string()->description('Caveats, links, scope reminders. Markdown supported.'),
             'status' => $schema->string()
                 ->description('New status. One of: '.implode(', ', $statuses)),
         ];

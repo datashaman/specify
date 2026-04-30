@@ -10,7 +10,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
-#[Fillable(['project_id', 'name', 'description', 'status'])]
+#[Fillable(['project_id', 'name', 'description', 'notes', 'status'])]
 class Feature extends Model
 {
     /** @use HasFactory<FeatureFactory> */

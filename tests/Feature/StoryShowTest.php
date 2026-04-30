@@ -4,9 +4,9 @@ use App\Enums\AgentRunStatus;
 use App\Models\AcceptanceCriterion;
 use App\Models\AgentRun;
 use App\Models\Feature;
-use App\Models\Plan;
 use App\Models\Project;
 use App\Models\Story;
+use App\Models\Subtask;
 use App\Models\Task;
 use App\Models\Team;
 use App\Models\User;
@@ -25,17 +25,17 @@ function storyShowScene(): array
     return compact('user', 'project', 'feature');
 }
 
-test('story show renders AC, plans with DAG, and runs', function () {
+test('story show renders AC, tasks with subtasks, and runs', function () {
     ['user' => $user, 'feature' => $feature] = storyShowScene();
     $story = Story::factory()->for($feature)->create(['name' => 'visible-story']);
-    AcceptanceCriterion::create([
-        'story_id' => $story->id, 'position' => 0, 'criterion' => 'must-render-AC', 'met' => false,
+    $ac = AcceptanceCriterion::create([
+        'story_id' => $story->id, 'position' => 0, 'criterion' => 'must-render-AC',
     ]);
-    $plan = Plan::factory()->for($story)->create(['version' => 1]);
-    $task = Task::factory()->for($plan)->create(['name' => 'task-name', 'position' => 0]);
+    $task = Task::factory()->for($story)->create(['name' => 'task-name', 'position' => 0, 'acceptance_criterion_id' => $ac->id]);
+    $sub = Subtask::factory()->for($task)->create(['name' => 'sub-name', 'position' => 0]);
     AgentRun::factory()->create([
-        'runnable_type' => Task::class,
-        'runnable_id' => $task->id,
+        'runnable_type' => Subtask::class,
+        'runnable_id' => $sub->id,
         'status' => AgentRunStatus::Succeeded,
         'output' => ['pull_request_url' => 'https://github.com/o/r/pull/9'],
     ]);
@@ -46,6 +46,7 @@ test('story show renders AC, plans with DAG, and runs', function () {
         ->assertSee('visible-story')
         ->assertSee('must-render-AC')
         ->assertSee('task-name')
+        ->assertSee('sub-name')
         ->assertSee('https://github.com/o/r/pull/9');
 });
 

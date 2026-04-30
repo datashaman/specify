@@ -3,7 +3,6 @@
 use App\Enums\StoryStatus;
 use App\Enums\TaskStatus;
 use App\Models\Feature;
-use App\Models\Plan;
 use App\Models\Project;
 use App\Models\Story;
 use App\Models\Task;
@@ -13,10 +12,10 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);
 
-test('task can depend on another task in the same plan', function () {
-    $plan = Plan::factory()->create();
-    $a = Task::factory()->for($plan)->create(['name' => 'a']);
-    $b = Task::factory()->for($plan)->create(['name' => 'b']);
+test('task can depend on another task in the same story', function () {
+    $story = Story::factory()->create();
+    $a = Task::factory()->for($story)->create(['name' => 'a']);
+    $b = Task::factory()->for($story)->create(['name' => 'b']);
 
     $b->addDependency($a);
 
@@ -24,12 +23,12 @@ test('task can depend on another task in the same plan', function () {
         ->and($a->dependents->pluck('name')->all())->toBe(['b']);
 });
 
-test('task dependencies are rejected across plans', function () {
+test('task dependencies are rejected across stories', function () {
     $a = Task::factory()->create();
     $b = Task::factory()->create();
 
     expect(fn () => $b->addDependency($a))
-        ->toThrow(InvalidArgumentException::class, 'same plan');
+        ->toThrow(InvalidArgumentException::class, 'same story');
 });
 
 test('task self-dependency is rejected', function () {
@@ -40,10 +39,10 @@ test('task self-dependency is rejected', function () {
 });
 
 test('task dependency cycle is prevented', function () {
-    $plan = Plan::factory()->create();
-    $a = Task::factory()->for($plan)->create();
-    $b = Task::factory()->for($plan)->create();
-    $c = Task::factory()->for($plan)->create();
+    $story = Story::factory()->create();
+    $a = Task::factory()->for($story)->create();
+    $b = Task::factory()->for($story)->create();
+    $c = Task::factory()->for($story)->create();
 
     $b->addDependency($a);
     $c->addDependency($b);
@@ -53,9 +52,9 @@ test('task dependency cycle is prevented', function () {
 });
 
 test('task isReady reflects dependency status', function () {
-    $plan = Plan::factory()->create();
-    $a = Task::factory()->for($plan)->create(['status' => TaskStatus::Pending]);
-    $b = Task::factory()->for($plan)->create(['status' => TaskStatus::Pending]);
+    $story = Story::factory()->create();
+    $a = Task::factory()->for($story)->create(['status' => TaskStatus::Pending]);
+    $b = Task::factory()->for($story)->create(['status' => TaskStatus::Pending]);
     $b->addDependency($a);
 
     expect($b->isReady())->toBeFalse();
@@ -63,34 +62,6 @@ test('task isReady reflects dependency status', function () {
     $a->update(['status' => TaskStatus::Done]);
 
     expect($b->fresh()->isReady())->toBeTrue();
-});
-
-test('plan exposes next actionable tasks based on dependency graph', function () {
-    $plan = Plan::factory()->create();
-    $a = Task::factory()->for($plan)->create(['name' => 'a', 'status' => TaskStatus::Done]);
-    $b = Task::factory()->for($plan)->create(['name' => 'b', 'status' => TaskStatus::Pending]);
-    $c = Task::factory()->for($plan)->create(['name' => 'c', 'status' => TaskStatus::Pending]);
-    $d = Task::factory()->for($plan)->create(['name' => 'd', 'status' => TaskStatus::Pending]);
-
-    $b->addDependency($a);
-    $c->addDependency($a);
-    $d->addDependency($b);
-
-    expect($plan->nextActionableTasks()->pluck('name')->sort()->values()->all())
-        ->toBe(['b', 'c']);
-});
-
-test('parallel flows fall out of the dependency graph automatically', function () {
-    $plan = Plan::factory()->create();
-    $root = Task::factory()->for($plan)->create(['name' => 'root', 'status' => TaskStatus::Done]);
-    $left = Task::factory()->for($plan)->create(['name' => 'left', 'status' => TaskStatus::Pending]);
-    $right = Task::factory()->for($plan)->create(['name' => 'right', 'status' => TaskStatus::Pending]);
-
-    $left->addDependency($root);
-    $right->addDependency($root);
-
-    expect($plan->nextActionableTasks()->pluck('name')->sort()->values()->all())
-        ->toBe(['left', 'right']);
 });
 
 test('story precedence works across features within a workspace', function () {

@@ -32,7 +32,7 @@ new #[Title('Feature')] class extends Component {
     public function stories()
     {
         return $this->feature
-            ? $this->feature->stories()->with('creator', 'currentPlan')->latest('updated_at')->get()
+            ? $this->feature->stories()->with('creator', 'tasks:id,story_id,status')->latest('updated_at')->get()
             : collect();
     }
 }; ?>
@@ -52,7 +52,13 @@ new #[Title('Feature')] class extends Component {
                 </a>
             </div>
             @if ($this->feature->description)
-                <flux:text class="mt-1">{{ $this->feature->description }}</flux:text>
+                <x-markdown :content="$this->feature->description" class="mt-1" />
+            @endif
+            @if ($this->feature->notes)
+                <details class="mt-2">
+                    <summary class="cursor-pointer text-xs text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300">{{ __('Notes') }}</summary>
+                    <x-markdown :content="$this->feature->notes" class="mt-2" />
+                </details>
             @endif
         </div>
 
@@ -67,13 +73,17 @@ new #[Title('Feature')] class extends Component {
                             @if ($story->creator)
                                 <flux:badge>{{ __('by') }} {{ $story->creator->name }}</flux:badge>
                             @endif
-                            @if ($story->current_plan_id)
-                                <flux:badge>plan v{{ $story->currentPlan?->version }}</flux:badge>
+                            @php
+                                $tasksTotal = $story->tasks->count();
+                                $tasksDone = $story->tasks->filter(fn ($t) => $t->status === \App\Enums\TaskStatus::Done)->count();
+                            @endphp
+                            @if ($tasksTotal > 0)
+                                <flux:badge>{{ $tasksDone }}/{{ $tasksTotal }} {{ __('tasks') }}</flux:badge>
                             @endif
                             <flux:text class="ml-auto text-xs text-zinc-500">{{ $story->updated_at?->diffForHumans() }}</flux:text>
                         </div>
                         <flux:heading class="mt-2">{{ $story->name }}</flux:heading>
-                        <flux:text class="mt-1">{{ $story->description }}</flux:text>
+                        <x-markdown :content="$story->description" class="mt-1" />
                     </a>
                 </flux:card>
             @empty

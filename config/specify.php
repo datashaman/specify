@@ -49,7 +49,7 @@ return [
     | Executor
     |--------------------------------------------------------------------------
     |
-    | Drives task execution. "laravel-ai" uses the laravel/ai TaskExecutor
+    | Drives subtask execution. "laravel-ai" uses the laravel/ai SubtaskExecutor
     | agent and is describe-only (no filesystem mutation). "cli" spawns an
     | external agent CLI in the working directory and observes filesystem
     | changes via git afterward. Any CLI that supports one-shot prompting

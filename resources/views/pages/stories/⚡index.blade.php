@@ -23,7 +23,7 @@ new #[Title('Stories')] class extends Component {
         return Story::query()
             ->whereHas('feature', fn ($q) => $q->whereIn('project_id', $projectIds))
             ->when($this->status, fn ($q, $s) => $q->where('status', $s))
-            ->with(['feature.project', 'creator', 'currentPlan'])
+            ->with(['feature.project', 'creator', 'tasks:id,story_id,status'])
             ->latest('updated_at')
             ->paginate(25);
     }
@@ -57,13 +57,17 @@ new #[Title('Stories')] class extends Component {
                         @if ($story->creator)
                             <flux:badge>{{ __('by') }} {{ $story->creator->name }}</flux:badge>
                         @endif
-                        @if ($story->current_plan_id)
-                            <flux:badge>plan v{{ $story->currentPlan?->version }}</flux:badge>
+                        @php
+                            $tasksTotal = $story->tasks->count();
+                            $tasksDone = $story->tasks->filter(fn ($t) => $t->status === \App\Enums\TaskStatus::Done)->count();
+                        @endphp
+                        @if ($tasksTotal > 0)
+                            <flux:badge>{{ $tasksDone }}/{{ $tasksTotal }} {{ __('tasks') }}</flux:badge>
                         @endif
                         <flux:text class="ml-auto text-xs text-zinc-500">{{ $story->updated_at?->diffForHumans() }}</flux:text>
                     </div>
                     <flux:heading class="mt-2">{{ $story->name }}</flux:heading>
-                    <flux:text class="mt-1">{{ $story->description }}</flux:text>
+                    <x-markdown :content="$story->description" class="mt-1" />
                 </flux:card>
             </a>
         @empty

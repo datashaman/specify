@@ -1,14 +1,14 @@
 <?php
 
 use App\Enums\AgentRunStatus;
-use App\Enums\PlanStatus;
+use App\Enums\StoryStatus;
 use App\Enums\TaskStatus;
+use App\Models\AcceptanceCriterion;
 use App\Models\AgentRun;
 use App\Models\ApprovalPolicy;
-use App\Models\Plan;
 use App\Models\Repo;
+use App\Models\Subtask;
 use App\Models\Task;
-use App\Services\ExecutionService;
 use App\Services\Executors\CliExecutor;
 use App\Services\Executors\Executor;
 use App\Services\WorkspaceRunner;
@@ -18,14 +18,6 @@ use Symfony\Component\Process\Process;
 
 uses(RefreshDatabase::class);
 
-/**
- * Build a fake "agent CLI" — a tiny shell script that:
- *   - writes the prompt it received (stdin) to a sibling file in cwd,
- *   - creates/edits a file inside cwd (so git status reports a change),
- *   - prints a one-line summary on stdout.
- *
- * Returns the absolute path to the script.
- */
 function fakeAgentBinary(string $body): string
 {
     $path = sys_get_temp_dir().'/specify-fake-agent-'.uniqid().'.sh';
@@ -54,10 +46,10 @@ test('CliExecutor runs the configured binary in cwd, captures stdout, observes g
     new Process(['git', '-c', 'init.defaultBranch=main', 'init'], $workingDir)->mustRun();
     new Process(['git', '-c', 'user.email=t@t', '-c', 'user.name=t', 'commit', '--allow-empty', '-m', 'init'], $workingDir)->mustRun();
 
-    $task = Task::factory()->create(['name' => 'add export', 'description' => 'export users']);
+    $subtask = Subtask::factory()->create(['name' => 'add export', 'description' => 'export users']);
 
     $executor = new CliExecutor([$bin]);
-    $output = $executor->execute($task, $workingDir, repo: null, workingBranch: 'specify/test');
+    $output = $executor->execute($subtask, $workingDir, repo: null, workingBranch: 'specify/test');
 
     expect($output['summary'])->toContain('agent ran successfully')
         ->and($output['files_changed'])->toContain('new-from-agent.txt')
@@ -67,10 +59,10 @@ test('CliExecutor runs the configured binary in cwd, captures stdout, observes g
 });
 
 test('CliExecutor refuses to run when no working directory is provided', function () {
-    $task = Task::factory()->create();
+    $subtask = Subtask::factory()->create();
     $executor = new CliExecutor(['/bin/true']);
 
-    expect(fn () => $executor->execute($task, null, null, null))
+    expect(fn () => $executor->execute($subtask, null, null, null))
         ->toThrow(RuntimeException::class, 'working directory');
 });
 
@@ -84,14 +76,14 @@ test('CliExecutor surfaces non-zero exit codes as exceptions', function () {
     File::ensureDirectoryExists($workingDir);
     new Process(['git', '-c', 'init.defaultBranch=main', 'init'], $workingDir)->mustRun();
 
-    $task = Task::factory()->create(['name' => 'x']);
+    $subtask = Subtask::factory()->create(['name' => 'x']);
     $executor = new CliExecutor([$bin]);
 
-    expect(fn () => $executor->execute($task, $workingDir, null, null))
+    expect(fn () => $executor->execute($subtask, $workingDir, null, null))
         ->toThrow(RuntimeException::class, 'CLI executor failed');
 });
 
-test('full pipeline with cli driver: clone → branch → cli edits → commit → diff → task Done', function () {
+test('full pipeline with cli driver: clone → branch → cli edits → commit → diff → subtask Done', function () {
     config(['queue.default' => 'sync']);
     config(['specify.executor.driver' => 'cli']);
     config(['specify.workspace.open_pr_after_push' => false]);
@@ -109,7 +101,6 @@ test('full pipeline with cli driver: clone → branch → cli edits → commit �
     new Process(['git', 'push', 'origin', 'main'], $seed)->mustRun();
     File::deleteDirectory($seed);
 
-    // Configure the fake agent — appends a line to README and a new file.
     $bin = fakeAgentBinary(<<<'BASH'
         cat > .agent-prompt.txt
         echo "edited by agent" >> README.md
@@ -118,12 +109,10 @@ test('full pipeline with cli driver: clone → branch → cli edits → commit �
     BASH);
     config(['specify.executor.cli.command' => [$bin]]);
 
-    // Use a temp runs path so we don't litter storage/.
     config(['specify.runs_path' => sys_get_temp_dir().'/specify-runs-'.uniqid()]);
     app()->forgetInstance(WorkspaceRunner::class);
     app()->forgetInstance(Executor::class);
 
-    // Build a story → project → workspace → repo (pointing to our bare).
     $story = makeStory();
     $project = $story->feature->project;
     $workspace = $project->team->workspace;
@@ -139,19 +128,23 @@ test('full pipeline with cli driver: clone → branch → cli edits → commit �
         'required_approvals' => 0,
     ]);
 
-    $plan = Plan::factory()->for($story)->create();
-    $task = Task::factory()->for($plan)->create(['name' => 'append', 'position' => 0]);
-    $plan->submitForApproval();
+    $ac = $story->acceptanceCriteria()->first() ?? AcceptanceCriterion::factory()->for($story)->create();
+    $task = Task::factory()->for($story)->create(['name' => 'append', 'position' => 0, 'acceptance_criterion_id' => $ac->id]);
+    $subtask = Subtask::factory()->for($task)->create(['name' => 'append', 'position' => 0]);
+    $story->forceFill(['status' => StoryStatus::Draft->value])->save();
+    $story->fresh()->submitForApproval();
 
-    $run = AgentRun::where('runnable_id', $task->id)->latest('id')->firstOrFail();
+    $run = AgentRun::where('runnable_id', $subtask->id)
+        ->where('runnable_type', Subtask::class)
+        ->latest('id')->firstOrFail();
 
     expect($run->status)->toBe(AgentRunStatus::Succeeded)
         ->and($run->output['commit_sha'] ?? null)->toBeString()
         ->and($run->output['pushed'] ?? null)->toBeTrue()
         ->and($run->diff)->toContain('AGENT_NOTE.md')
         ->and($run->diff)->toContain('edited by agent')
-        ->and($task->fresh()->status)->toBe(TaskStatus::Done)
-        ->and($plan->fresh()->status)->toBe(PlanStatus::Done);
+        ->and($subtask->fresh()->status)->toBe(TaskStatus::Done)
+        ->and($story->fresh()->status)->toBe(StoryStatus::Done);
 
     $remoteBranches = new Process(['git', 'branch', '--list'], $bare);
     $remoteBranches->mustRun();

@@ -2,6 +2,7 @@
 
 use App\Models\AgentRun;
 use App\Models\Story;
+use App\Models\Subtask;
 use App\Models\Task;
 use Illuminate\Support\Facades\Auth;
 use Livewire\Attributes\Computed;
@@ -21,8 +22,8 @@ new #[Title('Run history')] class extends Component {
 
         return AgentRun::query()
             ->where(function ($q) use ($projectIds) {
-                $q->whereHasMorph('runnable', [Task::class], function ($qq) use ($projectIds) {
-                    $qq->whereHas('plan.story.feature', fn ($qqq) => $qqq->whereIn('project_id', $projectIds));
+                $q->whereHasMorph('runnable', [Subtask::class], function ($qq) use ($projectIds) {
+                    $qq->whereHas('task.story.feature', fn ($qqq) => $qqq->whereIn('project_id', $projectIds));
                 })
                 ->orWhereHasMorph('runnable', [Story::class], function ($qq) use ($projectIds) {
                     $qq->whereHas('feature', fn ($qqq) => $qqq->whereIn('project_id', $projectIds));
@@ -92,21 +93,21 @@ new #[Title('Run history')] class extends Component {
                 </div>
 
                 <flux:heading class="mt-2">
-                    @if ($run->runnable instanceof App\Models\Task)
+                    @if ($run->runnable instanceof App\Models\Subtask)
                         {{ $run->runnable->name }}
                     @elseif ($run->runnable instanceof App\Models\Story)
-                        {{ __('Plan generation for') }} {{ $run->runnable->name }}
+                        {{ __('Task generation for') }} {{ $run->runnable->name }}
                     @else
                         {{ __('Agent run') }}
                     @endif
                 </flux:heading>
 
-                @if ($run->runnable instanceof App\Models\Task && $run->runnable->plan?->story)
+                @if ($run->runnable instanceof App\Models\Subtask && $run->runnable->task?->story)
                     <flux:text class="mt-1 text-xs text-zinc-500">
-                        {{ $run->runnable->plan->story->feature?->project?->name }}
-                        &middot; {{ $run->runnable->plan->story->name }}
-                        &middot; {{ __('plan v') }}{{ $run->runnable->plan->version }}
-                        &middot; {{ __('task') }} #{{ $run->runnable->position }}
+                        {{ $run->runnable->task->story->feature?->project?->name }}
+                        &middot; {{ $run->runnable->task->story->name }}
+                        &middot; {{ __('task') }} #{{ $run->runnable->task->position }} {{ $run->runnable->task->name }}
+                        &middot; {{ __('subtask') }} #{{ $run->runnable->position }}
                     </flux:text>
                 @endif
 

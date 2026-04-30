@@ -1,8 +1,8 @@
 <?php
 
-use App\Enums\AgentRunStatus;
 use App\Models\AgentRun;
 use App\Models\Story;
+use App\Models\Subtask;
 use App\Models\Task;
 use Illuminate\Support\Facades\Auth;
 use Livewire\Attributes\Computed;
@@ -27,8 +27,9 @@ new #[Title('Story')] class extends Component {
                 'feature.project',
                 'creator',
                 'acceptanceCriteria',
-                'plans.tasks.dependencies',
-                'plans.approvals.approver',
+                'tasks.acceptanceCriterion',
+                'tasks.dependencies',
+                'tasks.subtasks',
                 'approvals.approver',
             ])
             ->find($this->story_id);
@@ -41,15 +42,24 @@ new #[Title('Story')] class extends Component {
             return collect();
         }
 
-        $taskIds = $this->story->plans->flatMap->tasks->pluck('id');
+        $taskIds = $this->story->tasks->pluck('id');
+        $subtaskIds = $this->story->tasks->flatMap->subtasks->pluck('id');
 
         return AgentRun::query()
-            ->where(function ($q) use ($taskIds) {
-                $q->where(function ($qq) use ($taskIds) {
-                    $qq->where('runnable_type', Task::class)->whereIn('runnable_id', $taskIds);
-                })->orWhere(function ($qq) {
+            ->where(function ($q) use ($taskIds, $subtaskIds) {
+                $q->where(function ($qq) {
                     $qq->where('runnable_type', Story::class)->where('runnable_id', $this->story_id);
                 });
+                if ($taskIds->isNotEmpty()) {
+                    $q->orWhere(function ($qq) use ($taskIds) {
+                        $qq->where('runnable_type', Task::class)->whereIn('runnable_id', $taskIds);
+                    });
+                }
+                if ($subtaskIds->isNotEmpty()) {
+                    $q->orWhere(function ($qq) use ($subtaskIds) {
+                        $qq->where('runnable_type', Subtask::class)->whereIn('runnable_id', $subtaskIds);
+                    });
+                }
             })
             ->with('repo', 'runnable')
             ->latest('id')
@@ -77,7 +87,13 @@ new #[Title('Story')] class extends Component {
                     <flux:badge>{{ __('by') }} {{ $story->creator->name }}</flux:badge>
                 @endif
             </div>
-            <flux:text class="mt-3">{{ $story->description }}</flux:text>
+            <x-markdown :content="$story->description" class="mt-3" />
+            @if ($story->notes)
+                <details class="mt-3">
+                    <summary class="cursor-pointer text-xs text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300">{{ __('Notes') }}</summary>
+                    <x-markdown :content="$story->notes" class="mt-2" />
+                </details>
+            @endif
         </div>
 
         @if ($story->acceptanceCriteria->isNotEmpty())
@@ -85,56 +101,52 @@ new #[Title('Story')] class extends Component {
                 <flux:heading size="lg">{{ __('Acceptance criteria') }}</flux:heading>
                 <ul class="list-disc pl-5 text-sm">
                     @foreach ($story->acceptanceCriteria as $ac)
-                        <li>{{ $ac->criterion }}</li>
+                        <li>{{ $ac->criterion }} @if ($ac->met)<flux:badge class="ml-2">{{ __('met') }}</flux:badge>@endif</li>
                     @endforeach
                 </ul>
             </section>
         @endif
 
         <section class="flex flex-col gap-3">
-            <flux:heading size="lg">{{ __('Plans') }}</flux:heading>
-            @forelse ($story->plans->sortByDesc('version') as $plan)
+            <flux:heading size="lg">{{ __('Tasks') }}</flux:heading>
+            @forelse ($story->tasks->sortBy('position') as $task)
                 <flux:card>
                     <div class="flex flex-wrap items-center gap-2">
-                        <flux:badge variant="solid">v{{ $plan->version }}</flux:badge>
-                        <flux:badge>{{ $plan->status->value }}</flux:badge>
-                        @if ($story->current_plan_id === $plan->id)
-                            <flux:badge>{{ __('current') }}</flux:badge>
+                        <flux:badge variant="solid">#{{ $task->position }}</flux:badge>
+                        <flux:badge>{{ $task->status->value }}</flux:badge>
+                        @if ($task->acceptanceCriterion)
+                            <flux:badge>{{ __('AC') }} #{{ $task->acceptanceCriterion->position }}</flux:badge>
+                        @endif
+                        @php
+                            $deps = $task->dependencies->map(fn ($d) => '#'.$d->position);
+                        @endphp
+                        @if ($deps->isNotEmpty())
+                            <flux:badge>{{ __('depends on') }} {{ $deps->implode(', ') }}</flux:badge>
                         @endif
                     </div>
-                    @if ($plan->summary)
-                        <flux:text class="mt-2">{{ $plan->summary }}</flux:text>
+                    <flux:heading class="mt-2">{{ $task->name }}</flux:heading>
+                    @if ($task->acceptanceCriterion)
+                        <flux:text class="mt-1 text-sm text-zinc-500"><em>{{ $task->acceptanceCriterion->criterion }}</em></flux:text>
                     @endif
-                    @if ($plan->tasks->isNotEmpty())
-                        <table class="mt-3 w-full text-sm">
-                            <thead class="text-left text-xs uppercase tracking-wide text-zinc-500">
-                                <tr>
-                                    <th class="w-10 py-1">#</th>
-                                    <th class="py-1">{{ __('Task') }}</th>
-                                    <th class="py-1">{{ __('Status') }}</th>
-                                    <th class="py-1">{{ __('Depends on') }}</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                @foreach ($plan->tasks->sortBy('position') as $task)
-                                    <tr class="border-t border-zinc-100 dark:border-zinc-800">
-                                        <td class="py-1 align-top text-zinc-500">{{ $task->position }}</td>
-                                        <td class="py-1 align-top">{{ $task->name }}</td>
-                                        <td class="py-1 align-top text-zinc-500">{{ $task->status->value }}</td>
-                                        <td class="py-1 align-top text-zinc-500">
-                                            @php
-                                                $deps = $task->dependencies->map(fn ($d) => '#'.$d->position.' '.$d->name);
-                                            @endphp
-                                            {{ $deps->isEmpty() ? '—' : $deps->implode(', ') }}
-                                        </td>
-                                    </tr>
-                                @endforeach
-                            </tbody>
-                        </table>
+                    @if ($task->description)
+                        <x-markdown :content="$task->description" class="mt-2 text-sm" />
+                    @endif
+                    @if ($task->subtasks->isNotEmpty())
+                        <ol class="mt-3 list-decimal pl-5 text-sm">
+                            @foreach ($task->subtasks->sortBy('position') as $sub)
+                                <li class="py-1">
+                                    <span class="font-medium">{{ $sub->name }}</span>
+                                    <flux:badge class="ml-2">{{ $sub->status->value }}</flux:badge>
+                                    @if ($sub->description)
+                                        <x-markdown :content="$sub->description" class="mt-1 text-xs text-zinc-500" />
+                                    @endif
+                                </li>
+                            @endforeach
+                        </ol>
                     @endif
                 </flux:card>
             @empty
-                <flux:text class="text-zinc-500">{{ __('No plans yet.') }}</flux:text>
+                <flux:text class="text-zinc-500">{{ __('No tasks yet.') }}</flux:text>
             @endforelse
         </section>
 
@@ -155,7 +167,9 @@ new #[Title('Story')] class extends Component {
                             <flux:text class="ml-auto text-xs text-zinc-500">{{ $run->finished_at->diffForHumans() }}</flux:text>
                         @endif
                     </div>
-                    @if ($run->runnable instanceof Task)
+                    @if ($run->runnable instanceof Subtask)
+                        <flux:text class="mt-2 text-sm">{{ $run->runnable->name }}</flux:text>
+                    @elseif ($run->runnable)
                         <flux:text class="mt-2 text-sm">{{ $run->runnable->name }}</flux:text>
                     @endif
                     @if ($url = $run->output['pull_request_url'] ?? null)

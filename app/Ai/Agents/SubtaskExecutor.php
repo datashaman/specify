@@ -3,7 +3,7 @@
 namespace App\Ai\Agents;
 
 use App\Models\Repo;
-use App\Models\Task;
+use App\Models\Subtask;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Laravel\Ai\Attributes\MaxTokens;
 use Laravel\Ai\Attributes\Provider;
@@ -18,12 +18,12 @@ use Laravel\Ai\Promptable;
 #[UseSmartestModel]
 #[MaxTokens(4096)]
 #[Temperature(0.2)]
-class TaskExecutor implements Agent, HasStructuredOutput
+class SubtaskExecutor implements Agent, HasStructuredOutput
 {
     use Promptable;
 
     public function __construct(
-        public Task $task,
+        public Subtask $subtask,
         public ?Repo $repo = null,
         public ?string $workingBranch = null,
     ) {}
@@ -31,15 +31,15 @@ class TaskExecutor implements Agent, HasStructuredOutput
     public function instructions(): string
     {
         return <<<'INSTRUCTIONS'
-You are the execution agent for Specify. A human has approved a Plan; your job
-is to execute one Task from that Plan against the specified repository on the
-specified working branch.
+You are the execution agent for Specify. A human has approved a Story and its
+task list; your job is to execute one Subtask against the specified repository
+on the specified working branch.
 
 Constraints:
-- Make only the changes the Task requires. Do not refactor unrelated code.
+- Make only the changes the Subtask requires. Do not refactor unrelated code.
 - Stay on the working branch provided. Do not switch branches or rebase.
 - Never push, open PRs, or merge — your scope ends at producing a clean diff.
-- If the Task is ambiguous, prefer the smallest interpretation that satisfies it.
+- If the Subtask is ambiguous, prefer the smallest interpretation that satisfies it.
 
 Return a structured summary of what was done so the orchestration system can
 record the run. List each file you touched. Provide a one-line commit message
@@ -49,24 +49,32 @@ INSTRUCTIONS;
 
     public function buildPrompt(): string
     {
-        $task = $this->task->loadMissing('plan.story.feature.project');
-        $story = $task->plan->story;
+        $subtask = $this->subtask->loadMissing('task.story.feature.project', 'task.acceptanceCriterion');
+        $task = $subtask->task;
+        $story = $task?->story;
+        $criterion = $task?->acceptanceCriterion?->criterion;
 
         $repoBlock = $this->repo
             ? "Repository: {$this->repo->name}\nURL: {$this->repo->url}\nDefault branch: {$this->repo->default_branch}\nWorking branch: {$this->workingBranch}"
             : 'Repository: (none specified — operate on context only)';
 
+        $criterionBlock = $criterion ? "Acceptance Criterion: {$criterion}\n\n" : '';
+        $taskBlock = $task ? "Parent Task #{$task->position}: {$task->name}\n" : '';
+
         return <<<PROMPT
-Story: {$story->name}
-Plan version: {$task->plan->version}
-Task #{$task->position}: {$task->name}
+Story: {$story?->name}
 
 Description:
-{$task->description}
+{$story?->description}
+
+{$criterionBlock}{$taskBlock}Subtask #{$subtask->position}: {$subtask->name}
+
+Subtask description:
+{$subtask->description}
 
 {$repoBlock}
 
-Execute this Task and return a summary.
+Execute this Subtask and return a summary.
 PROMPT;
     }
 
