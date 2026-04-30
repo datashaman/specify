@@ -7,6 +7,7 @@ use App\Mcp\Auth;
 use App\Models\Story;
 use App\Models\Subtask;
 use App\Models\Task;
+use App\Services\ApprovalService;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Illuminate\Support\Facades\DB;
 use Laravel\Mcp\Request;
@@ -120,6 +121,8 @@ class SetTasksTool extends Tool
                 'subtask_count' => Subtask::whereIn('task_id', collect($tasksByPosition)->map->getKey()->all())->count(),
             ];
         });
+
+        app(ApprovalService::class)->recompute($story->fresh());
 
         return Response::json([
             'story_id' => $story->id,

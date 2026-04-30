@@ -49,7 +49,6 @@ class ApprovalService
     public function recompute(Story $story): void
     {
         $policy = $story->effectivePolicy();
-        $previousStatus = $story->status;
 
         $approvals = $story->approvals()
             ->where('story_revision', $story->revision ?? 1)
@@ -94,10 +93,6 @@ class ApprovalService
         if ($policy->auto_approve || $count >= $policy->required_approvals) {
             if ($story->status !== StoryStatus::Draft) {
                 $story->forceFill(['status' => StoryStatus::Approved->value])->save();
-
-                if ($previousStatus !== StoryStatus::Approved) {
-                    app(ExecutionService::class)->startStoryExecution($story->fresh());
-                }
             }
 
             return;

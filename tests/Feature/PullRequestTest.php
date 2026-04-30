@@ -10,6 +10,7 @@ use App\Models\Repo;
 use App\Models\Subtask;
 use App\Models\Task;
 use App\Models\Workspace;
+use App\Services\ExecutionService;
 use App\Services\Executors\Executor;
 use App\Services\PullRequests\GithubPullRequestProvider;
 use App\Services\PullRequests\PullRequestManager;
@@ -200,6 +201,7 @@ test('full pipeline records pull_request_url after a successful run on a github 
     $subtask = Subtask::factory()->for($task)->create(['name' => 'add file', 'position' => 0]);
     $story->forceFill(['status' => StoryStatus::Draft->value])->save();
     $story->fresh()->submitForApproval();
+    app(ExecutionService::class)->startStoryExecution($story->fresh());
 
     $run = AgentRun::where('runnable_id', $subtask->id)
         ->where('runnable_type', Subtask::class)

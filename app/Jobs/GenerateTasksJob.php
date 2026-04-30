@@ -8,6 +8,7 @@ use App\Models\AgentRun;
 use App\Models\Story;
 use App\Models\Subtask;
 use App\Models\Task;
+use App\Services\ApprovalService;
 use App\Services\ExecutionService;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
@@ -20,7 +21,7 @@ class GenerateTasksJob implements ShouldQueue
 
     public function __construct(public int $agentRunId) {}
 
-    public function handle(ExecutionService $execution): void
+    public function handle(ExecutionService $execution, ApprovalService $approvals): void
     {
         $run = AgentRun::findOrFail($this->agentRunId);
         $story = $run->runnable;
@@ -100,6 +101,12 @@ class GenerateTasksJob implements ShouldQueue
                 'task_count' => $result['task_count'],
                 'subtask_count' => $result['subtask_count'],
             ]);
+
+            // After the plan is committed, let the approval policy decide the story's
+            // status. With required_approvals=0 this auto-promotes to Approved and
+            // kicks off execution immediately; otherwise it stays at PendingApproval
+            // for human review.
+            $approvals->recompute($story->fresh());
         } catch (Throwable $e) {
             $execution->markFailed($run, $e->getMessage());
 

@@ -6,6 +6,7 @@ use App\Enums\StoryStatus;
 use App\Enums\TaskStatus;
 use App\Mcp\Auth;
 use App\Models\Task;
+use App\Services\ApprovalService;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Illuminate\Support\Facades\DB;
 use Laravel\Mcp\Request;
@@ -103,6 +104,8 @@ class UpdateTaskTool extends Tool
             } elseif ($task->story->status === StoryStatus::ChangesRequested) {
                 $task->story->silentlyForceFill(['status' => StoryStatus::PendingApproval->value]);
             }
+
+            app(ApprovalService::class)->recompute($task->story->fresh());
         }
 
         $task->refresh()->load('dependencies:id,position', 'acceptanceCriterion:id,position,criterion');

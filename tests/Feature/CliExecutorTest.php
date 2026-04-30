@@ -9,6 +9,7 @@ use App\Models\ApprovalPolicy;
 use App\Models\Repo;
 use App\Models\Subtask;
 use App\Models\Task;
+use App\Services\ExecutionService;
 use App\Services\Executors\CliExecutor;
 use App\Services\Executors\Executor;
 use App\Services\WorkspaceRunner;
@@ -133,6 +134,7 @@ test('full pipeline with cli driver: clone → branch → cli edits → commit �
     $subtask = Subtask::factory()->for($task)->create(['name' => 'append', 'position' => 0]);
     $story->forceFill(['status' => StoryStatus::Draft->value])->save();
     $story->fresh()->submitForApproval();
+    app(ExecutionService::class)->startStoryExecution($story->fresh());
 
     $run = AgentRun::where('runnable_id', $subtask->id)
         ->where('runnable_type', Subtask::class)

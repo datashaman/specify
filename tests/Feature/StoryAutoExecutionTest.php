@@ -10,6 +10,7 @@ use App\Models\Subtask;
 use App\Models\Task;
 use App\Models\User;
 use App\Services\ApprovalService;
+use App\Services\ExecutionService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);
@@ -38,7 +39,7 @@ function approvedStoryScene(): array
     return ['story' => $story->fresh(), 'project' => $project, 'task' => $task];
 }
 
-test('approving the threshold flips story to Approved and dispatches actionable subtasks', function () {
+test('approving the threshold flips story to Approved without dispatching subtasks', function () {
     ['story' => $story, 'project' => $project] = approvedStoryScene();
     ApprovalPolicy::create([
         'scope_type' => ApprovalPolicy::SCOPE_PROJECT,
@@ -52,10 +53,11 @@ test('approving the threshold flips story to Approved and dispatches actionable 
     $approver = User::factory()->create();
     app(ApprovalService::class)->recordDecision($story->fresh(), $approver, ApprovalDecision::Approve);
 
-    expect(AgentRun::where('runnable_type', Subtask::class)->count())->toBeGreaterThan(0);
+    expect($story->fresh()->status)->toBe(StoryStatus::Approved)
+        ->and(AgentRun::where('runnable_type', Subtask::class)->count())->toBe(0);
 });
 
-test('required_approvals=0 auto-approves and immediately starts execution', function () {
+test('required_approvals=0 skips PendingApproval and lands on Approved without auto-execution', function () {
     ['story' => $story, 'project' => $project] = approvedStoryScene();
     ApprovalPolicy::create([
         'scope_type' => ApprovalPolicy::SCOPE_PROJECT,
@@ -65,8 +67,24 @@ test('required_approvals=0 auto-approves and immediately starts execution', func
 
     $story->fresh()->submitForApproval();
 
-    expect($story->fresh()->status)->toBe(StoryStatus::Done)
-        ->and(AgentRun::where('runnable_type', Subtask::class)->count())->toBe(1);
+    expect($story->fresh()->status)->toBe(StoryStatus::Approved)
+        ->and(AgentRun::where('runnable_type', Subtask::class)->count())->toBe(0);
+});
+
+test('explicit startStoryExecution dispatches subtasks once the story is Approved', function () {
+    ['story' => $story, 'project' => $project] = approvedStoryScene();
+    ApprovalPolicy::create([
+        'scope_type' => ApprovalPolicy::SCOPE_PROJECT,
+        'scope_id' => $project->id,
+        'required_approvals' => 0,
+    ]);
+
+    $story->fresh()->submitForApproval();
+    expect($story->fresh()->status)->toBe(StoryStatus::Approved);
+
+    app(ExecutionService::class)->startStoryExecution($story->fresh());
+
+    expect(AgentRun::where('runnable_type', Subtask::class)->count())->toBe(1);
 });
 
 test('Reject does not start execution', function () {

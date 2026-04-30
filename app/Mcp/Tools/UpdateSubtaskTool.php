@@ -6,6 +6,7 @@ use App\Enums\StoryStatus;
 use App\Enums\TaskStatus;
 use App\Mcp\Auth;
 use App\Models\Subtask;
+use App\Services\ApprovalService;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Laravel\Mcp\Request;
 use Laravel\Mcp\Response;
@@ -82,6 +83,8 @@ class UpdateSubtaskTool extends Tool
             } elseif ($story->status === StoryStatus::ChangesRequested) {
                 $story->silentlyForceFill(['status' => StoryStatus::PendingApproval->value]);
             }
+
+            app(ApprovalService::class)->recompute($story->fresh());
         }
 
         $subtask->refresh();
