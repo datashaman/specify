@@ -4,12 +4,14 @@ use App\Enums\AgentRunStatus;
 use App\Enums\ApprovalDecision;
 use App\Enums\StoryStatus;
 use App\Enums\TaskStatus;
+use App\Models\AcceptanceCriterion;
 use App\Models\AgentRun;
 use App\Models\Story;
 use App\Models\Subtask;
 use App\Models\Task;
 use App\Services\ApprovalService;
 use App\Services\ExecutionService;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Auth;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Title;
@@ -29,6 +31,9 @@ new #[Title('Story')] class extends Component {
     #[Validate('required|string')]
     public string $editDescription = '';
 
+    /** @var array<int, array{id: ?int, criterion: string}> */
+    public array $editCriteria = [];
+
     public function mount(int $story): void
     {
         $this->story_id = $story;
@@ -43,7 +48,29 @@ new #[Title('Story')] class extends Component {
 
         $this->editName = (string) $story->name;
         $this->editDescription = (string) $story->description;
+        $this->editCriteria = $story->acceptanceCriteria
+            ->sortBy('position')
+            ->values()
+            ->map(fn (AcceptanceCriterion $ac) => ['id' => $ac->id, 'criterion' => (string) $ac->criterion])
+            ->all();
+        if ($this->editCriteria === []) {
+            $this->editCriteria = [['id' => null, 'criterion' => '']];
+        }
         $this->editing = true;
+    }
+
+    public function addCriterion(): void
+    {
+        $this->editCriteria[] = ['id' => null, 'criterion' => ''];
+    }
+
+    public function removeCriterion(int $index): void
+    {
+        if (! isset($this->editCriteria[$index])) {
+            return;
+        }
+        unset($this->editCriteria[$index]);
+        $this->editCriteria = array_values($this->editCriteria);
     }
 
     public function cancelEdit(): void
@@ -51,6 +78,7 @@ new #[Title('Story')] class extends Component {
         $this->editing = false;
         $this->editName = '';
         $this->editDescription = '';
+        $this->editCriteria = [];
         $this->resetErrorBag();
     }
 
@@ -61,15 +89,69 @@ new #[Title('Story')] class extends Component {
         abort_unless($this->canEdit($story), 403);
         abort_if(in_array($story->status, [StoryStatus::Done, StoryStatus::Cancelled, StoryStatus::Rejected], true), 422, 'Story is read-only.');
 
-        $this->validate();
+        $this->validate([
+            'editName' => 'required|string|max:255',
+            'editDescription' => 'required|string',
+            'editCriteria' => 'array|min:1',
+            'editCriteria.*.criterion' => 'required|string|max:1000',
+        ]);
+
+        $criteriaChanged = $this->syncCriteria($story);
 
         $story->update([
             'name' => trim($this->editName),
             'description' => $this->editDescription,
         ]);
 
+        if ($criteriaChanged && in_array($story->status, [StoryStatus::Approved, StoryStatus::ChangesRequested], true)) {
+            $story->silentlyForceFill([
+                'status' => StoryStatus::PendingApproval->value,
+                'revision' => ($story->revision ?? 1) + 1,
+            ]);
+            app(ApprovalService::class)->recompute($story->fresh());
+        }
+
         $this->editing = false;
         unset($this->story);
+    }
+
+    private function syncCriteria(Story $story): bool
+    {
+        $existing = $story->acceptanceCriteria()->get()->keyBy('id');
+        $kept = [];
+        $changed = false;
+
+        return DB::transaction(function () use ($story, $existing, &$kept, &$changed) {
+            foreach ($this->editCriteria as $i => $row) {
+                $position = $i + 1;
+                $text = trim((string) ($row['criterion'] ?? ''));
+                $id = $row['id'] ?? null;
+
+                if ($id !== null && $existing->has($id)) {
+                    $ac = $existing[$id];
+                    if ($ac->criterion !== $text || $ac->position !== $position) {
+                        $ac->update(['criterion' => $text, 'position' => $position]);
+                        $changed = true;
+                    }
+                    $kept[] = $id;
+                } else {
+                    AcceptanceCriterion::create([
+                        'story_id' => $story->id,
+                        'position' => $position,
+                        'criterion' => $text,
+                    ]);
+                    $changed = true;
+                }
+            }
+
+            $toDelete = $existing->keys()->diff($kept);
+            if ($toDelete->isNotEmpty()) {
+                AcceptanceCriterion::whereIn('id', $toDelete)->delete();
+                $changed = true;
+            }
+
+            return $changed;
+        });
     }
 
     private function canEdit(Story $story): bool
@@ -259,6 +341,24 @@ new #[Title('Story')] class extends Component {
                 <div class="mt-3 flex flex-col gap-3">
                     <flux:input wire:model="editName" :label="__('Name')" />
                     <flux:textarea wire:model="editDescription" :label="__('Description (markdown supported)')" rows="8" />
+
+                    <div class="flex flex-col gap-2">
+                        <flux:label>{{ __('Acceptance criteria') }}</flux:label>
+                        @foreach ($editCriteria as $i => $row)
+                            <div wire:key="ac-{{ $i }}" class="flex items-start gap-2">
+                                <flux:badge class="mt-2">{{ __('AC') }} #{{ $i + 1 }}</flux:badge>
+                                <flux:textarea wire:model="editCriteria.{{ $i }}.criterion" rows="2" class="flex-1" />
+                                <flux:button wire:click="removeCriterion({{ $i }})" variant="ghost" size="sm" class="mt-1">{{ __('Remove') }}</flux:button>
+                            </div>
+                        @endforeach
+                        <div>
+                            <flux:button wire:click="addCriterion" variant="ghost" size="sm">{{ __('+ Add criterion') }}</flux:button>
+                        </div>
+                        @error('editCriteria')
+                            <flux:text class="text-xs text-red-500">{{ $message }}</flux:text>
+                        @enderror
+                    </div>
+
                     <div class="flex items-center gap-2">
                         <flux:button wire:click="saveEdit" wire:target="saveEdit" wire:loading.attr="disabled" variant="primary">
                             <span wire:loading.remove wire:target="saveEdit">{{ __('Save') }}</span>
