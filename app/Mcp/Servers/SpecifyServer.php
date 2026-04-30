@@ -12,11 +12,14 @@ use App\Mcp\Tools\CurrentContextTool;
 use App\Mcp\Tools\GetFeatureTool;
 use App\Mcp\Tools\GetPlanTool;
 use App\Mcp\Tools\GetProjectTool;
+use App\Mcp\Tools\GetRepoTool;
 use App\Mcp\Tools\GetRunTool;
 use App\Mcp\Tools\GetStoryTool;
+use App\Mcp\Tools\ListEventsTool;
 use App\Mcp\Tools\ListFeaturesTool;
 use App\Mcp\Tools\ListPlansTool;
 use App\Mcp\Tools\ListProjectsTool;
+use App\Mcp\Tools\ListReposTool;
 use App\Mcp\Tools\ListRunsTool;
 use App\Mcp\Tools\ListStoriesTool;
 use App\Mcp\Tools\RejectStoryTool;
@@ -63,6 +66,9 @@ class SpecifyServer extends Server
         ListRunsTool::class,
         GetRunTool::class,
         StartRunTool::class,
+        ListReposTool::class,
+        GetRepoTool::class,
+        ListEventsTool::class,
     ];
 
     protected array $resources = [
