@@ -15,8 +15,9 @@ class EditFile implements Tool
     public function description(): Stringable|string
     {
         return 'Apply one or more exact-string replacements to a file. Each edit is matched against '
-            .'the ORIGINAL file (not incrementally). `old_string` must match exactly once unless '
-            .'`replace_all` is true. Do not include overlapping edits — merge them into one.';
+            .'the ORIGINAL file (not incrementally), so two edits cannot rely on each other. '
+            .'`old_string` must match exactly once unless `replace_all` is true. Overlapping edits '
+            .'are rejected — merge them into one.';
     }
 
     public function handle(Request $request): Stringable|string
@@ -43,8 +44,9 @@ class EditFile implements Tool
             return "Error: unable to read {$path}";
         }
 
-        $current = $original;
-        $applied = 0;
+        // Phase 1: validate each edit and collect every replacement [start,end,new]
+        // tuple by scanning the ORIGINAL string. No edit can see another edit's effect.
+        $replacements = [];
 
         foreach ($edits as $i => $edit) {
             if (! is_array($edit) || ! array_key_exists('old_string', $edit) || ! array_key_exists('new_string', $edit)) {
@@ -61,18 +63,39 @@ class EditFile implements Tool
                 return "Error: edit #{$i} `old_string` and `new_string` are identical.";
             }
 
-            $count = substr_count($current, $old);
-            if ($count === 0) {
+            $offsets = $this->findAll($original, $old);
+            if ($offsets === []) {
                 return "Error: edit #{$i} `old_string` not found.";
             }
-            if ($count > 1 && ! $replaceAll) {
-                return "Error: edit #{$i} `old_string` matches {$count} times; pass `replace_all: true` or add more context.";
+            if (count($offsets) > 1 && ! $replaceAll) {
+                return "Error: edit #{$i} `old_string` matches ".count($offsets)
+                    .' times; pass `replace_all: true` or add more context.';
             }
 
-            $current = $replaceAll
-                ? str_replace($old, $new, $current)
-                : preg_replace('/'.preg_quote($old, '/').'/', $this->escapeReplacement($new), $current, 1);
-            $applied++;
+            $oldLen = strlen($old);
+            foreach ($offsets as $offset) {
+                $replacements[] = [
+                    'edit' => $i,
+                    'start' => $offset,
+                    'end' => $offset + $oldLen,
+                    'new' => $new,
+                ];
+            }
+        }
+
+        // Phase 2: detect overlap between any two replacement spans.
+        usort($replacements, fn ($a, $b) => $a['start'] <=> $b['start']);
+        for ($i = 1, $n = count($replacements); $i < $n; $i++) {
+            if ($replacements[$i]['start'] < $replacements[$i - 1]['end']) {
+                return "Error: edit #{$replacements[$i]['edit']} overlaps with edit #{$replacements[$i - 1]['edit']}; merge them.";
+            }
+        }
+
+        // Phase 3: apply in reverse so earlier offsets stay valid as the string grows/shrinks.
+        $current = $original;
+        for ($i = count($replacements) - 1; $i >= 0; $i--) {
+            $r = $replacements[$i];
+            $current = substr($current, 0, $r['start']).$r['new'].substr($current, $r['end']);
         }
 
         if ($current === $original) {
@@ -83,12 +106,22 @@ class EditFile implements Tool
             return "Error: unable to write {$path}";
         }
 
-        return "Applied {$applied} edit(s) to ".$this->sandbox->relative($absolute).'.';
+        return 'Applied '.count($edits).' edit(s) to '.$this->sandbox->relative($absolute).'.';
     }
 
-    private function escapeReplacement(string $value): string
+    /**
+     * @return array<int, int>
+     */
+    private function findAll(string $haystack, string $needle): array
     {
-        return strtr($value, ['\\' => '\\\\', '$' => '\\$']);
+        $offsets = [];
+        $pos = 0;
+        while (($pos = strpos($haystack, $needle, $pos)) !== false) {
+            $offsets[] = $pos;
+            $pos += strlen($needle);
+        }
+
+        return $offsets;
     }
 
     public function schema(JsonSchema $schema): array
@@ -96,7 +129,7 @@ class EditFile implements Tool
         return [
             'path' => $schema->string()->description('File path to edit.')->required(),
             'edits' => $schema->array()
-                ->description('Each edit is an object with `old_string`, `new_string`, optional `replace_all`.')
+                ->description('Each edit is an object with `old_string`, `new_string`, optional `replace_all`. All edits are matched against the original file content.')
                 ->items($schema->object(fn ($s) => [
                     'old_string' => $s->string()->description('Exact text to match in the original file.')->required(),
                     'new_string' => $s->string()->description('Replacement text (may be empty).')->required(),
