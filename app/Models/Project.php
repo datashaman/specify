@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Enums\ProjectStatus;
+use App\Models\Concerns\HasSlug;
 use Database\Factories\ProjectFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Casts\Attribute;
@@ -15,11 +16,16 @@ use Illuminate\Database\Eloquent\Relations\HasManyThrough;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 
-#[Fillable(['team_id', 'created_by_id', 'name', 'description', 'status'])]
+#[Fillable(['team_id', 'created_by_id', 'name', 'slug', 'description', 'status'])]
 class Project extends Model
 {
     /** @use HasFactory<ProjectFactory> */
-    use HasFactory;
+    use HasFactory, HasSlug;
+
+    protected function slugScopeColumn(): string
+    {
+        return 'team_id';
+    }
 
     protected function casts(): array
     {

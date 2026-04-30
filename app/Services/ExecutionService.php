@@ -15,7 +15,6 @@ use App\Models\Subtask;
 use App\Models\Task;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Str;
 use RuntimeException;
 
 class ExecutionService
@@ -59,17 +58,10 @@ class ExecutionService
         $story = $subtask->task?->story;
         $feature = $story?->feature;
 
-        $featureSlug = $this->slug($feature?->name, 'feature-'.($feature?->getKey() ?? 'orphan'));
-        $storySlug = $this->slug($story?->name, 'story-'.($story?->getKey() ?? 'orphan'));
+        $featureSlug = $feature?->slug ?? 'feature-'.($feature?->getKey() ?? 'orphan');
+        $storySlug = $story?->slug ?? 'story-'.($story?->getKey() ?? 'orphan');
 
         return "specify/{$featureSlug}/{$storySlug}";
-    }
-
-    private function slug(?string $name, string $fallback): string
-    {
-        $slug = Str::slug((string) $name);
-
-        return $slug !== '' ? $slug : $fallback;
     }
 
     public function startStoryExecution(Story $story, ?StoryApproval $approval = null): void

@@ -13,6 +13,7 @@ use App\Services\ExecutionService;
 use Illuminate\Support\Facades\Auth;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Title;
+use Livewire\Attributes\Validate;
 use Livewire\Component;
 
 new #[Title('Story')] class extends Component {
@@ -20,10 +21,76 @@ new #[Title('Story')] class extends Component {
 
     public ?string $approvalNote = null;
 
+    public bool $editing = false;
+
+    #[Validate('required|string|max:255')]
+    public string $editName = '';
+
+    #[Validate('required|string')]
+    public string $editDescription = '';
+
     public function mount(int $story): void
     {
         $this->story_id = $story;
         abort_unless($this->story, 404);
+    }
+
+    public function startEdit(): void
+    {
+        $story = $this->story;
+        abort_unless($story, 404);
+        abort_unless($this->canEdit($story), 403);
+
+        $this->editName = (string) $story->name;
+        $this->editDescription = (string) $story->description;
+        $this->editing = true;
+    }
+
+    public function cancelEdit(): void
+    {
+        $this->editing = false;
+        $this->editName = '';
+        $this->editDescription = '';
+        $this->resetErrorBag();
+    }
+
+    public function saveEdit(): void
+    {
+        $story = $this->story;
+        abort_unless($story, 404);
+        abort_unless($this->canEdit($story), 403);
+        abort_if(in_array($story->status, [StoryStatus::Done, StoryStatus::Cancelled, StoryStatus::Rejected], true), 422, 'Story is read-only.');
+
+        $this->validate();
+
+        $story->update([
+            'name' => trim($this->editName),
+            'description' => $this->editDescription,
+        ]);
+
+        $this->editing = false;
+        unset($this->story);
+    }
+
+    private function canEdit(Story $story): bool
+    {
+        $user = Auth::user();
+
+        return $story->created_by_id === $user->id
+            || $user->canApproveInProject($story->feature->project);
+    }
+
+    public function canEditStory(): bool
+    {
+        $story = $this->story;
+        if (! $story) {
+            return false;
+        }
+        if (in_array($story->status, [StoryStatus::Done, StoryStatus::Cancelled, StoryStatus::Rejected], true)) {
+            return false;
+        }
+
+        return $this->canEdit($story);
     }
 
     public function submit(): void
@@ -187,15 +254,35 @@ new #[Title('Story')] class extends Component {
             <a href="{{ route('features.show', ['project' => $project->id, 'feature' => $story->feature_id]) }}" wire:navigate class="text-sm text-zinc-500 underline">
                 &larr; {{ $project->name }} / {{ $story->feature->name }}
             </a>
-            <flux:heading size="xl" class="mt-2">{{ $story->name }}</flux:heading>
-            <div class="mt-2 flex flex-wrap items-center gap-2">
-                <flux:badge>{{ $story->status->value }}</flux:badge>
-                <flux:badge>rev {{ $story->revision }}</flux:badge>
-                @if ($story->creator)
-                    <flux:badge>{{ __('by') }} {{ $story->creator->name }}</flux:badge>
-                @endif
-            </div>
-            <x-markdown :content="$story->description" class="mt-3" />
+
+            @if ($editing)
+                <div class="mt-3 flex flex-col gap-3">
+                    <flux:input wire:model="editName" :label="__('Name')" />
+                    <flux:textarea wire:model="editDescription" :label="__('Description (markdown supported)')" rows="8" />
+                    <div class="flex items-center gap-2">
+                        <flux:button wire:click="saveEdit" wire:target="saveEdit" wire:loading.attr="disabled" variant="primary">
+                            <span wire:loading.remove wire:target="saveEdit">{{ __('Save') }}</span>
+                            <span wire:loading wire:target="saveEdit">{{ __('Saving…') }}</span>
+                        </flux:button>
+                        <flux:button wire:click="cancelEdit" variant="ghost">{{ __('Cancel') }}</flux:button>
+                    </div>
+                </div>
+            @else
+                <div class="mt-2 flex items-start justify-between gap-3">
+                    <flux:heading size="xl">{{ $story->name }}</flux:heading>
+                    @if ($this->canEditStory())
+                        <flux:button wire:click="startEdit" size="sm" variant="ghost">{{ __('Edit') }}</flux:button>
+                    @endif
+                </div>
+                <div class="mt-2 flex flex-wrap items-center gap-2">
+                    <flux:badge>{{ $story->status->value }}</flux:badge>
+                    <flux:badge>rev {{ $story->revision }}</flux:badge>
+                    @if ($story->creator)
+                        <flux:badge>{{ __('by') }} {{ $story->creator->name }}</flux:badge>
+                    @endif
+                </div>
+                <x-markdown :content="$story->description" class="mt-3" />
+            @endif
             @php
                 $user = auth()->user();
                 $policy = $story->effectivePolicy();

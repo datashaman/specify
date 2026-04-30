@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Enums\StoryStatus;
+use App\Models\Concerns\HasSlug;
 use App\Services\ApprovalService;
 use Database\Factories\StoryFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
@@ -14,11 +15,16 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
 use InvalidArgumentException;
 
-#[Fillable(['feature_id', 'created_by_id', 'name', 'description', 'notes', 'status', 'revision'])]
+#[Fillable(['feature_id', 'created_by_id', 'name', 'slug', 'description', 'notes', 'status', 'revision'])]
 class Story extends Model
 {
     /** @use HasFactory<StoryFactory> */
-    use HasFactory;
+    use HasFactory, HasSlug;
+
+    protected function slugScopeColumn(): string
+    {
+        return 'feature_id';
+    }
 
     protected static bool $suppressRevisionBump = false;
 
