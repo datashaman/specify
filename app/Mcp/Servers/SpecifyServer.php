@@ -6,16 +6,22 @@ use App\Mcp\Tools\AddAcceptanceCriterionTool;
 use App\Mcp\Tools\AddStoryDependencyTool;
 use App\Mcp\Tools\ApproveStoryTool;
 use App\Mcp\Tools\CreateFeatureTool;
+use App\Mcp\Tools\CreatePlanTool;
 use App\Mcp\Tools\CreateStoryTool;
 use App\Mcp\Tools\CurrentContextTool;
 use App\Mcp\Tools\GetFeatureTool;
+use App\Mcp\Tools\GetPlanTool;
 use App\Mcp\Tools\GetProjectTool;
+use App\Mcp\Tools\GetRunTool;
 use App\Mcp\Tools\GetStoryTool;
 use App\Mcp\Tools\ListFeaturesTool;
+use App\Mcp\Tools\ListPlansTool;
 use App\Mcp\Tools\ListProjectsTool;
+use App\Mcp\Tools\ListRunsTool;
 use App\Mcp\Tools\ListStoriesTool;
 use App\Mcp\Tools\RejectStoryTool;
 use App\Mcp\Tools\RequestStoryChangesTool;
+use App\Mcp\Tools\StartRunTool;
 use App\Mcp\Tools\SubmitStoryTool;
 use App\Mcp\Tools\SwitchProjectTool;
 use App\Mcp\Tools\UpdateFeatureTool;
@@ -51,6 +57,12 @@ class SpecifyServer extends Server
         ApproveStoryTool::class,
         RequestStoryChangesTool::class,
         RejectStoryTool::class,
+        ListPlansTool::class,
+        GetPlanTool::class,
+        CreatePlanTool::class,
+        ListRunsTool::class,
+        GetRunTool::class,
+        StartRunTool::class,
     ];
 
     protected array $resources = [
