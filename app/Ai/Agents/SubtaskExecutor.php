@@ -6,6 +6,7 @@ use App\Ai\Tools\Bash;
 use App\Ai\Tools\EditFile;
 use App\Ai\Tools\Find;
 use App\Ai\Tools\Grep;
+use App\Ai\Tools\LoggedTool;
 use App\Ai\Tools\Ls;
 use App\Ai\Tools\ReadFile;
 use App\Ai\Tools\Sandbox;
@@ -49,8 +50,13 @@ class SubtaskExecutor implements Agent, HasStructuredOutput, HasTools
         }
 
         $sandbox = new Sandbox($this->workingDir);
+        $context = [
+            'subtask_id' => $this->subtask->getKey(),
+            'story_id' => $this->subtask->task?->story_id,
+            'branch' => $this->workingBranch,
+        ];
 
-        return [
+        return collect([
             new ReadFile($sandbox),
             new WriteFile($sandbox),
             new EditFile($sandbox),
@@ -58,7 +64,7 @@ class SubtaskExecutor implements Agent, HasStructuredOutput, HasTools
             new Grep($sandbox),
             new Find($sandbox),
             new Ls($sandbox),
-        ];
+        ])->map(fn ($tool) => new LoggedTool($tool, $context))->all();
     }
 
     public function instructions(): string
