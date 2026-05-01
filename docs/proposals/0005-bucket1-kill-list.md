@@ -39,7 +39,7 @@ Title remains short but adds the AC position so reviewers can scan a queue: `'Sp
 
 **Before**: stdout was returned as the `summary` of the `ExecutionResult`, but anything beyond the trimmed final output was thrown away. Tool calls, retries, and "I tried X but it failed" notes are lost.
 
-**After**: full stdout (and stderr if non-empty) is captured and persisted on `AgentRun.output['executor_log']` (truncated at 64 KB). The `summary` becomes the *last* paragraph of stdout (best-effort), not the entire blob.
+**After**: full stdout (and stderr if non-empty) is captured and persisted on `AgentRun.output['executor_log']` (truncated at 64 KB). The `summary` is reduced to the trailing 4 KB of stdout at a newline boundary so it can be safely embedded in PR bodies; the full transcript lives on `executor_log`. `PrPayloadBuilder` further clamps the "What changed" section to 8 KB as a defense-in-depth.
 
 **File**: `app/Services/Executors/CliExecutor.php` and `app/Services/SubtaskRunPipeline.php`.
 
