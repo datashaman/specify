@@ -6,6 +6,7 @@ use App\Services\Executors\CliExecutor;
 use App\Services\Executors\Executor;
 use App\Services\Executors\FakeExecutor;
 use App\Services\Executors\LaravelAiExecutor;
+use App\Services\Prompts\PromptLoader;
 use App\Services\WorkspaceRunner;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Date;
@@ -26,6 +27,8 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
+        $this->app->singleton(PromptLoader::class, fn () => new PromptLoader(base_path('prompts')));
+
         $this->app->singleton(WorkspaceRunner::class, fn () => WorkspaceRunner::fromConfig());
 
         $this->app->bind(Executor::class, function ($app) {
