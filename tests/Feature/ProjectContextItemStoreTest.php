@@ -108,7 +108,7 @@ test('admin cannot create a file context item larger than the configured limit',
     ['user' => $user, 'project' => $project] = projectContextItemStoreScene();
     $file = UploadedFile::fake()->create('notes.txt', 2, 'text/plain');
 
-    contextItemStoreRequest($this)->actingAs($user)
+    $response = contextItemStoreRequest($this)->actingAs($user)
         ->postJson(route('projects.context-items.store', $project), [
             'type' => 'file',
             'title' => 'Project notes',
@@ -116,7 +116,14 @@ test('admin cannot create a file context item larger than the configured limit',
         ])
         ->assertInvalid([
             'file' => 'The context file must not be larger than 1 kilobytes.',
-        ]);
+        ])
+        ->assertJsonPath('error.code', 'context_item_upload_rejected')
+        ->assertJsonPath('error.field', 'file')
+        ->assertJsonPath('error.violations.0.rule', 'max_file_size')
+        ->assertJsonPath('error.violations.0.limit.kilobytes', 1)
+        ->assertJsonPath('error.violations.0.limit.bytes', 1024);
+
+    expect($response->json('error.violations.0.actual.kilobytes'))->toBeGreaterThan(1);
 
     expect(ContextItem::query()->count())->toBe(0);
 });
@@ -134,8 +141,40 @@ test('admin cannot create a file context item with a disallowed extension', func
             'title' => 'Project brief',
             'file' => $file,
         ])
+        ->assertJsonPath('error.code', 'context_item_upload_rejected')
+        ->assertJsonPath('error.field', 'file')
+        ->assertJsonPath('error.violations.0.rule', 'allowed_file_type')
+        ->assertJsonPath('error.violations.0.limit.allowed_extensions', ['txt'])
+        ->assertJsonPath('error.violations.1.rule', 'allowed_extension')
+        ->assertJsonPath('error.violations.1.limit.allowed_extensions', ['txt'])
+        ->assertJsonPath('error.violations.1.actual.extension', 'pdf')
         ->assertInvalid([
             'file' => 'The context file must use one of these extensions: txt.',
+        ]);
+
+    expect(ContextItem::query()->count())->toBe(0);
+});
+
+test('admin cannot create a file context item with a disallowed content type', function () {
+    Storage::fake('local');
+    config()->set('specify.context_items.uploads.allowed_extensions', ['txt']);
+
+    ['user' => $user, 'project' => $project] = projectContextItemStoreScene();
+    $file = UploadedFile::fake()->create('notes.txt', 1, 'application/pdf');
+
+    contextItemStoreRequest($this)->actingAs($user)
+        ->postJson(route('projects.context-items.store', $project), [
+            'type' => 'file',
+            'title' => 'Project notes',
+            'file' => $file,
+        ])
+        ->assertJsonPath('error.code', 'context_item_upload_rejected')
+        ->assertJsonPath('error.field', 'file')
+        ->assertJsonPath('error.violations.0.rule', 'allowed_file_type')
+        ->assertJsonPath('error.violations.0.limit.allowed_extensions', ['txt'])
+        ->assertJsonPath('error.violations.0.actual.mime_type', 'application/pdf')
+        ->assertInvalid([
+            'file' => 'The context file must use one of these file types: txt.',
         ]);
 
     expect(ContextItem::query()->count())->toBe(0);
