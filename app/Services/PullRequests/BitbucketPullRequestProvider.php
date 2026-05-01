@@ -6,8 +6,13 @@ use App\Models\Repo;
 use Illuminate\Support\Facades\Http;
 use RuntimeException;
 
+/** PR provider for Bitbucket Cloud repos via the v2.0 API. */
 class BitbucketPullRequestProvider implements PullRequestProvider
 {
+    /**
+     * @throws RuntimeException When the repo has no access token, the URL is unparseable,
+     *                          or the Bitbucket API returns a non-2xx response.
+     */
     public function createPullRequest(Repo $repo, string $head, string $base, string $title, ?string $body = null): array
     {
         if ($repo->access_token === null || $repo->access_token === '') {

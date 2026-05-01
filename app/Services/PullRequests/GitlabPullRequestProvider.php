@@ -6,8 +6,13 @@ use App\Models\Repo;
 use Illuminate\Support\Facades\Http;
 use RuntimeException;
 
+/** PR provider for GitLab repos via the v4 API (creates a merge request). */
 class GitlabPullRequestProvider implements PullRequestProvider
 {
+    /**
+     * @throws RuntimeException When the repo has no access token, the URL is unparseable,
+     *                          or the GitLab API returns a non-2xx response.
+     */
     public function createPullRequest(Repo $repo, string $head, string $base, string $title, ?string $body = null): array
     {
         if ($repo->access_token === null || $repo->access_token === '') {

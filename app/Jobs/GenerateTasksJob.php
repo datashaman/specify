@@ -11,12 +11,20 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Throwable;
 
+/**
+ * Queue job that asks the `TasksGenerator` agent to produce a Story's task plan.
+ *
+ * The agent returns structured tasks + subtasks; this job normalises them into
+ * the `PlanWriter::replacePlan()` shape and persists in one transaction. The
+ * write resets approval (per ADR-0001) so reviewers re-approve the new plan.
+ */
 class GenerateTasksJob implements ShouldQueue
 {
     use Queueable;
 
     public function __construct(public int $agentRunId) {}
 
+    /** Queue handler — see class docblock. */
     public function handle(ExecutionService $execution, PlanWriter $planWriter): void
     {
         $run = AgentRun::findOrFail($this->agentRunId);

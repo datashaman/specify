@@ -10,8 +10,24 @@ use App\Models\User;
 use InvalidArgumentException;
 use RuntimeException;
 
+/**
+ * Coordinates Story approval state.
+ *
+ * Records decisions against the current `story_revision` and re-runs the
+ * state machine. Uniqueness is per (approver, revision); editing a story
+ * bumps revision, which discards old approvals from the count.
+ */
 class ApprovalService
 {
+    /**
+     * Record an approval decision against the story's current revision and recompute status.
+     *
+     * Rejects further decisions on a Rejected story and enforces the policy's
+     * `allow_self_approval` flag for the story's creator.
+     *
+     * @throws RuntimeException When the story is already Rejected.
+     * @throws InvalidArgumentException When self-approval is attempted but not allowed.
+     */
     public function recordDecision(
         Story $target,
         User $approver,
@@ -46,6 +62,14 @@ class ApprovalService
         return $approval;
     }
 
+    /**
+     * Replay approvals for the current revision and write the resulting Story status.
+     *
+     * Reject is terminal and short-circuits. ChangesRequested resets effective
+     * approvals to empty. Approve/Revoke maintain a per-approver tally; once
+     * the unique-approver count meets `required_approvals` (or `auto_approve`
+     * is set), the story moves to Approved. Drafts are not auto-promoted.
+     */
     public function recompute(Story $story): void
     {
         $policy = $story->effectivePolicy();

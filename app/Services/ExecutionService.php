@@ -17,8 +17,19 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
 
+/**
+ * Orchestrates AgentRun lifecycles for task generation and subtask execution.
+ *
+ * Each public dispatch* / start* method creates an `AgentRun` row, queues the
+ * matching job, and (on completion via `markSucceeded`) advances the cascade
+ * down through Subtask → Task → Story status. This class is the only place
+ * AgentRun rows should be created.
+ */
 class ExecutionService
 {
+    /**
+     * Queue a `GenerateTasksJob` for the given Story and return the AgentRun row.
+     */
     public function dispatchTaskGeneration(Story $story, ?StoryApproval $approval = null): AgentRun
     {
         $run = AgentRun::create([
@@ -34,6 +45,12 @@ class ExecutionService
         return $run;
     }
 
+    /**
+     * Queue an `ExecuteSubtaskJob` for the given Subtask.
+     *
+     * Resolves the target Repo from the project's primary repo when not supplied,
+     * and pre-computes the working branch name (`specify/{feature-slug}/{story-slug}`).
+     */
     public function dispatchSubtaskExecution(Subtask $subtask, ?StoryApproval $approval = null, ?Repo $repo = null): AgentRun
     {
         $repo ??= $subtask->task?->story?->feature?->project?->primaryRepo();
@@ -64,6 +81,14 @@ class ExecutionService
         return "specify/{$featureSlug}/{$storySlug}";
     }
 
+    /**
+     * Begin executing an Approved Story by dispatching every actionable subtask.
+     *
+     * No-op for terminal statuses (Done/Cancelled/Rejected). Skips subtasks
+     * that already have a Queued or Running AgentRun, so it is safe to retry.
+     *
+     * @throws RuntimeException When the Story is not in Approved status.
+     */
     public function startStoryExecution(Story $story, ?StoryApproval $approval = null): void
     {
         if (in_array($story->status, [StoryStatus::Done, StoryStatus::Cancelled, StoryStatus::Rejected], true)) {
@@ -111,6 +136,7 @@ class ExecutionService
             ->values();
     }
 
+    /** Transition an AgentRun to Running and stamp `started_at`. */
     public function markRunning(AgentRun $run): void
     {
         $run->forceFill([
@@ -119,6 +145,13 @@ class ExecutionService
         ])->save();
     }
 
+    /**
+     * Mark an AgentRun Succeeded, persist its output and diff, and cascade.
+     *
+     * For Subtask runs, marks the Subtask Done and dispatches the next
+     * actionable work via `advanceFromSubtask()` — completing all subtasks
+     * of a Task marks the Task Done; completing all Tasks marks the Story Done.
+     */
     public function markSucceeded(AgentRun $run, ?array $output = null, ?string $diff = null): void
     {
         $run->forceFill([
@@ -137,6 +170,7 @@ class ExecutionService
         }
     }
 
+    /** Mark an AgentRun Failed and move its Subtask (if any) to Blocked. */
     public function markFailed(AgentRun $run, string $error): void
     {
         $run->forceFill([
@@ -151,6 +185,7 @@ class ExecutionService
         }
     }
 
+    /** Mark an AgentRun Aborted (manual cancel) without cascading. */
     public function markAborted(AgentRun $run, ?string $reason = null): void
     {
         $run->forceFill([

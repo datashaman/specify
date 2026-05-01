@@ -9,10 +9,19 @@ use Illuminate\Support\Facades\File;
 use RuntimeException;
 use Symfony\Component\Process\Process;
 
+/**
+ * Manages the on-disk git working directory for an AgentRun.
+ *
+ * Each public method is a thin wrapper around a `git` invocation. Auth tokens
+ * are injected only into HTTPS clone URLs (never logged) and the working
+ * directory layout is `{runs_path}/specify/{feature-slug}/{story-slug}` so
+ * concurrent subtasks of the same story share one checkout.
+ */
 class WorkspaceRunner
 {
     public function __construct(public string $basePath, public string $committerName, public string $committerEmail) {}
 
+    /** Build a `WorkspaceRunner` from `config/specify.php` values. */
     public static function fromConfig(): self
     {
         return new self(
@@ -22,6 +31,13 @@ class WorkspaceRunner
         );
     }
 
+    /**
+     * Resolve the working-directory path for an AgentRun.
+     *
+     * Subtask runs share `{base}/specify/{feature-slug}/{story-slug}` so all
+     * subtasks of a story collaborate on one branch; runs without a slug
+     * fall back to a per-run directory.
+     */
     public function workingDirFor(AgentRun $run): string
     {
         $base = rtrim($this->basePath, '/');
@@ -60,6 +76,12 @@ class WorkspaceRunner
         return $dir;
     }
 
+    /**
+     * Check out `$branch`, creating it from `$baseBranch` if it doesn't exist.
+     *
+     * When `$baseBranch` is supplied, hard-resets the local copy to its remote
+     * tracking branch first so the executor starts from a clean upstream.
+     */
     public function checkoutBranch(string $workingDir, string $branch, ?string $baseBranch = null): void
     {
         if ($baseBranch !== null) {
@@ -121,6 +143,7 @@ class WorkspaceRunner
         return $diff['stdout'];
     }
 
+    /** Recursively delete the working directory if it exists. */
     public function cleanup(string $workingDir): void
     {
         if (is_dir($workingDir)) {

@@ -50,6 +50,7 @@ class SubtaskRunOutcome
         return new self(self::STATE_PULL_REQUEST_FAILED, $output, null, $error);
     }
 
+    /** True only for the clean Succeeded state — `noDiff` and `pullRequestFailed` return false. */
     public function isSucceeded(): bool
     {
         return $this->state === self::STATE_SUCCEEDED;

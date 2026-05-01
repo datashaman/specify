@@ -27,6 +27,11 @@ class CliExecutor implements Executor
         return true;
     }
 
+    /**
+     * Pipe a prompt to the CLI, run it in `$workingDir`, and report changed files.
+     *
+     * @throws RuntimeException When `$workingDir` is null or the CLI exits non-zero.
+     */
     public function execute(Subtask $subtask, ?string $workingDir, ?Repo $repo, ?string $workingBranch): ExecutionResult
     {
         if ($workingDir === null) {

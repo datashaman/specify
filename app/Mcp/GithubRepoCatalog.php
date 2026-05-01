@@ -6,6 +6,12 @@ use App\Models\User;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 
+/**
+ * Cached lookup of GitHub repos a User can access via their personal token.
+ *
+ * Used by MCP tools that need to resolve `owner/name` strings against the
+ * caller's actual GitHub permissions before attaching repos to a project.
+ */
 final class GithubRepoCatalog
 {
     /**

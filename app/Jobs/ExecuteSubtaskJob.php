@@ -12,12 +12,21 @@ use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Facades\Log;
 use Throwable;
 
+/**
+ * Queue job that runs a single Subtask AgentRun via `SubtaskRunPipeline`.
+ *
+ * Owns only queue-lifecycle concerns: load the AgentRun, mark Running, hand
+ * off to the pipeline, then translate the outcome into a markSucceeded /
+ * markFailed call. Exceptions from the pipeline mark Failed and rethrow so
+ * the queue can decide whether to retry.
+ */
 class ExecuteSubtaskJob implements ShouldQueue
 {
     use Queueable;
 
     public function __construct(public int $agentRunId) {}
 
+    /** Queue handler — see class docblock. */
     public function handle(ExecutionService $execution, SubtaskRunPipeline $pipeline): void
     {
         $run = AgentRun::findOrFail($this->agentRunId);

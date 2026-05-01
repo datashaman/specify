@@ -5,6 +5,13 @@ namespace App\Services\Executors;
 use App\Models\Repo;
 use App\Models\Subtask;
 
+/**
+ * Strategy that performs the engineering work for one Subtask.
+ *
+ * Implementations are bound by `specify.executor.driver` (see ADR-0003).
+ * `LaravelAiExecutor`, `CliExecutor`, and `FakeExecutor` cover the in-tree
+ * cases; new drivers register a name and implement this contract.
+ */
 interface Executor
 {
     /**

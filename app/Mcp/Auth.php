@@ -5,6 +5,7 @@ namespace App\Mcp;
 use App\Models\User;
 use Laravel\Mcp\Request;
 
+/** Static helpers for resolving the acting User on incoming MCP requests. */
 final class Auth
 {
     /**

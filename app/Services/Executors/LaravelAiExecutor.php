@@ -10,6 +10,14 @@ use Illuminate\Support\Facades\Log;
 use RuntimeException;
 use Throwable;
 
+/**
+ * Executor backed by the in-tree `SubtaskExecutor` agent (laravel/ai).
+ *
+ * Drives the Anthropic-backed agent to read and edit files in a checked-out
+ * working directory via tool calls. API errors and "no structured output"
+ * responses surface as their own RuntimeExceptions so the pipeline can
+ * report them distinctly (see commit 29f524c).
+ */
 class LaravelAiExecutor implements Executor
 {
     public function needsWorkingDirectory(): bool
@@ -17,6 +25,13 @@ class LaravelAiExecutor implements Executor
         return true;
     }
 
+    /**
+     * Run the agent loop and translate its final output into an `ExecutionResult`.
+     *
+     * @throws RuntimeException When the AI provider returns an HTTP error,
+     *                          or when the agent terminates without producing
+     *                          summary/files/commit-message fields.
+     */
     public function execute(Subtask $subtask, ?string $workingDir, ?Repo $repo, ?string $workingBranch): ExecutionResult
     {
         $context = [

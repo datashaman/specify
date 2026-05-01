@@ -27,6 +27,17 @@ class SubtaskRunPipeline
         public WorkspaceRunner $workspace,
     ) {}
 
+    /**
+     * Run the full prepare → execute → commit → push → PR sequence for an AgentRun.
+     *
+     * Returns a `SubtaskRunOutcome` describing how the run terminated; the caller
+     * (`ExecuteSubtaskJob`) translates that into AgentRun status changes. PR
+     * failures are non-fatal (see ADR-0004) and surface as a distinct outcome.
+     *
+     * @throws RuntimeException When the AgentRun's runnable is not a Subtask, or
+     *                          when the executor needs a working directory but
+     *                          no repo is bound to the run.
+     */
     public function run(AgentRun $agentRun): SubtaskRunOutcome
     {
         $subtask = $agentRun->runnable;
