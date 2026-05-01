@@ -32,6 +32,27 @@ return [
         'open_pr_after_push' => filter_var(env('SPECIFY_OPEN_PR_AFTER_PUSH', true), FILTER_VALIDATE_BOOLEAN),
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | Context item uploads
+    |--------------------------------------------------------------------------
+    |
+    | Project context-item file uploads are validated with these limits before
+    | storage. Size is in kilobytes because Laravel's file validation max rule
+    | uses kilobytes. Allowed extensions are comma-separated in the environment.
+    |
+    */
+
+    'context_items' => [
+        'uploads' => [
+            'max_file_size_kilobytes' => (int) env('SPECIFY_CONTEXT_ITEM_UPLOAD_MAX_KB', 10240),
+            'allowed_extensions' => array_values(array_filter(array_map(
+                'trim',
+                explode(',', (string) env('SPECIFY_CONTEXT_ITEM_UPLOAD_ALLOWED_EXTENSIONS', 'pdf,txt,md,markdown,csv,json,doc,docx,png,jpg,jpeg')),
+            ))),
+        ],
+    ],
+
     'github' => [
         'api_base' => env('SPECIFY_GITHUB_API_BASE', 'https://api.github.com'),
     ],

@@ -100,6 +100,47 @@ test('admin can create a file context item', function () {
     Storage::disk('local')->assertExists($path);
 });
 
+test('admin cannot create a file context item larger than the configured limit', function () {
+    Storage::fake('local');
+    config()->set('specify.context_items.uploads.max_file_size_kilobytes', 1);
+    config()->set('specify.context_items.uploads.allowed_extensions', ['txt']);
+
+    ['user' => $user, 'project' => $project] = projectContextItemStoreScene();
+    $file = UploadedFile::fake()->create('notes.txt', 2, 'text/plain');
+
+    contextItemStoreRequest($this)->actingAs($user)
+        ->postJson(route('projects.context-items.store', $project), [
+            'type' => 'file',
+            'title' => 'Project notes',
+            'file' => $file,
+        ])
+        ->assertInvalid([
+            'file' => 'The context file must not be larger than 1 kilobytes.',
+        ]);
+
+    expect(ContextItem::query()->count())->toBe(0);
+});
+
+test('admin cannot create a file context item with a disallowed extension', function () {
+    Storage::fake('local');
+    config()->set('specify.context_items.uploads.allowed_extensions', ['txt']);
+
+    ['user' => $user, 'project' => $project] = projectContextItemStoreScene();
+    $file = UploadedFile::fake()->create('brief.pdf', 1, 'application/pdf');
+
+    contextItemStoreRequest($this)->actingAs($user)
+        ->postJson(route('projects.context-items.store', $project), [
+            'type' => 'file',
+            'title' => 'Project brief',
+            'file' => $file,
+        ])
+        ->assertInvalid([
+            'file' => 'The context file must use one of these extensions: txt.',
+        ]);
+
+    expect(ContextItem::query()->count())->toBe(0);
+});
+
 test('team member cannot create a project context item', function () {
     ['user' => $user, 'project' => $project] = projectContextItemStoreScene(TeamRole::Member);
 
