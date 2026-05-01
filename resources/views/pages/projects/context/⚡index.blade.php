@@ -53,11 +53,23 @@ new #[Title('Project context')] class extends Component {
             class="flex flex-col gap-3"
             x-data="{
                 endpoint: {{ \Illuminate\Support\Js::from(route('projects.context-items.index', $this->project)) }},
+                csrfToken: {{ \Illuminate\Support\Js::from(csrf_token()) }},
                 errorMessage: {{ \Illuminate\Support\Js::from(__('Context items could not be loaded.')) }},
+                createErrorMessage: {{ \Illuminate\Support\Js::from(__('Context item could not be added.')) }},
                 defaultType: {{ \Illuminate\Support\Js::from(__('Context')) }},
                 contextItems: Array(),
                 error: null,
                 loading: true,
+                saving: false,
+                form: {
+                    type: 'file',
+                    title: '',
+                    description: '',
+                    url: '',
+                    body: '',
+                },
+                fieldErrors: {},
+                createError: null,
                 async load() {
                     this.loading = true;
                     this.error = null;
@@ -79,6 +91,78 @@ new #[Title('Project context')] class extends Component {
                         this.error = error.message || this.errorMessage;
                     } finally {
                         this.loading = false;
+                    }
+                },
+                resetForm() {
+                    this.form = {
+                        type: 'file',
+                        title: '',
+                        description: '',
+                        url: '',
+                        body: '',
+                    };
+                    this.fieldErrors = {};
+                    this.createError = null;
+
+                    if (this.$refs.file) {
+                        this.$refs.file.value = '';
+                    }
+                },
+                firstError(field) {
+                    return this.fieldErrors[field]?.[0] || '';
+                },
+                async create() {
+                    this.saving = true;
+                    this.fieldErrors = {};
+                    this.createError = null;
+
+                    const data = new FormData();
+                    data.append('type', this.form.type);
+                    data.append('title', this.form.title);
+                    data.append('description', this.form.description);
+
+                    if (this.form.type === 'file' && this.$refs.file?.files?.[0]) {
+                        data.append('file', this.$refs.file.files[0]);
+                    }
+
+                    if (this.form.type === 'link') {
+                        data.append('url', this.form.url);
+                    }
+
+                    if (this.form.type === 'text') {
+                        data.append('body', this.form.body);
+                    }
+
+                    try {
+                        const response = await fetch(this.endpoint, {
+                            method: 'POST',
+                            headers: {
+                                Accept: 'application/json',
+                                'X-CSRF-TOKEN': this.csrfToken,
+                            },
+                            credentials: 'same-origin',
+                            body: data,
+                        });
+
+                        if (response.status === 422) {
+                            const payload = await response.json();
+                            this.fieldErrors = payload.errors || {};
+                            this.createError = payload.message || this.createErrorMessage;
+
+                            return;
+                        }
+
+                        if (! response.ok) {
+                            throw new Error(`${this.createErrorMessage} (${response.status})`);
+                        }
+
+                        this.resetForm();
+                        this.$flux.modal('add-context-item-modal').close();
+                        await this.load();
+                    } catch (error) {
+                        this.createError = error.message || this.createErrorMessage;
+                    } finally {
+                        this.saving = false;
                     }
                 },
                 formatType(type) {
@@ -103,6 +187,87 @@ new #[Title('Project context')] class extends Component {
             }"
             x-init="load()"
         >
+            <div class="flex justify-end">
+                <flux:modal.trigger name="add-context-item-modal">
+                    <flux:button variant="primary" icon="plus">
+                        {{ __('Add context item') }}
+                    </flux:button>
+                </flux:modal.trigger>
+            </div>
+
+            <flux:modal name="add-context-item-modal" class="md:w-[34rem]">
+                <form class="flex flex-col gap-5" x-on:submit.prevent="create()">
+                    <div class="flex flex-col gap-1">
+                        <flux:heading>{{ __('Add context item') }}</flux:heading>
+                        <flux:text class="text-sm text-zinc-500">
+                            {{ __('Attach a file, link, or text snippet to this project.') }}
+                        </flux:text>
+                    </div>
+
+                    <template x-if="createError">
+                        <flux:callout variant="danger" icon="exclamation-triangle">
+                            <flux:callout.heading>{{ __('Unable to add context item') }}</flux:callout.heading>
+                            <flux:callout.text x-text="createError"></flux:callout.text>
+                        </flux:callout>
+                    </template>
+
+                    <flux:field>
+                        <flux:label>{{ __('Type') }}</flux:label>
+                        <flux:select x-model="form.type" x-on:change="fieldErrors = {}; createError = null">
+                            <flux:select.option value="file">{{ __('File') }}</flux:select.option>
+                            <flux:select.option value="link">{{ __('Link') }}</flux:select.option>
+                            <flux:select.option value="text">{{ __('Text snippet') }}</flux:select.option>
+                        </flux:select>
+                        <flux:error name="type" x-text="firstError('type')" />
+                    </flux:field>
+
+                    <div class="grid gap-4 sm:grid-cols-2">
+                        <flux:field>
+                            <flux:label>{{ __('Title') }}</flux:label>
+                            <flux:input x-model="form.title" required />
+                            <flux:error name="title" x-text="firstError('title')" />
+                        </flux:field>
+
+                        <flux:field>
+                            <flux:label>{{ __('Description') }}</flux:label>
+                            <flux:input x-model="form.description" />
+                            <flux:error name="description" x-text="firstError('description')" />
+                        </flux:field>
+                    </div>
+
+                    <flux:field x-show="form.type === 'file'">
+                        <flux:label>{{ __('File') }}</flux:label>
+                        <flux:input type="file" x-ref="file" />
+                        <flux:error name="file" x-text="firstError('file')" />
+                    </flux:field>
+
+                    <flux:field x-show="form.type === 'link'">
+                        <flux:label>{{ __('URL') }}</flux:label>
+                        <flux:input type="url" x-model="form.url" placeholder="https://example.com" />
+                        <flux:error name="url" x-text="firstError('url')" />
+                    </flux:field>
+
+                    <flux:field x-show="form.type === 'text'">
+                        <flux:label>{{ __('Text snippet') }}</flux:label>
+                        <flux:textarea x-model="form.body" rows="6" />
+                        <flux:error name="body" x-text="firstError('body')" />
+                    </flux:field>
+
+                    <div class="flex justify-end gap-2">
+                        <flux:modal.close>
+                            <flux:button type="button" variant="ghost" x-on:click="resetForm()">
+                                {{ __('Cancel') }}
+                            </flux:button>
+                        </flux:modal.close>
+
+                        <flux:button type="submit" variant="primary" x-bind:disabled="saving">
+                            <span x-show="! saving">{{ __('Add item') }}</span>
+                            <span x-show="saving">{{ __('Adding...') }}</span>
+                        </flux:button>
+                    </div>
+                </form>
+            </flux:modal>
+
             <template x-if="loading">
                 <div class="flex flex-col gap-3" aria-live="polite">
                     <flux:card>
