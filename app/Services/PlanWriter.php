@@ -3,10 +3,13 @@
 namespace App\Services;
 
 use App\Enums\StoryStatus;
+use App\Models\AgentRun;
 use App\Models\Story;
 use App\Models\Subtask;
 use App\Models\Task;
+use App\Services\Executors\ProposedSubtask;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use InvalidArgumentException;
 
 /**
@@ -94,6 +97,52 @@ class PlanWriter
         $this->approvals->recompute($story->fresh());
 
         return $result;
+    }
+
+    /**
+     * Append-only growth of a Task's Subtask list driven by a successful
+     * executor run (ADR-0005). Unlike `replacePlan()`, this does NOT reset
+     * Story approval, because intent and existing Subtasks are unchanged.
+     *
+     * Caps at three appended Subtasks per call; surplus is discarded with a
+     * warning so a runaway agent cannot extend the plan unboundedly.
+     *
+     * @param  list<ProposedSubtask>  $proposed
+     * @return list<Subtask> The Subtasks that were created (in execution order).
+     */
+    public function appendProposedSubtasks(Task $task, array $proposed, AgentRun $run): array
+    {
+        if ($proposed === []) {
+            return [];
+        }
+
+        $cap = 3;
+        if (count($proposed) > $cap) {
+            Log::warning('specify.plan.proposed_subtasks.capped', [
+                'task_id' => $task->getKey(),
+                'run_id' => $run->getKey(),
+                'received' => count($proposed),
+                'cap' => $cap,
+            ]);
+            $proposed = array_slice($proposed, 0, $cap);
+        }
+
+        return DB::transaction(function () use ($task, $proposed, $run) {
+            $startPosition = ((int) $task->subtasks()->max('position')) + 1;
+            $created = [];
+
+            foreach ($proposed as $i => $entry) {
+                $created[] = Subtask::create([
+                    'task_id' => $task->getKey(),
+                    'position' => $startPosition + $i,
+                    'name' => $entry->name,
+                    'description' => $entry->description."\n\n_Reason:_ ".$entry->reason,
+                    'proposed_by_run_id' => $run->getKey(),
+                ]);
+            }
+
+            return $created;
+        });
     }
 
     /**

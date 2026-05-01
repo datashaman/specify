@@ -75,11 +75,28 @@ class PrPayloadBuilder
             foreach ($clarifications as $c) {
                 if (is_array($c) && isset($c['message'])) {
                     $kind = isset($c['kind']) ? '['.$c['kind'].'] ' : '';
-                    $rendered[] = '- '.$kind.$c['message'];
+                    $line = '- '.$kind.$c['message'];
+                    if (! empty($c['proposed'])) {
+                        $line .= "\n  _Proposed:_ ".$c['proposed'];
+                    }
+                    $rendered[] = $line;
                 }
             }
             if ($rendered !== []) {
                 $sections[] = "## Open questions\n".implode("\n", $rendered);
+            }
+        }
+
+        $appended = (array) ($output['appended_subtasks'] ?? []);
+        if ($appended !== []) {
+            $rendered = [];
+            foreach ($appended as $entry) {
+                if (is_array($entry) && isset($entry['name'])) {
+                    $rendered[] = sprintf('- #%s — %s', $entry['position'] ?? '?', $entry['name']);
+                }
+            }
+            if ($rendered !== []) {
+                $sections[] = "## Proposed follow-up subtasks\nThe executor appended these subtasks to the parent Task and they are queued to run automatically (ADR-0005). Reject the PR or request changes on the Story if the growth is wrong.\n\n".implode("\n", $rendered);
             }
         }
 

@@ -6,6 +6,7 @@ use App\Models\AgentRun;
 use App\Models\Repo;
 use App\Models\Subtask;
 use App\Services\Executors\Executor;
+use App\Services\Executors\ProposedSubtask;
 use App\Services\PullRequests\PrPayloadBuilder;
 use Illuminate\Support\Facades\Log;
 use RuntimeException;
@@ -26,6 +27,7 @@ class SubtaskRunPipeline
     public function __construct(
         public Executor $executor,
         public WorkspaceRunner $workspace,
+        public PlanWriter $planWriter,
     ) {}
 
     /**
@@ -69,6 +71,7 @@ class SubtaskRunPipeline
         if ($workingDir === null) {
             $diff = $result->filesChanged === [] ? null : implode("\n", $result->filesChanged);
             $output['commit_sha'] = null;
+            $output = $this->applyProposedSubtasks($subtask, $result->proposedSubtasks, $agentRun, $output, $logCtx);
             Log::info('specify.subtask.run.succeeded', $logCtx + ['commit_sha' => null]);
 
             return SubtaskRunOutcome::succeeded($output, $diff);
@@ -94,6 +97,7 @@ class SubtaskRunPipeline
         }
 
         $output['commit_sha'] = $commitSha;
+        $output = $this->applyProposedSubtasks($subtask, $result->proposedSubtasks, $agentRun, $output, $logCtx);
 
         if (config('specify.workspace.push_after_commit', true)) {
             $branch = $this->branchFor($agentRun);
@@ -157,6 +161,79 @@ class SubtaskRunPipeline
     private function branchFor(AgentRun $agentRun): string
     {
         return $agentRun->working_branch ?? 'specify/run-'.$agentRun->getKey();
+    }
+
+    /**
+     * Append-and-merge: persist proposed follow-up Subtasks (ADR-0005) and
+     * record them in the AgentRun output so the PR body can render them.
+     *
+     * Called only on paths that have produced real work — describe-only
+     * success or post-commit success — so a `noDiff` outcome cannot strand
+     * orphaned Subtasks.
+     *
+     * @param  list<ProposedSubtask>  $proposed
+     * @param  array<string, mixed>  $output
+     * @param  array<string, mixed>  $logCtx
+     * @return array<string, mixed>
+     */
+    private function applyProposedSubtasks(Subtask $subtask, array $proposed, AgentRun $agentRun, array $output, array $logCtx): array
+    {
+        $appended = $this->appendProposedSubtasks($subtask, $proposed, $agentRun);
+        if ($appended === []) {
+            return $output;
+        }
+
+        $output['appended_subtasks'] = array_map(fn ($s) => [
+            'id' => $s->getKey(),
+            'position' => $s->position,
+            'name' => $s->name,
+        ], $appended);
+        Log::info('specify.subtask.proposed_subtasks.appended', $logCtx + [
+            'count' => count($appended),
+            'subtask_ids' => array_map(fn ($s) => $s->getKey(), $appended),
+        ]);
+
+        return $output;
+    }
+
+    /**
+     * Append executor-proposed follow-up Subtasks to the parent Task (ADR-0005).
+     *
+     * Returns the created Subtasks (empty if the executor proposed none or has
+     * no parent Task). Failures are non-fatal — appending a follow-up should
+     * never tank the run that just succeeded — so we log and continue.
+     *
+     * @param  list<ProposedSubtask>  $proposed
+     * @return list<Subtask>
+     */
+    private function appendProposedSubtasks(Subtask $subtask, array $proposed, AgentRun $agentRun): array
+    {
+        if ($proposed === []) {
+            return [];
+        }
+
+        $task = $subtask->task;
+        if ($task === null) {
+            Log::warning('specify.subtask.proposed_subtasks.skipped', [
+                'run_id' => $agentRun->getKey(),
+                'reason' => 'no parent task',
+            ]);
+
+            return [];
+        }
+
+        try {
+            return $this->planWriter->appendProposedSubtasks($task, $proposed, $agentRun);
+        } catch (Throwable $e) {
+            Log::warning('specify.subtask.proposed_subtasks.failed', [
+                'run_id' => $agentRun->getKey(),
+                'task_id' => $task->getKey(),
+                'exception' => $e::class,
+                'message' => $e->getMessage(),
+            ]);
+
+            return [];
+        }
     }
 
     /**

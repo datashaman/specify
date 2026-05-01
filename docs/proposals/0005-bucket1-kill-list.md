@@ -73,14 +73,7 @@ Same shape as #1: the linear pipeline is a deliberate design that an ADR should 
 
 ### #5 (full) — Rename `generate-plan` MCP tool to `generate-tasks`
 
-**Why deferred**: every MCP client that currently calls `generate-plan` would break. Need to:
-
-1. Add `generate-tasks` as an alias that forwards to the same handler.
-2. Update internal docs and clients.
-3. Deprecate `generate-plan` with a console warning for one minor version.
-4. Remove `generate-plan` after the deprecation window.
-
-Recommend opening as a separate small PR with the alias-and-deprecate dance. ADR-0002 already promised this with a deprecation period.
+**Resolution**: greenfield codebase, no external callers to migrate. The legacy slug was deleted outright in the same change as the rename; `GenerateTasksTool` is the only entry point.
 
 ## Risk and reversibility
 

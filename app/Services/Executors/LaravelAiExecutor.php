@@ -76,12 +76,16 @@ class LaravelAiExecutor implements Executor
         $summary = trim((string) ($output['summary'] ?? ''));
         $files = array_values(array_filter(array_map('strval', $output['files_changed'] ?? [])));
         $commitMessage = trim((string) ($output['commit_message'] ?? ''));
+        $clarifications = $this->parseClarifications($output['clarifications'] ?? []);
+        $proposedSubtasks = $this->parseProposedSubtasks($output['proposed_subtasks'] ?? []);
 
         Log::info('specify.subtask.agent.finished', $context + [
             'duration_ms' => (int) ((microtime(true) - $start) * 1000),
             'summary' => $summary,
             'files_changed' => $files,
             'commit_message' => $commitMessage,
+            'clarification_count' => count($clarifications),
+            'proposed_subtask_count' => count($proposedSubtasks),
         ]);
 
         if ($summary === '' && $files === [] && $commitMessage === '') {
@@ -92,6 +96,58 @@ class LaravelAiExecutor implements Executor
             );
         }
 
-        return new ExecutionResult($summary, $files, $commitMessage);
+        return new ExecutionResult(
+            summary: $summary,
+            filesChanged: $files,
+            commitMessage: $commitMessage,
+            clarifications: $clarifications,
+            proposedSubtasks: $proposedSubtasks,
+        );
+    }
+
+    /**
+     * @param  mixed  $raw
+     * @return list<ExecutorClarification>
+     */
+    private function parseClarifications($raw): array
+    {
+        if (! is_array($raw)) {
+            return [];
+        }
+        $out = [];
+        foreach ($raw as $entry) {
+            if (! is_array($entry)) {
+                continue;
+            }
+            $c = ExecutorClarification::fromArray($entry);
+            if ($c !== null) {
+                $out[] = $c;
+            }
+        }
+
+        return $out;
+    }
+
+    /**
+     * @param  mixed  $raw
+     * @return list<ProposedSubtask>
+     */
+    private function parseProposedSubtasks($raw): array
+    {
+        if (! is_array($raw)) {
+            return [];
+        }
+        $out = [];
+        foreach ($raw as $entry) {
+            if (! is_array($entry)) {
+                continue;
+            }
+            $p = ProposedSubtask::fromArray($entry);
+            if ($p !== null) {
+                $out[] = $p;
+            }
+        }
+
+        return $out;
     }
 }

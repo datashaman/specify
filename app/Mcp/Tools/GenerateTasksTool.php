@@ -12,14 +12,17 @@ use Laravel\Mcp\Server\Attributes\Description;
 use Laravel\Mcp\Server\Tool;
 
 /**
- * MCP tool: generate-plan
+ * MCP tool: generate-tasks
+ *
+ * Drives the planning agent for an Approved story. Aligned with the
+ * Story → Task → Subtask hierarchy (ADR-0002).
  */
-#[Description('Generate the plan (tasks + subtasks) for an Approved story using the planning agent. One task per acceptance criterion, each with one or more subtasks. The story must be Approved and have no existing tasks. Generated plan reopens approval — the story flips back to PendingApproval (revision bumped) so a human can review the breakdown before execution.')]
-class GeneratePlanTool extends Tool
+#[Description('Generate the task list (tasks + subtasks) for an Approved story using the planning agent. One task per acceptance criterion, each with one or more subtasks. The story must be Approved and have no existing tasks. Generated tasks reopen approval — the story flips back to PendingApproval (revision bumped) so a human can review the breakdown before execution.')]
+class GenerateTasksTool extends Tool
 {
     use ResolvesProjectAccess;
 
-    protected string $name = 'generate-plan';
+    protected string $name = 'generate-tasks';
 
     /**
      * Handle the MCP tool invocation.
@@ -42,11 +45,11 @@ class GeneratePlanTool extends Tool
         }
 
         if ($story->status !== StoryStatus::Approved) {
-            return Response::error('Story must be Approved before generating a plan.');
+            return Response::error('Story must be Approved before generating tasks.');
         }
 
         if ($story->tasks()->exists()) {
-            return Response::error('Story already has a plan. Use set-tasks / update-task to edit it.');
+            return Response::error('Story already has tasks. Use set-tasks / update-task to edit them.');
         }
 
         $run = $execution->dispatchTaskGeneration($story);
@@ -64,7 +67,7 @@ class GeneratePlanTool extends Tool
     public function schema(JsonSchema $schema): array
     {
         return [
-            'story_id' => $schema->integer()->description('Approved story to generate the plan for. Must have no existing tasks.')->required(),
+            'story_id' => $schema->integer()->description('Approved story to generate tasks for. Must have no existing tasks.')->required(),
         ];
     }
 }

@@ -16,7 +16,7 @@ We needed a single, meaningful approval surface that binds intent to work withou
 - `StoryApproval` is the only approval table; `PlanApproval` was removed.
 - `ApprovalPolicy` (workspace/project/story scope cascade, with `required_approvals` threshold) governs how many Approve decisions a Story needs.
 - `ApprovalService::recordDecision/recompute` runs the state machine: Approve counts unique approvers toward the threshold, ChangesRequested resets, Reject is terminal, Revoke cancels prior decisions.
-- Any subsequent edit to a Story's tasks or subtasks resets the Story to `PendingApproval`. Re-approving the Story re-authorises the (now-edited) plan beneath it.
+- Any subsequent edit to a Story's tasks or subtasks resets the Story to `PendingApproval`. Re-approving the Story re-authorises the (now-edited) plan beneath it. **Exception (ADR-0005):** executor-driven append-only growth of the plan during a running approved Subtask does *not* reset approval, because intent and existing Subtasks are unchanged.
 - The diff-review surface for engineering output is the **pull request**, not an in-app approval table.
 
 ## Consequences
