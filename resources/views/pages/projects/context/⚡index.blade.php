@@ -39,6 +39,11 @@ new #[Title('Project context')] class extends Component {
         <flux:text class="text-zinc-500">{{ __('Project not found.') }}</flux:text>
     @else
         @php($canManage = $this->canManage)
+        @php($allowedUploadExtensions = array_values(array_filter(array_map(
+            fn (mixed $extension): string => strtolower(trim((string) $extension)),
+            config('specify.context_items.uploads.allowed_extensions', []),
+        ))))
+        @php($maxUploadSizeInKilobytes = max(1, (int) config('specify.context_items.uploads.max_file_size_kilobytes', 10240)))
 
         <div class="flex flex-col gap-3">
             <flux:breadcrumbs>
@@ -65,8 +70,18 @@ new #[Title('Project context')] class extends Component {
                 createErrorMessage: {{ \Illuminate\Support\Js::from(__('Context item could not be added.')) }},
                 updateErrorMessage: {{ \Illuminate\Support\Js::from(__('Context item could not be updated.')) }},
                 deleteErrorMessage: {{ \Illuminate\Support\Js::from(__('Context item could not be deleted.')) }},
+                uploadTooLargeMessage: {{ \Illuminate\Support\Js::from(__('The context file is too large.')) }},
+                uploadTypeMessage: {{ \Illuminate\Support\Js::from(__('This file type is not allowed.')) }},
+                uploadChooseAnotherMessage: {{ \Illuminate\Support\Js::from(__('Choose another file and try again.')) }},
+                uploadAllowedExtensionsMessage: {{ \Illuminate\Support\Js::from(__('Allowed file types')) }},
+                uploadMaxSizeMessage: {{ \Illuminate\Support\Js::from(__('Maximum size')) }},
                 defaultType: {{ \Illuminate\Support\Js::from(__('Context')) }},
                 canManage: {{ \Illuminate\Support\Js::from($canManage) }},
+                uploadLimits: {
+                    maxFileSizeKilobytes: {{ \Illuminate\Support\Js::from($maxUploadSizeInKilobytes) }},
+                    maxFileSizeBytes: {{ \Illuminate\Support\Js::from($maxUploadSizeInKilobytes * 1024) }},
+                    allowedExtensions: {{ \Illuminate\Support\Js::from($allowedUploadExtensions) }},
+                },
                 contextItems: Array(),
                 error: null,
                 loading: true,
@@ -136,6 +151,100 @@ new #[Title('Project context')] class extends Component {
                 firstError(field) {
                     return this.fieldErrors[field]?.[0] || '';
                 },
+                formatFileSize(bytes) {
+                    if (! Number.isFinite(Number(bytes)) || Number(bytes) <= 0) {
+                        return '';
+                    }
+
+                    if (Number(bytes) >= 1024 * 1024) {
+                        return `${(Number(bytes) / 1024 / 1024).toFixed(1).replace(/\.0$/, '')} MB`;
+                    }
+
+                    return `${Math.ceil(Number(bytes) / 1024)} KB`;
+                },
+                allowedExtensionsText() {
+                    return this.uploadLimits.allowedExtensions.map((extension) => `.${extension}`).join(', ');
+                },
+                fileExtension(fileName) {
+                    const parts = String(fileName || '').toLowerCase().split('.');
+
+                    return parts.length > 1 ? parts.pop() : '';
+                },
+                fileTypeErrorMessage() {
+                    const allowedExtensions = this.allowedExtensionsText();
+
+                    return allowedExtensions
+                        ? `${this.uploadTypeMessage} ${this.uploadAllowedExtensionsMessage}: ${allowedExtensions}. ${this.uploadChooseAnotherMessage}`
+                        : `${this.uploadTypeMessage} ${this.uploadChooseAnotherMessage}`;
+                },
+                fileTooLargeErrorMessage(limitBytes = this.uploadLimits.maxFileSizeBytes) {
+                    const formattedLimit = this.formatFileSize(limitBytes);
+
+                    return formattedLimit
+                        ? `${this.uploadTooLargeMessage} ${this.uploadMaxSizeMessage}: ${formattedLimit}. ${this.uploadChooseAnotherMessage}`
+                        : `${this.uploadTooLargeMessage} ${this.uploadChooseAnotherMessage}`;
+                },
+                selectedFileError(file) {
+                    if (! file) {
+                        return '';
+                    }
+
+                    if (file.size > this.uploadLimits.maxFileSizeBytes) {
+                        return this.fileTooLargeErrorMessage();
+                    }
+
+                    if (
+                        this.uploadLimits.allowedExtensions.length > 0
+                        && ! this.uploadLimits.allowedExtensions.includes(this.fileExtension(file.name))
+                    ) {
+                        return this.fileTypeErrorMessage();
+                    }
+
+                    return '';
+                },
+                validateSelectedFile() {
+                    if (this.form.type !== 'file') {
+                        return true;
+                    }
+
+                    const error = this.selectedFileError(this.$refs.file?.files?.[0]);
+
+                    if (! error) {
+                        return true;
+                    }
+
+                    this.fieldErrors.file = [error];
+                    this.createError = error;
+
+                    return false;
+                },
+                createValidationMessage(payload) {
+                    if (payload?.error?.code === 'context_item_upload_rejected' || payload?.errors?.file?.length) {
+                        return this.uploadRejectionMessage(payload);
+                    }
+
+                    return payload?.message || this.createErrorMessage;
+                },
+                uploadRejectionMessage(payload) {
+                    const violations = Array.isArray(payload?.error?.violations) ? payload.error.violations : [];
+                    const messages = [];
+
+                    violations.forEach((violation) => {
+                        if (violation.rule === 'max_file_size') {
+                            messages.push(this.fileTooLargeErrorMessage(violation.limit?.bytes));
+                        }
+
+                        if (['allowed_file_type', 'allowed_extension'].includes(violation.rule)) {
+                            messages.push(this.fileTypeErrorMessage());
+                        }
+                    });
+
+                    if (messages.length > 0) {
+                        return [...new Set(messages)].join(' ');
+                    }
+
+                    return payload?.errors?.file?.[0] || payload?.message || this.createErrorMessage;
+                },
                 firstEditError(field) {
                     return this.editFieldErrors[field]?.[0] || '';
                 },
@@ -143,9 +252,14 @@ new #[Title('Project context')] class extends Component {
                     return `${this.endpoint}/${id}`;
                 },
                 async create() {
-                    this.saving = true;
                     this.fieldErrors = {};
                     this.createError = null;
+
+                    if (! this.validateSelectedFile()) {
+                        return;
+                    }
+
+                    this.saving = true;
 
                     const data = new FormData();
                     data.append('type', this.form.type);
@@ -178,7 +292,7 @@ new #[Title('Project context')] class extends Component {
                         if (response.status === 422) {
                             const payload = await response.json();
                             this.fieldErrors = payload.errors || {};
-                            this.createError = payload.message || this.createErrorMessage;
+                            this.createError = this.createValidationMessage(payload);
 
                             return;
                         }
@@ -392,8 +506,19 @@ new #[Title('Project context')] class extends Component {
 
                     <flux:field x-show="form.type === 'file'">
                         <flux:label>{{ __('File') }}</flux:label>
-                        <flux:input type="file" x-ref="file" />
+                        <flux:input
+                            type="file"
+                            x-ref="file"
+                            x-bind:accept="uploadLimits.allowedExtensions.map((extension) => `.${extension}`).join(',')"
+                            x-on:change="fieldErrors.file = []; createError = null; validateSelectedFile()"
+                        />
                         <flux:error name="file" x-text="firstError('file')" />
+                        <flux:text class="text-xs text-zinc-500">
+                            {{ __('Allowed file types') }}:
+                            <span x-text="allowedExtensionsText()"></span>.
+                            {{ __('Maximum size') }}:
+                            <span x-text="formatFileSize(uploadLimits.maxFileSizeBytes)"></span>.
+                        </flux:text>
                     </flux:field>
 
                     <flux:field x-show="form.type === 'link'">
