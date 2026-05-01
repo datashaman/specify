@@ -138,6 +138,7 @@ class SubtaskRunPipeline
 
                     return SubtaskRunOutcome::pullRequestFailed(
                         $output,
+                        $diff,
                         'Pull request creation failed: '.$prResult['pull_request_error'],
                     );
                 }

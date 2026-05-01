@@ -63,12 +63,12 @@ class ExecuteSubtaskJob implements ShouldQueue
         }
 
         match ($outcome->state) {
-            SubtaskRunOutcome::STATE_SUCCEEDED => $execution->markSucceeded($run, $outcome->output, $outcome->diff),
-            SubtaskRunOutcome::STATE_NO_DIFF,
-            SubtaskRunOutcome::STATE_PULL_REQUEST_FAILED => $execution->markFailed($run, $outcome->error ?? 'Subtask run failed.'),
+            SubtaskRunOutcome::STATE_SUCCEEDED,
+            SubtaskRunOutcome::STATE_PULL_REQUEST_FAILED => $execution->markSucceeded($run, $outcome->output, $outcome->diff),
+            SubtaskRunOutcome::STATE_NO_DIFF => $execution->markFailed($run, $outcome->error ?? 'Subtask run failed.'),
         };
 
-        if ($outcome->state === SubtaskRunOutcome::STATE_SUCCEEDED) {
+        if ($outcome->isSucceeded()) {
             $this->dispatchAdvisoryReview($run->fresh());
         }
     }
