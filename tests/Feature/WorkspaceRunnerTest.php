@@ -116,6 +116,29 @@ test('checkoutBranch creates and switches to a new branch', function () {
     expect($current)->toBe('specify/feature');
 });
 
+test('checkoutBranch resyncs to origin/{branch} when remote has moved ahead', function () {
+    $url = makeSourceRepoWithCommit();
+    $runner = makeRunner();
+    $repo = makeRepoWithUrl($url);
+
+    // First run pushes a commit on the feature branch.
+    $first = $runner->prepare($repo, makeAgentRun());
+    $runner->checkoutBranch($first, 'specify/sync-me', baseBranch: 'main');
+    File::put($first.'/from-first.txt', "first\n");
+    $runner->commit($first, 'feat: first run');
+    $runner->push($first, 'specify/sync-me');
+
+    // Second run starts in its own working dir; the branch is already on
+    // origin. checkoutBranch must hard-reset local to origin/{branch} so
+    // the agent sees the work the first run pushed (the bug it patches).
+    $second = $runner->prepare($repo, makeAgentRun());
+    $runner->checkoutBranch($second, 'specify/sync-me', baseBranch: 'main');
+
+    expect(file_exists($second.'/from-first.txt'))->toBeTrue();
+    $current = trim(gitRun($second, ['git', 'rev-parse', '--abbrev-ref', 'HEAD']));
+    expect($current)->toBe('specify/sync-me');
+});
+
 test('commit returns null when working tree is clean', function () {
     $url = makeSourceRepoWithCommit();
     $runner = makeRunner();
