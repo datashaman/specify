@@ -9,6 +9,7 @@ use App\Models\Repo;
 use App\Models\Story;
 use App\Models\Subtask;
 use App\Models\Task;
+use App\Services\Context\ContextBuilder;
 use App\Services\Context\NullContextBuilder;
 use App\Services\Executors\ExecutionResult;
 use App\Services\Executors\Executor;
@@ -195,6 +196,74 @@ test('SubtaskRunPipeline does NOT append proposed subtasks when the run ends in 
 
     expect($outcome->state)->toBe(SubtaskRunOutcome::STATE_NO_DIFF)
         ->and($afterCount)->toBe($beforeCount);
+});
+
+test('context_brief is persisted on AgentRun.output even when the run ends in noDiff', function () {
+    $task = makeApprovedTask();
+    $subtask = Subtask::factory()->for($task)->create(['name' => 'main', 'position' => 1]);
+    $repo = Repo::factory()->for($task->story->feature->project->team->workspace)->create();
+    $run = AgentRun::create([
+        'runnable_type' => Subtask::class,
+        'runnable_id' => $subtask->getKey(),
+        'repo_id' => $repo->getKey(),
+        'working_branch' => 'specify/test',
+        'status' => AgentRunStatus::Running,
+    ]);
+
+    $executor = new class implements Executor
+    {
+        public function needsWorkingDirectory(): bool
+        {
+            return true;
+        }
+
+        public function execute(Subtask $subtask, ?string $workingDir, ?Repo $repo, ?string $workingBranch, ?string $contextBrief = null): ExecutionResult
+        {
+            return new ExecutionResult(summary: '', filesChanged: [], commitMessage: 'noop');
+        }
+    };
+
+    $workspace = new class extends WorkspaceRunner
+    {
+        public function __construct() {}
+
+        public function prepare(Repo $repo, AgentRun $run): string
+        {
+            return sys_get_temp_dir();
+        }
+
+        public function checkoutBranch(string $workingDir, string $branch, ?string $baseBranch = null): void {}
+
+        public function commit(string $workingDir, string $message): ?string
+        {
+            return null;
+        }
+
+        public function diff(string $workingDir, ?string $base = null): string
+        {
+            return '';
+        }
+    };
+
+    $contextBuilder = new class implements ContextBuilder
+    {
+        public function build(Subtask $subtask, ?string $workingDir, ?Repo $repo): string
+        {
+            return "<context-brief>\n\nSEEN BY AGENT\n\n</context-brief>";
+        }
+    };
+
+    $pipeline = new SubtaskRunPipeline($executor, $workspace, app(PlanWriter::class), $contextBuilder);
+    $outcome = $pipeline->run($run);
+
+    expect($outcome->state)->toBe(SubtaskRunOutcome::STATE_NO_DIFF);
+
+    // Even though the pipeline returns noDiff (which the job will mark
+    // Failed without persisting outcome.output), the brief must already be
+    // on the AgentRun row from the early save so debugging is possible.
+    $persisted = $run->fresh()->output;
+    expect($persisted)->toBeArray()
+        ->and($persisted['context_brief'] ?? null)->toContain('SEEN BY AGENT');
 });
 
 test('PR body renders clarifications with their proposed alternative when present', function () {

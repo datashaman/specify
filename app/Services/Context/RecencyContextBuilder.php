@@ -16,11 +16,13 @@ use Throwable;
  *   1. Files the Subtask description mentions by path (verified to exist).
  *   2. Files recently touched in the working directory's git history,
  *      intersected with that mentioned set.
- *   3. Prior `AgentRun`s for this Subtask that ended in Failed or noDiff —
- *      so the executor can learn from its own history.
+ *   3. Prior `AgentRun`s for this Subtask that ended in `Failed` (which
+ *      includes the `noDiff` and `pullRequestFailed` outcomes — see
+ *      `ExecuteSubtaskJob` for the outcome → status mapping). The
+ *      executor can learn from its own history.
  *
  * Output is capped at 4 KB. Failures are non-fatal: a builder should never
- * tank a run, so any exception logs and returns the partial brief.
+ * tank a run, so any exception logs and returns an empty brief.
  */
 class RecencyContextBuilder implements ContextBuilder
 {
@@ -107,7 +109,9 @@ class RecencyContextBuilder implements ContextBuilder
 
     /**
      * For each mentioned file, record the most recent commit subject from
-     * the configured window. Returns at most `maxFiles` entries.
+     * the configured window. Single `git log` invocation across all files
+     * with a strict overall timeout — keeps the builder inside the ≤ 1s
+     * wall-clock budget the interface promises.
      *
      * @param  list<string>  $mentioned
      * @return array<string, string> file path => one-line note
@@ -118,24 +122,46 @@ class RecencyContextBuilder implements ContextBuilder
             return [];
         }
 
+        $files = array_values(array_slice($mentioned, 0, $this->maxFiles));
+        $marker = '__RECENCY_COMMIT__ ';
+
+        $proc = new Process([
+            'git', 'log',
+            '--since='.$this->window,
+            '--pretty=format:'.$marker.'%h %s',
+            '--name-only',
+            '--',
+            ...$files,
+        ], $workingDir);
+        $proc->setTimeout(2);
+
+        try {
+            $proc->run();
+        } catch (Throwable) {
+            return [];
+        }
+
+        $wanted = array_fill_keys($files, true);
         $out = [];
-        foreach ($mentioned as $file) {
-            $proc = new Process([
-                'git', 'log',
-                '--since='.$this->window,
-                '-n', '1',
-                '--pretty=%h %s',
-                '--', $file,
-            ], $workingDir);
-            $proc->setTimeout(5);
-            try {
-                $proc->run();
-            } catch (Throwable) {
+        $currentCommit = null;
+
+        foreach (preg_split('/\R/', (string) $proc->getOutput()) ?: [] as $line) {
+            $line = trim($line);
+            if ($line === '') {
                 continue;
             }
-            $line = trim($proc->getOutput());
-            if ($line !== '') {
-                $out[$file] = $line;
+
+            if (str_starts_with($line, $marker)) {
+                $currentCommit = substr($line, strlen($marker));
+
+                continue;
+            }
+
+            if ($currentCommit !== null && isset($wanted[$line]) && ! isset($out[$line])) {
+                $out[$line] = $currentCommit;
+                if (count($out) >= count($files)) {
+                    break;
+                }
             }
         }
 
@@ -180,10 +206,16 @@ class RecencyContextBuilder implements ContextBuilder
 
     private function clamp(string $value, int $limit): string
     {
+        $suffix = "\n[brief truncated]";
+
         if (strlen($value) <= $limit) {
             return $value;
         }
 
-        return substr($value, 0, $limit)."\n[brief truncated]";
+        if ($limit <= strlen($suffix)) {
+            return substr($suffix, 0, $limit);
+        }
+
+        return substr($value, 0, $limit - strlen($suffix)).$suffix;
     }
 }

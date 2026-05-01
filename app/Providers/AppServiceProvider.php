@@ -30,7 +30,12 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        $this->app->singleton(PromptLoader::class, fn () => new PromptLoader(base_path('prompts')));
+        // Scoped, not singleton: the loader caches in-memory, but we want
+        // edits to prompts/*.md to be picked up between requests / queue
+        // jobs in long-lived workers (Octane, queue:work) without a
+        // process restart. `scoped` ties the cache lifetime to a single
+        // request/job.
+        $this->app->scoped(PromptLoader::class, fn () => new PromptLoader(base_path('prompts')));
 
         $this->app->singleton(WorkspaceRunner::class, fn () => WorkspaceRunner::fromConfig());
 

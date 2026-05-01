@@ -72,6 +72,13 @@ class SubtaskRunPipeline
             Log::info('specify.subtask.context_brief.built', $logCtx + [
                 'bytes' => strlen($contextBrief),
             ]);
+            // Persist the brief on the AgentRun row immediately so it
+            // survives failure paths — `markFailed` does not touch
+            // `output`, so noDiff / pullRequestFailed runs would otherwise
+            // lose the brief that the agent saw.
+            $agentRun->forceFill([
+                'output' => array_merge((array) $agentRun->output, ['context_brief' => $contextBrief]),
+            ])->save();
         }
 
         $result = $this->executor->execute($subtask, $workingDir, $repo, $agentRun->working_branch, $contextBrief !== '' ? $contextBrief : null);
