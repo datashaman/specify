@@ -5,7 +5,7 @@ Status: Accepted
 
 ## Context
 
-The system needs to delegate "do the engineering work for this Subtask" to something — sometimes a hosted Anthropic model via `laravel/ai`, sometimes a one-shot CLI agent (Claude Code, codex, gemini, aider) the operator already trusts in their own toolchain, sometimes a fake for tests. Hard-coding any one of these into `ExecuteSubtaskJob` would either lock the project to a single AI vendor or force every test to spin up a real model.
+Specify needs to delegate "do the engineering work for this Subtask" to something — sometimes a hosted Anthropic model via `laravel/ai`, sometimes a one-shot CLI agent (Claude Code, codex, gemini, aider) the operator already trusts in their own toolchain, sometimes a fake for tests. Hard-coding any one of these into `ExecuteSubtaskJob` would either lock the project to a single AI vendor or force every test to spin up a real model.
 
 We also wanted the choice of executor to be a deployment concern, not a code concern: rotating from one CLI to another should be a config edit, not a refactor.
 
@@ -28,7 +28,7 @@ interface Executor
 
 Three implementations live under `app/Services/Executors/`:
 
-- `LaravelAiExecutor` — describe-only; wraps the `TaskExecutor` agent and returns a structured plan without mutating the filesystem. Used when the system is producing instructions, not edits.
+- `LaravelAiExecutor` — describe-only; wraps the `TaskExecutor` agent and returns a structured plan without mutating the filesystem. Used when the executor is producing instructions, not edits.
 - `CliExecutor` — generic; runs any one-shot agent CLI with the working directory as cwd and observes results via `git status`. Configured via `specify.executor.cli.{command, timeout}`.
 - `FakeExecutor` — test double producing deterministic `ExecutionResult`s.
 
