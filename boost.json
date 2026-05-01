@@ -5,7 +5,7 @@
         "codex"
     ],
     "cloud": false,
-    "guidelines": true,
+    "guidelines": false,
     "mcp": true,
     "nightwatch": false,
     "sail": false,
