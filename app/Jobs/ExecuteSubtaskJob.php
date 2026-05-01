@@ -58,5 +58,39 @@ class ExecuteSubtaskJob implements ShouldQueue
             SubtaskRunOutcome::STATE_NO_DIFF,
             SubtaskRunOutcome::STATE_PULL_REQUEST_FAILED => $execution->markFailed($run, $outcome->error ?? 'Subtask run failed.'),
         };
+
+        if ($outcome->state === SubtaskRunOutcome::STATE_SUCCEEDED) {
+            $this->dispatchAdvisoryReview($run->fresh());
+        }
+    }
+
+    /**
+     * Fire the ADR-conformance review job after the AgentRun has been
+     * persisted by markSucceeded. Dispatched here (not from the pipeline)
+     * so the queued job sees `output.pull_request_number` and `diff`
+     * already on the row — even on non-sync queues.
+     */
+    private function dispatchAdvisoryReview(?AgentRun $run): void
+    {
+        if ($run === null) {
+            return;
+        }
+        if (! (bool) config('specify.review.enabled', false)) {
+            return;
+        }
+        $personas = (array) config('specify.review.personas', []);
+        if (! in_array('adr-conformance', $personas, true)) {
+            return;
+        }
+        $output = (array) $run->output;
+        if (! isset($output['pull_request_number'])) {
+            return;
+        }
+
+        ReviewPullRequestJob::dispatch($run->getKey());
+        Log::info('specify.review.dispatched', [
+            'run_id' => $run->getKey(),
+            'pr_number' => $output['pull_request_number'],
+        ]);
     }
 }

@@ -94,6 +94,25 @@ return [
     |
     */
 
+    /*
+    |--------------------------------------------------------------------------
+    | Advisory reviews
+    |--------------------------------------------------------------------------
+    |
+    | After a PR opens, optionally post advisory reviews using one or more
+    | personas. The only V1 persona is `adr-conformance` (flags PR diffs
+    | that contradict an Accepted ADR). Reviews are always advisory — they
+    | post as `COMMENT`-style reviews on the host VCS, never block merge.
+    |
+    */
+
+    'review' => [
+        'enabled' => filter_var(env('SPECIFY_REVIEW_ENABLED', false), FILTER_VALIDATE_BOOLEAN),
+        'personas' => array_values(array_filter(
+            array_map('trim', explode(',', (string) env('SPECIFY_REVIEW_PERSONAS', 'adr-conformance')))
+        )),
+    ],
+
     'context' => [
         'builder' => env('SPECIFY_CONTEXT_BUILDER', 'recency'),
         'recency' => [

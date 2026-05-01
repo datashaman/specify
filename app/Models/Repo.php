@@ -7,6 +7,8 @@ use App\Services\PullRequests\BitbucketPullRequestProvider;
 use App\Services\PullRequests\GithubPullRequestProvider;
 use App\Services\PullRequests\GitlabPullRequestProvider;
 use App\Services\PullRequests\PullRequestProvider;
+use App\Services\Reviews\GithubReviewProvider;
+use App\Services\Reviews\ReviewProvider;
 use Database\Factories\RepoFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -211,6 +213,18 @@ class Repo extends Model
             RepoProvider::Github => app(GithubPullRequestProvider::class),
             RepoProvider::Gitlab => app(GitlabPullRequestProvider::class),
             RepoProvider::Bitbucket => app(BitbucketPullRequestProvider::class),
+            default => null,
+        };
+    }
+
+    /**
+     * Resolve the advisory review adapter for this repo's provider, or null
+     * when no driver is implemented for it. GitHub is the only V1 driver.
+     */
+    public function reviewProvider(): ?ReviewProvider
+    {
+        return match ($this->provider) {
+            RepoProvider::Github => app(GithubReviewProvider::class),
             default => null,
         };
     }
