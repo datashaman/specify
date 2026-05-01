@@ -13,6 +13,8 @@ Specify is a Laravel 13 system where humans approve AI actions on code repos. **
 | Add or change an Executor | [ADR-0003](docs/adr/0003-pluggable-executor-interface.md), `app/Services/Executors/` |
 | Touch PR creation | [ADR-0004](docs/adr/0004-pr-after-push-is-non-fatal.md), `app/Services/PullRequests/` |
 | Add an MCP tool | `app/Mcp/Tools/` (follow the existing `#[Description]` + `handle()` shape) |
+| Edit an agent's system prompt | `prompts/*.md` (loaded by `App\Services\Prompts\PromptLoader`) |
+| Tune the per-subtask context brief | `app/Services/Context/` (`ContextBuilder` interface + `RecencyContextBuilder`) |
 | Run the suite | `composer test` (Pint check + Pest) |
 
 ## Specify-specific rules
