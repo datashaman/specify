@@ -74,6 +74,10 @@ Branch naming: `specify/story-{id}-v{revision}-task-{position}`.
 
 `AGENTS.md` (and its mirror `CLAUDE.md`) carry the Laravel Boost guidelines this repo follows. Read this README first for project context, then those for framework conventions.
 
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for setup, test, style, and ADR conventions.
+
 ## License
 
-MIT — see `composer.json`. (A top-level `LICENSE` file is on the to-do list.)
+MIT — see [LICENSE](LICENSE).
