@@ -82,6 +82,11 @@ class LaravelAiExecutor implements Executor
         $commitMessage = trim((string) ($output['commit_message'] ?? ''));
         $clarifications = $this->parseClarifications($output['clarifications'] ?? []);
         $proposedSubtasks = $this->parseProposedSubtasks($output['proposed_subtasks'] ?? []);
+        $alreadyComplete = (bool) ($output['already_complete'] ?? false);
+        $alreadyCompleteEvidence = array_values(array_filter(
+            array_map('strval', (array) ($output['already_complete_evidence'] ?? [])),
+            fn ($sha) => $sha !== '',
+        ));
 
         Log::info('specify.subtask.agent.finished', $context + [
             'duration_ms' => (int) ((microtime(true) - $start) * 1000),
@@ -106,6 +111,8 @@ class LaravelAiExecutor implements Executor
             commitMessage: $commitMessage,
             clarifications: $clarifications,
             proposedSubtasks: $proposedSubtasks,
+            alreadyComplete: $alreadyComplete,
+            alreadyCompleteEvidence: $alreadyCompleteEvidence,
         );
     }
 

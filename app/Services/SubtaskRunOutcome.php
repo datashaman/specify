@@ -24,6 +24,8 @@ class SubtaskRunOutcome
 
     public const STATE_PULL_REQUEST_FAILED = 'pull_request_failed';
 
+    public const STATE_ALREADY_COMPLETE = 'already_complete';
+
     /**
      * @param  array<string, mixed>  $output
      */
@@ -60,12 +62,30 @@ class SubtaskRunOutcome
     }
 
     /**
-     * True for both clean success and the non-fatal `pullRequestFailed`
-     * outcome. The job uses this to choose markSucceeded vs markFailed; only
-     * `noDiff` returns false.
+     * The Subtask's spec was already satisfied on the working branch — agent
+     * produced no diff and cited commit SHAs the pipeline verified are
+     * reachable from HEAD. ADR-0007: Succeeded-class outcome, cascade
+     * advances. The agent's evidence and reason are stamped on `output` for
+     * post-hoc audit.
+     *
+     * @param  array<string, mixed>  $output
+     */
+    public static function alreadyComplete(array $output): self
+    {
+        return new self(self::STATE_ALREADY_COMPLETE, $output, null, null);
+    }
+
+    /**
+     * True for clean success, the non-fatal `pullRequestFailed`, and the
+     * `alreadyComplete` no-op outcome. The job uses this to choose
+     * markSucceeded vs markFailed; only `noDiff` returns false.
      */
     public function isSucceeded(): bool
     {
-        return in_array($this->state, [self::STATE_SUCCEEDED, self::STATE_PULL_REQUEST_FAILED], true);
+        return in_array(
+            $this->state,
+            [self::STATE_SUCCEEDED, self::STATE_PULL_REQUEST_FAILED, self::STATE_ALREADY_COMPLETE],
+            true,
+        );
     }
 }

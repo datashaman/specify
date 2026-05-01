@@ -166,6 +166,29 @@ class WorkspaceRunner
         return $diff['stdout'];
     }
 
+    /**
+     * True when `$sha` is a commit reachable from HEAD on the working dir.
+     *
+     * Used by the pipeline to verify "already complete" evidence (ADR-0007):
+     * the agent must cite commits that actually live on the branch, not
+     * arbitrary or hallucinated SHAs.
+     */
+    public function isCommitReachableFromHead(string $workingDir, string $sha): bool
+    {
+        $sha = trim($sha);
+        if ($sha === '' || ! preg_match('/^[0-9a-f]{4,40}$/i', $sha)) {
+            return false;
+        }
+
+        $check = $this->run(
+            ['git', 'merge-base', '--is-ancestor', $sha, 'HEAD'],
+            $workingDir,
+            allowFailure: true,
+        );
+
+        return $check['exitCode'] === 0;
+    }
+
     /** Recursively delete the working directory if it exists. */
     public function cleanup(string $workingDir): void
     {

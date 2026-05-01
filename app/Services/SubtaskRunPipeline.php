@@ -111,7 +111,39 @@ class SubtaskRunPipeline
 
         if ($commitSha === null) {
             $summary = trim($result->summary);
+
+            // ADR-0007: agent may declare the spec already satisfied on the
+            // working branch. Honour the claim only when paired with commit
+            // SHAs that exist and are reachable from HEAD.
+            if ($result->alreadyComplete) {
+                $verified = $this->verifyAlreadyCompleteEvidence(
+                    $workingDir,
+                    $result->alreadyCompleteEvidence,
+                );
+                if ($verified !== []) {
+                    $output['already_complete'] = true;
+                    $output['already_complete_evidence'] = $verified;
+                    $output['already_complete_reason'] = $summary;
+                    $output['commit_sha'] = null;
+                    $output = $this->applyProposedSubtasks($subtask, $result->proposedSubtasks, $agentRun, $output, $logCtx);
+                    Log::info('specify.subtask.already_complete', $logCtx + [
+                        'summary' => $summary,
+                        'evidence' => $verified,
+                    ]);
+
+                    return SubtaskRunOutcome::alreadyComplete($output);
+                }
+
+                Log::warning('specify.subtask.already_complete.rejected', $logCtx + [
+                    'summary' => $summary,
+                    'evidence_claimed' => $result->alreadyCompleteEvidence,
+                ]);
+            }
+
             $reason = 'Agent produced no diff. The subtask was not executed.';
+            if ($result->alreadyComplete) {
+                $reason .= ' Agent claimed already_complete but the cited commit SHAs were empty or not all reachable from HEAD; rejected per ADR-0007.';
+            }
             if ($summary !== '') {
                 $reason .= ' Agent summary: '.$summary;
             }
@@ -186,6 +218,40 @@ class SubtaskRunPipeline
     private function branchFor(AgentRun $agentRun): string
     {
         return $agentRun->working_branch ?? 'specify/run-'.$agentRun->getKey();
+    }
+
+    /**
+     * Verify that *every* claimed evidence SHA exists on the working branch.
+     *
+     * Returns the trimmed/deduped input list only when all SHAs are
+     * reachable from HEAD; otherwise returns an empty array so the pipeline
+     * rejects the alreadyComplete claim and falls through to the no_diff
+     * failure path (ADR-0007). All-or-nothing — partial evidence (some real
+     * commits + some hallucinated SHAs) is treated the same as no evidence,
+     * because a single hallucinated SHA is enough to make the whole claim
+     * untrustworthy.
+     *
+     * @param  list<string>  $shas
+     * @return list<string>
+     */
+    private function verifyAlreadyCompleteEvidence(string $workingDir, array $shas): array
+    {
+        $normalized = array_values(array_unique(array_filter(
+            array_map(static fn ($sha) => trim((string) $sha), $shas),
+            static fn ($sha) => $sha !== '',
+        )));
+
+        if ($normalized === []) {
+            return [];
+        }
+
+        foreach ($normalized as $sha) {
+            if (! $this->workspace->isCommitReachableFromHead($workingDir, $sha)) {
+                return [];
+            }
+        }
+
+        return $normalized;
     }
 
     /**

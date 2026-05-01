@@ -64,7 +64,8 @@ class ExecuteSubtaskJob implements ShouldQueue
 
         match ($outcome->state) {
             SubtaskRunOutcome::STATE_SUCCEEDED,
-            SubtaskRunOutcome::STATE_PULL_REQUEST_FAILED => $execution->markSucceeded($run, $outcome->output, $outcome->diff),
+            SubtaskRunOutcome::STATE_PULL_REQUEST_FAILED,
+            SubtaskRunOutcome::STATE_ALREADY_COMPLETE => $execution->markSucceeded($run, $outcome->output, $outcome->diff),
             SubtaskRunOutcome::STATE_NO_DIFF => $execution->markFailed($run, $outcome->error ?? 'Subtask run failed.'),
         };
 

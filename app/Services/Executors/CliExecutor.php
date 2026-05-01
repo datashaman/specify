@@ -61,13 +61,44 @@ class CliExecutor implements Executor
         $stdout = $process->getOutput();
         $stderr = $process->getErrorOutput();
         $files = $this->changedFiles($workingDir);
+        [$alreadyComplete, $alreadyCompleteEvidence] = $this->parseAlreadyCompleteSentinel($stdout);
 
         return new ExecutionResult(
             summary: $this->buildSummary($stdout),
             filesChanged: $files,
             commitMessage: $this->commitMessageFor($subtask),
             executorLog: $this->buildExecutorLog($stdout, $stderr),
+            alreadyComplete: $alreadyComplete,
+            alreadyCompleteEvidence: $alreadyCompleteEvidence,
         );
+    }
+
+    /**
+     * Detect an "already complete" sentinel block in the agent's stdout —
+     * `<<<SPECIFY:already_complete>>>sha1,sha2<<<END>>>` — and return the
+     * flag plus the parsed SHA list. ADR-0007.
+     *
+     * Free-text CLI agents that don't emit the sentinel keep the legacy
+     * no-diff-as-failure path — opt-in, not magic detection.
+     *
+     * @return array{0: bool, 1: list<string>}
+     */
+    private function parseAlreadyCompleteSentinel(string $stdout): array
+    {
+        if (preg_match(
+            '/<<<SPECIFY:already_complete>>>(.*?)<<<END>>>/s',
+            $stdout,
+            $m,
+        ) !== 1) {
+            return [false, []];
+        }
+
+        $shas = array_values(array_filter(
+            array_map('trim', preg_split('/[\s,]+/', $m[1]) ?: []),
+            fn ($sha) => $sha !== '',
+        ));
+
+        return [true, $shas];
     }
 
     /**

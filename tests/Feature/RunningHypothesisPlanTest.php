@@ -11,6 +11,7 @@ use App\Models\Subtask;
 use App\Models\Task;
 use App\Services\Context\ContextBuilder;
 use App\Services\Context\NullContextBuilder;
+use App\Services\Executors\CliExecutor;
 use App\Services\Executors\ExecutionResult;
 use App\Services\Executors\Executor;
 use App\Services\Executors\ExecutorClarification;
@@ -196,6 +197,291 @@ test('SubtaskRunPipeline does NOT append proposed subtasks when the run ends in 
 
     expect($outcome->state)->toBe(SubtaskRunOutcome::STATE_NO_DIFF)
         ->and($afterCount)->toBe($beforeCount);
+});
+
+test('alreadyComplete returns the Succeeded-class outcome when evidence SHAs are reachable from HEAD (ADR-0007)', function () {
+    $task = makeApprovedTask();
+    $subtask = Subtask::factory()->for($task)->create(['name' => 'already-done', 'position' => 1]);
+    $repo = Repo::factory()->for($task->story->feature->project->team->workspace)->create();
+    $run = AgentRun::create([
+        'runnable_type' => Subtask::class,
+        'runnable_id' => $subtask->getKey(),
+        'repo_id' => $repo->getKey(),
+        'working_branch' => 'specify/test',
+        'status' => AgentRunStatus::Running,
+    ]);
+
+    $executor = new class implements Executor
+    {
+        public function needsWorkingDirectory(): bool
+        {
+            return true;
+        }
+
+        public function execute(Subtask $subtask, ?string $workingDir, ?Repo $repo, ?string $workingBranch, ?string $contextBrief = null): ExecutionResult
+        {
+            return new ExecutionResult(
+                summary: 'Confirmed already done by abc1234',
+                filesChanged: [],
+                commitMessage: 'noop',
+                alreadyComplete: true,
+                alreadyCompleteEvidence: ['abc1234', 'def5678'],
+            );
+        }
+    };
+
+    $workspace = new class extends WorkspaceRunner
+    {
+        public function __construct() {}
+
+        public function prepare(Repo $repo, AgentRun $run): string
+        {
+            return sys_get_temp_dir();
+        }
+
+        public function checkoutBranch(string $workingDir, string $branch, ?string $baseBranch = null): void {}
+
+        public function commit(string $workingDir, string $message): ?string
+        {
+            return null;
+        }
+
+        public function diff(string $workingDir, ?string $base = null): string
+        {
+            return '';
+        }
+
+        public function isCommitReachableFromHead(string $workingDir, string $sha): bool
+        {
+            return in_array($sha, ['abc1234', 'def5678'], true);
+        }
+    };
+
+    $pipeline = new SubtaskRunPipeline($executor, $workspace, app(PlanWriter::class), new NullContextBuilder);
+    $outcome = $pipeline->run($run);
+
+    expect($outcome->state)->toBe(SubtaskRunOutcome::STATE_ALREADY_COMPLETE)
+        ->and($outcome->isSucceeded())->toBeTrue()
+        ->and($outcome->output['already_complete'] ?? null)->toBeTrue()
+        ->and($outcome->output['already_complete_evidence'] ?? [])->toBe(['abc1234', 'def5678'])
+        ->and($outcome->output['already_complete_reason'] ?? null)->toContain('Confirmed');
+});
+
+test('alreadyComplete falls through to noDiff when evidence is empty (ADR-0007 safety net)', function () {
+    $task = makeApprovedTask();
+    $subtask = Subtask::factory()->for($task)->create(['name' => 'sus-claim', 'position' => 1]);
+    $repo = Repo::factory()->for($task->story->feature->project->team->workspace)->create();
+    $run = AgentRun::create([
+        'runnable_type' => Subtask::class,
+        'runnable_id' => $subtask->getKey(),
+        'repo_id' => $repo->getKey(),
+        'working_branch' => 'specify/test',
+        'status' => AgentRunStatus::Running,
+    ]);
+
+    $executor = new class implements Executor
+    {
+        public function needsWorkingDirectory(): bool
+        {
+            return true;
+        }
+
+        public function execute(Subtask $subtask, ?string $workingDir, ?Repo $repo, ?string $workingBranch, ?string $contextBrief = null): ExecutionResult
+        {
+            return new ExecutionResult(
+                summary: 'I swear it is already done',
+                filesChanged: [],
+                commitMessage: 'noop',
+                alreadyComplete: true,
+                alreadyCompleteEvidence: [],
+            );
+        }
+    };
+
+    $workspace = new class extends WorkspaceRunner
+    {
+        public function __construct() {}
+
+        public function prepare(Repo $repo, AgentRun $run): string
+        {
+            return sys_get_temp_dir();
+        }
+
+        public function checkoutBranch(string $workingDir, string $branch, ?string $baseBranch = null): void {}
+
+        public function commit(string $workingDir, string $message): ?string
+        {
+            return null;
+        }
+
+        public function diff(string $workingDir, ?string $base = null): string
+        {
+            return '';
+        }
+
+        public function isCommitReachableFromHead(string $workingDir, string $sha): bool
+        {
+            return false;
+        }
+    };
+
+    $pipeline = new SubtaskRunPipeline($executor, $workspace, app(PlanWriter::class), new NullContextBuilder);
+    $outcome = $pipeline->run($run);
+
+    expect($outcome->state)->toBe(SubtaskRunOutcome::STATE_NO_DIFF);
+});
+
+test('alreadyComplete falls through to noDiff when ANY cited SHA is unreachable, even if others verify (ADR-0007 all-or-nothing)', function () {
+    $task = makeApprovedTask();
+    $subtask = Subtask::factory()->for($task)->create(['name' => 'partial-claim', 'position' => 1]);
+    $repo = Repo::factory()->for($task->story->feature->project->team->workspace)->create();
+    $run = AgentRun::create([
+        'runnable_type' => Subtask::class,
+        'runnable_id' => $subtask->getKey(),
+        'repo_id' => $repo->getKey(),
+        'working_branch' => 'specify/test',
+        'status' => AgentRunStatus::Running,
+    ]);
+
+    $executor = new class implements Executor
+    {
+        public function needsWorkingDirectory(): bool
+        {
+            return true;
+        }
+
+        public function execute(Subtask $subtask, ?string $workingDir, ?Repo $repo, ?string $workingBranch, ?string $contextBrief = null): ExecutionResult
+        {
+            return new ExecutionResult(
+                summary: 'One real, one made up',
+                filesChanged: [],
+                commitMessage: 'noop',
+                alreadyComplete: true,
+                alreadyCompleteEvidence: ['abc1234', 'deadbeef'],
+            );
+        }
+    };
+
+    $workspace = new class extends WorkspaceRunner
+    {
+        public function __construct() {}
+
+        public function prepare(Repo $repo, AgentRun $run): string
+        {
+            return sys_get_temp_dir();
+        }
+
+        public function checkoutBranch(string $workingDir, string $branch, ?string $baseBranch = null): void {}
+
+        public function commit(string $workingDir, string $message): ?string
+        {
+            return null;
+        }
+
+        public function diff(string $workingDir, ?string $base = null): string
+        {
+            return '';
+        }
+
+        public function isCommitReachableFromHead(string $workingDir, string $sha): bool
+        {
+            return $sha === 'abc1234';
+        }
+    };
+
+    $pipeline = new SubtaskRunPipeline($executor, $workspace, app(PlanWriter::class), new NullContextBuilder);
+    $outcome = $pipeline->run($run);
+
+    expect($outcome->state)->toBe(SubtaskRunOutcome::STATE_NO_DIFF)
+        ->and($outcome->error)->toContain('already_complete')
+        ->and($outcome->error)->toContain('not all reachable');
+});
+
+test('alreadyComplete falls through to noDiff when none of the cited SHAs are reachable (ADR-0007 safety net)', function () {
+    $task = makeApprovedTask();
+    $subtask = Subtask::factory()->for($task)->create(['name' => 'hallucinated', 'position' => 1]);
+    $repo = Repo::factory()->for($task->story->feature->project->team->workspace)->create();
+    $run = AgentRun::create([
+        'runnable_type' => Subtask::class,
+        'runnable_id' => $subtask->getKey(),
+        'repo_id' => $repo->getKey(),
+        'working_branch' => 'specify/test',
+        'status' => AgentRunStatus::Running,
+    ]);
+
+    $executor = new class implements Executor
+    {
+        public function needsWorkingDirectory(): bool
+        {
+            return true;
+        }
+
+        public function execute(Subtask $subtask, ?string $workingDir, ?Repo $repo, ?string $workingBranch, ?string $contextBrief = null): ExecutionResult
+        {
+            return new ExecutionResult(
+                summary: 'Done in commit deadbeef',
+                filesChanged: [],
+                commitMessage: 'noop',
+                alreadyComplete: true,
+                alreadyCompleteEvidence: ['deadbeef'],
+            );
+        }
+    };
+
+    $workspace = new class extends WorkspaceRunner
+    {
+        public function __construct() {}
+
+        public function prepare(Repo $repo, AgentRun $run): string
+        {
+            return sys_get_temp_dir();
+        }
+
+        public function checkoutBranch(string $workingDir, string $branch, ?string $baseBranch = null): void {}
+
+        public function commit(string $workingDir, string $message): ?string
+        {
+            return null;
+        }
+
+        public function diff(string $workingDir, ?string $base = null): string
+        {
+            return '';
+        }
+
+        public function isCommitReachableFromHead(string $workingDir, string $sha): bool
+        {
+            return false;
+        }
+    };
+
+    $pipeline = new SubtaskRunPipeline($executor, $workspace, app(PlanWriter::class), new NullContextBuilder);
+    $outcome = $pipeline->run($run);
+
+    expect($outcome->state)->toBe(SubtaskRunOutcome::STATE_NO_DIFF);
+});
+
+test('CliExecutor parses the already_complete sentinel out of stdout', function () {
+    $stdout = "doing some work\nlooks fine\n<<<SPECIFY:already_complete>>>abc1234, def5678\n9012345<<<END>>>\nbye\n";
+    $reflection = new ReflectionMethod(CliExecutor::class, 'parseAlreadyCompleteSentinel');
+    $reflection->setAccessible(true);
+
+    $exec = new CliExecutor(['true']);
+    [$flag, $shas] = $reflection->invoke($exec, $stdout);
+
+    expect($flag)->toBeTrue()
+        ->and($shas)->toBe(['abc1234', 'def5678', '9012345']);
+});
+
+test('CliExecutor returns false/empty when the sentinel is absent', function () {
+    $reflection = new ReflectionMethod(CliExecutor::class, 'parseAlreadyCompleteSentinel');
+    $reflection->setAccessible(true);
+
+    $exec = new CliExecutor(['true']);
+    [$flag, $shas] = $reflection->invoke($exec, "ordinary agent output\nno sentinel here\n");
+
+    expect($flag)->toBeFalse()
+        ->and($shas)->toBe([]);
 });
 
 test('context_brief is persisted on AgentRun.output even when the run ends in noDiff', function () {

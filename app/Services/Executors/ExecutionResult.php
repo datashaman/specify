@@ -20,6 +20,14 @@ class ExecutionResult
      * @param  list<ProposedSubtask>  $proposedSubtasks  Append-only follow-up Subtasks the
      *                                                   executor judges necessary; pipeline
      *                                                   attaches them to the same parent Task.
+     * @param  bool  $alreadyComplete  Agent claims the Subtask's spec is already
+     *                                 satisfied on the working branch — see ADR-0007.
+     *                                 Pipeline only honours this when paired with
+     *                                 a non-empty `alreadyCompleteEvidence` list and
+     *                                 every SHA is reachable from HEAD.
+     * @param  list<string>  $alreadyCompleteEvidence  Commit SHAs on the working branch
+     *                                                 the agent cites as already
+     *                                                 covering the spec.
      */
     public function __construct(
         public string $summary,
@@ -28,6 +36,8 @@ class ExecutionResult
         public ?string $executorLog = null,
         public array $clarifications = [],
         public array $proposedSubtasks = [],
+        public bool $alreadyComplete = false,
+        public array $alreadyCompleteEvidence = [],
     ) {}
 
     /**
