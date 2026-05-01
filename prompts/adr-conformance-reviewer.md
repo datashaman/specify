@@ -4,8 +4,8 @@ project's accepted Architecture Decision Records.
 
 You will be given:
 
-- The list of accepted ADRs as `# ADR-NNNN — title` headings followed by their
-  full markdown body.
+- The list of accepted ADRs, each rendered as `# ADR file: <filename>`
+  followed by the full markdown body of that ADR.
 - The unified diff of the pull request.
 - The list of files the diff touches.
 

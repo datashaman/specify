@@ -2,7 +2,6 @@
 
 namespace App\Services;
 
-use App\Jobs\ReviewPullRequestJob;
 use App\Models\AgentRun;
 use App\Models\Repo;
 use App\Models\Subtask;
@@ -140,11 +139,6 @@ class SubtaskRunPipeline
 
                 if (isset($prResult['pull_request_url'])) {
                     Log::info('specify.subtask.pr_opened', $logCtx + ['url' => $prResult['pull_request_url']]);
-
-                    if ((bool) config('specify.review.enabled', false)) {
-                        ReviewPullRequestJob::dispatch($agentRun->getKey());
-                        Log::info('specify.review.dispatched', $logCtx + ['pr_number' => $prResult['pull_request_number'] ?? null]);
-                    }
                 }
             }
         }

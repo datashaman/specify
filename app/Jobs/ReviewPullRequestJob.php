@@ -136,13 +136,24 @@ class ReviewPullRequestJob implements ShouldQueue
      */
     private function violationsToComments(array $violations): array
     {
-        $sorted = $violations;
-        usort($sorted, fn ($a, $b) => $this->severityRank($b['severity'] ?? 'warning')
-            <=> $this->severityRank($a['severity'] ?? 'warning'));
+        // Normalise severity *before* sorting so unknown values rank the
+        // same way they will be rendered (warning), and the cap-at-10 keeps
+        // the comments that actually get posted, not the ones that
+        // happened to claim a higher severity.
+        $normalised = array_map(function (array $v): array {
+            $v['severity'] = in_array($v['severity'] ?? '', ReviewComment::SEVERITIES, true)
+                ? (string) $v['severity']
+                : ReviewComment::SEVERITY_WARNING;
 
-        $sorted = array_slice($sorted, 0, self::COMMENT_CAP);
+            return $v;
+        }, $violations);
+
+        usort($normalised, fn ($a, $b) => $this->severityRank($b['severity'])
+            <=> $this->severityRank($a['severity']));
+
+        $normalised = array_slice($normalised, 0, self::COMMENT_CAP);
         $out = [];
-        foreach ($sorted as $v) {
+        foreach ($normalised as $v) {
             $body = sprintf(
                 "**ADR violation** (`%s`)\n\n%s",
                 $v['adr'] ?? '?',
@@ -153,9 +164,7 @@ class ReviewPullRequestJob implements ShouldQueue
                 body: $body,
                 path: isset($v['file']) ? (string) $v['file'] : null,
                 line: $line !== null && $line > 0 ? $line : null,
-                severity: in_array($v['severity'] ?? '', ReviewComment::SEVERITIES, true)
-                    ? (string) $v['severity']
-                    : ReviewComment::SEVERITY_WARNING,
+                severity: $v['severity'],
             );
         }
 

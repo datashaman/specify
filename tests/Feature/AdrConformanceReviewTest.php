@@ -92,7 +92,7 @@ test('Repo::reviewProvider returns the GitHub driver only for Github repos', fun
         ->and($generic->reviewProvider())->toBeNull();
 });
 
-test('ReviewPullRequestJob caps comments at 10, severity-sorted, and skips when no PR was opened', function () {
+test('ReviewPullRequestJob silently no-ops when the AgentRun has no PR opened', function () {
     // No PR number on output → silently no-op (also no HTTP attempted).
     $repo = Repo::factory()->for(Workspace::factory()->create())->create([
         'access_token' => 'ghp',
@@ -113,6 +113,77 @@ test('ReviewPullRequestJob caps comments at 10, severity-sorted, and skips when 
     (new ReviewPullRequestJob($run->getKey()))->handle();
 
     Http::assertNothingSent();
+});
+
+test('ReviewPullRequestJob sorts violations by severity and caps at 10 before posting', function () {
+    $adrDir = base_path('docs/adr');
+    File::ensureDirectoryExists($adrDir);
+    $marker = $adrDir.'/9998-cap-and-sort-fixture.md';
+    File::put($marker, "# 9998. Cap+sort fixture\n\nDate: 2026-05-01\nStatus: Accepted\n\n## Decision\n\nFlag everything.\n");
+
+    Http::fake([
+        'api.github.com/*/reviews' => Http::response(['html_url' => 'https://example/pull/1#review', 'id' => 1], 200),
+    ]);
+
+    $ws = Workspace::factory()->create();
+    $repo = Repo::factory()->for($ws)->create([
+        'url' => 'https://github.com/owner/repo.git',
+        'access_token' => 'ghp',
+        'provider' => RepoProvider::Github,
+    ]);
+    $subtask = Subtask::factory()->create();
+    $run = AgentRun::create([
+        'runnable_type' => Subtask::class,
+        'runnable_id' => $subtask->getKey(),
+        'repo_id' => $repo->getKey(),
+        'status' => AgentRunStatus::Succeeded,
+        'output' => [
+            'pull_request_number' => 7,
+            'files_changed' => ['app/Foo.php'],
+        ],
+        'diff' => "--- a/app/Foo.php\n+++ b/app/Foo.php\n@@\n+ // change\n",
+    ]);
+
+    // 3 errors + 7 warnings + 5 infos = 15. After cap-at-10 sorted by severity:
+    // 3 errors, 7 warnings, 0 infos.
+    $violations = [];
+    foreach (range(1, 5) as $i) {
+        $violations[] = ['adr' => '9998-cap-and-sort-fixture.md', 'file' => 'app/Foo.php', 'line' => $i, 'reason' => "info {$i}", 'severity' => 'info'];
+    }
+    foreach (range(1, 3) as $i) {
+        $violations[] = ['adr' => '9998-cap-and-sort-fixture.md', 'file' => 'app/Foo.php', 'line' => $i, 'reason' => "error {$i}", 'severity' => 'error'];
+    }
+    foreach (range(1, 7) as $i) {
+        $violations[] = ['adr' => '9998-cap-and-sort-fixture.md', 'file' => 'app/Foo.php', 'line' => $i, 'reason' => "warning {$i}", 'severity' => 'warning'];
+    }
+
+    AdrConformanceReviewer::fake(fn () => [
+        'overall' => 'fail',
+        'summary' => 'Many violations.',
+        'violations' => $violations,
+    ]);
+
+    try {
+        (new ReviewPullRequestJob($run->getKey()))->handle();
+
+        expect($run->fresh()->output['review_comment_count'] ?? null)->toBe(10);
+
+        Http::assertSent(function ($request) {
+            if (! str_contains($request->url(), '/pulls/7/reviews')) {
+                return false;
+            }
+            $inline = $request->data()['comments'] ?? [];
+            if (count($inline) !== 10) {
+                return false;
+            }
+            $tags = array_map(fn ($c) => preg_match('/^\[(\w+)\]/', $c['body'], $m) ? $m[1] : null, $inline);
+            $expected = array_merge(array_fill(0, 3, 'ERROR'), array_fill(0, 7, 'WARNING'));
+
+            return $tags === $expected;
+        });
+    } finally {
+        File::delete($marker);
+    }
 });
 
 test('ReviewPullRequestJob runs the agent, posts a review, and stores review_url on the AgentRun', function () {
