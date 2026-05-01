@@ -2,8 +2,7 @@
 
 namespace App\Mcp\Tools;
 
-use App\Mcp\Auth;
-use App\Models\Feature;
+use App\Mcp\Concerns\ResolvesProjectAccess;
 use App\Models\Story;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Laravel\Mcp\Request;
@@ -14,13 +13,15 @@ use Laravel\Mcp\Server\Tool;
 #[Description('List stories under a feature.')]
 class ListStoriesTool extends Tool
 {
+    use ResolvesProjectAccess;
+
     protected string $name = 'list-stories';
 
     public function handle(Request $request): Response
     {
-        $user = Auth::resolve($request);
-        if (! $user) {
-            return Response::error('Authentication required.');
+        $user = $this->resolveUser($request);
+        if ($user instanceof Response) {
+            return $user;
         }
 
         $featureId = $request->integer('feature_id');
@@ -28,13 +29,9 @@ class ListStoriesTool extends Tool
             return Response::error('feature_id is required.');
         }
 
-        $feature = Feature::query()->find($featureId);
-        if (! $feature) {
-            return Response::error('Feature not found.');
-        }
-
-        if (! in_array($feature->project_id, $user->accessibleProjectIds(), true)) {
-            return Response::error('Feature not accessible.');
+        $feature = $this->resolveAccessibleFeature($featureId, $user);
+        if ($feature instanceof Response) {
+            return $feature;
         }
 
         $stories = $feature->stories()

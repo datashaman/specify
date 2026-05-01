@@ -3,8 +3,7 @@
 namespace App\Mcp\Tools;
 
 use App\Enums\TaskStatus;
-use App\Mcp\Auth;
-use App\Models\Story;
+use App\Mcp\Concerns\ResolvesProjectAccess;
 use App\Models\Task;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Laravel\Mcp\Request;
@@ -15,13 +14,15 @@ use Laravel\Mcp\Server\Tool;
 #[Description('List the tasks attached to a story, in position order. Each entry includes subtask counts and the linked acceptance criterion text.')]
 class ListTasksTool extends Tool
 {
+    use ResolvesProjectAccess;
+
     protected string $name = 'list-tasks';
 
     public function handle(Request $request): Response
     {
-        $user = Auth::resolve($request);
-        if (! $user) {
-            return Response::error('Authentication required.');
+        $user = $this->resolveUser($request);
+        if ($user instanceof Response) {
+            return $user;
         }
 
         $storyId = $request->integer('story_id');
@@ -29,13 +30,9 @@ class ListTasksTool extends Tool
             return Response::error('story_id is required.');
         }
 
-        $story = Story::query()->with('feature')->find($storyId);
-        if (! $story) {
-            return Response::error('Story not found.');
-        }
-
-        if (! in_array($story->feature->project_id, $user->accessibleProjectIds(), true)) {
-            return Response::error('Story not accessible.');
+        $story = $this->resolveAccessibleStory($storyId, $user);
+        if ($story instanceof Response) {
+            return $story;
         }
 
         $tasks = $story->tasks()

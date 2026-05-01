@@ -2,8 +2,7 @@
 
 namespace App\Mcp\Tools;
 
-use App\Mcp\Auth;
-use App\Models\Story;
+use App\Mcp\Concerns\ResolvesProjectAccess;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Laravel\Mcp\Request;
 use Laravel\Mcp\Response;
@@ -13,13 +12,15 @@ use Laravel\Mcp\Server\Tool;
 #[Description('Submit a story for approval (Draft → PendingApproval). Errors if the story has been rejected.')]
 class SubmitStoryTool extends Tool
 {
+    use ResolvesProjectAccess;
+
     protected string $name = 'submit-story';
 
     public function handle(Request $request): Response
     {
-        $user = Auth::resolve($request);
-        if (! $user) {
-            return Response::error('Authentication required.');
+        $user = $this->resolveUser($request);
+        if ($user instanceof Response) {
+            return $user;
         }
 
         $storyId = $request->integer('story_id');
@@ -27,13 +28,9 @@ class SubmitStoryTool extends Tool
             return Response::error('story_id is required.');
         }
 
-        $story = Story::query()->with('feature')->find($storyId);
-        if (! $story) {
-            return Response::error('Story not found.');
-        }
-
-        if (! in_array($story->feature->project_id, $user->accessibleProjectIds(), true)) {
-            return Response::error('Story not accessible.');
+        $story = $this->resolveAccessibleStory($storyId, $user);
+        if ($story instanceof Response) {
+            return $story;
         }
 
         try {

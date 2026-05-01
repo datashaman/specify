@@ -2,7 +2,7 @@
 
 namespace App\Mcp\Tools;
 
-use App\Mcp\Auth;
+use App\Mcp\Concerns\ResolvesProjectAccess;
 use App\Models\AgentRun;
 use App\Models\Story;
 use App\Models\Subtask;
@@ -16,13 +16,15 @@ use Laravel\Mcp\Server\Tool;
 #[Description('Get an agent run in detail (input/output/diff). Diff is omitted by default — pass include_diff=true to fetch.')]
 class GetRunTool extends Tool
 {
+    use ResolvesProjectAccess;
+
     protected string $name = 'get-run';
 
     public function handle(Request $request): Response
     {
-        $user = Auth::resolve($request);
-        if (! $user) {
-            return Response::error('Authentication required.');
+        $user = $this->resolveUser($request);
+        if ($user instanceof Response) {
+            return $user;
         }
 
         $runId = $request->integer('run_id');
@@ -38,7 +40,7 @@ class GetRunTool extends Tool
         }
 
         $projectId = $this->resolveProjectId($run);
-        if ($projectId === null || ! in_array($projectId, $user->accessibleProjectIds(), true)) {
+        if ($projectId === null || ! $this->canAccessProject($user, $projectId)) {
             return Response::error('Run not accessible.');
         }
 

@@ -3,8 +3,7 @@
 namespace App\Mcp\Tools;
 
 use App\Enums\StoryStatus;
-use App\Mcp\Auth;
-use App\Models\Feature;
+use App\Mcp\Concerns\ResolvesProjectAccess;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Illuminate\Support\Facades\DB;
 use Laravel\Mcp\Request;
@@ -15,13 +14,15 @@ use Laravel\Mcp\Server\Tool;
 #[Description('Create a story under an existing feature. The feature must already exist — use create_feature first if needed.')]
 class CreateStoryTool extends Tool
 {
+    use ResolvesProjectAccess;
+
     protected string $name = 'create-story';
 
     public function handle(Request $request): Response
     {
-        $user = Auth::resolve($request);
-        if (! $user) {
-            return Response::error('Authentication required.');
+        $user = $this->resolveUser($request);
+        if ($user instanceof Response) {
+            return $user;
         }
 
         $validated = $request->validate([
@@ -34,13 +35,13 @@ class CreateStoryTool extends Tool
             'acceptance_criteria.*' => ['required', 'string'],
         ]);
 
-        $feature = Feature::query()->find($validated['feature_id']);
-        if (! $feature) {
-            return Response::error('Feature not found. Use create_feature first.');
-        }
-
-        if (! in_array($feature->project_id, $user->accessibleProjectIds(), true)) {
-            return Response::error('Feature not accessible.');
+        $feature = $this->resolveAccessibleFeature(
+            $validated['feature_id'],
+            $user,
+            notFoundMessage: 'Feature not found. Use create_feature first.',
+        );
+        if ($feature instanceof Response) {
+            return $feature;
         }
 
         $story = DB::transaction(function () use ($feature, $user, $validated) {

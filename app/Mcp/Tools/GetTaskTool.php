@@ -2,7 +2,7 @@
 
 namespace App\Mcp\Tools;
 
-use App\Mcp\Auth;
+use App\Mcp\Concerns\ResolvesProjectAccess;
 use App\Models\Task;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Laravel\Mcp\Request;
@@ -13,13 +13,15 @@ use Laravel\Mcp\Server\Tool;
 #[Description('Get a task in detail, including its subtasks (positions, statuses) and dependency positions.')]
 class GetTaskTool extends Tool
 {
+    use ResolvesProjectAccess;
+
     protected string $name = 'get-task';
 
     public function handle(Request $request): Response
     {
-        $user = Auth::resolve($request);
-        if (! $user) {
-            return Response::error('Authentication required.');
+        $user = $this->resolveUser($request);
+        if ($user instanceof Response) {
+            return $user;
         }
 
         $taskId = $request->integer('task_id');
@@ -35,7 +37,7 @@ class GetTaskTool extends Tool
             return Response::error('Task not found.');
         }
 
-        if (! in_array($task->story->feature->project_id, $user->accessibleProjectIds(), true)) {
+        if (! $this->canAccessProject($user, (int) $task->story->feature->project_id)) {
             return Response::error('Task not accessible.');
         }
 

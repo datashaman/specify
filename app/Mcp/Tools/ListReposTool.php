@@ -2,8 +2,7 @@
 
 namespace App\Mcp\Tools;
 
-use App\Mcp\Auth;
-use App\Models\Project;
+use App\Mcp\Concerns\ResolvesProjectAccess;
 use App\Models\Repo;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Laravel\Mcp\Request;
@@ -14,13 +13,15 @@ use Laravel\Mcp\Server\Tool;
 #[Description('List repositories attached to a project. Defaults to the user’s current project.')]
 class ListReposTool extends Tool
 {
+    use ResolvesProjectAccess;
+
     protected string $name = 'list-repos';
 
     public function handle(Request $request): Response
     {
-        $user = Auth::resolve($request);
-        if (! $user) {
-            return Response::error('Authentication required.');
+        $user = $this->resolveUser($request);
+        if ($user instanceof Response) {
+            return $user;
         }
 
         $projectId = $request->integer('project_id') ?: $user->current_project_id;
@@ -28,11 +29,10 @@ class ListReposTool extends Tool
             return Response::error('No project_id provided and no current project set.');
         }
 
-        if (! in_array($projectId, $user->accessibleProjectIds(), true)) {
-            return Response::error('Project not accessible.');
+        $project = $this->resolveAccessibleProject($projectId, $user);
+        if ($project instanceof Response) {
+            return $project;
         }
-
-        $project = Project::query()->findOrFail($projectId);
         $repos = $project->repos()->orderBy('name')->get();
 
         return Response::json([

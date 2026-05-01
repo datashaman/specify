@@ -2,8 +2,7 @@
 
 namespace App\Mcp\Tools;
 
-use App\Mcp\Auth;
-use App\Models\Project;
+use App\Mcp\Concerns\ResolvesProjectAccess;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Laravel\Mcp\Request;
 use Laravel\Mcp\Response;
@@ -13,13 +12,15 @@ use Laravel\Mcp\Server\Tool;
 #[Description('Get a project in detail (counts of features, stories, repos). Defaults to the user’s current project.')]
 class GetProjectTool extends Tool
 {
+    use ResolvesProjectAccess;
+
     protected string $name = 'get-project';
 
     public function handle(Request $request): Response
     {
-        $user = Auth::resolve($request);
-        if (! $user) {
-            return Response::error('Authentication required.');
+        $user = $this->resolveUser($request);
+        if ($user instanceof Response) {
+            return $user;
         }
 
         $projectId = $request->integer('project_id') ?: $user->current_project_id;
@@ -27,14 +28,11 @@ class GetProjectTool extends Tool
             return Response::error('No project_id provided and no current project set.');
         }
 
-        if (! in_array($projectId, $user->accessibleProjectIds(), true)) {
-            return Response::error('Project not accessible.');
+        $project = $this->resolveAccessibleProject($projectId, $user);
+        if ($project instanceof Response) {
+            return $project;
         }
-
-        $project = Project::query()
-            ->with('team')
-            ->withCount(['features', 'stories', 'repos'])
-            ->findOrFail($projectId);
+        $project->load('team')->loadCount(['features', 'stories', 'repos']);
 
         $primary = $project->primaryRepo();
 

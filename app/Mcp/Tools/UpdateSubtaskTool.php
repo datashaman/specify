@@ -4,7 +4,7 @@ namespace App\Mcp\Tools;
 
 use App\Enums\StoryStatus;
 use App\Enums\TaskStatus;
-use App\Mcp\Auth;
+use App\Mcp\Concerns\ResolvesProjectAccess;
 use App\Models\Subtask;
 use App\Services\ApprovalService;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
@@ -16,13 +16,15 @@ use Laravel\Mcp\Server\Tool;
 #[Description('Update a single subtask. Any of: name, description (markdown), status, position. Editing structural fields (name/description/position) on an Approved story resets it to PendingApproval.')]
 class UpdateSubtaskTool extends Tool
 {
+    use ResolvesProjectAccess;
+
     protected string $name = 'update-subtask';
 
     public function handle(Request $request): Response
     {
-        $user = Auth::resolve($request);
-        if (! $user) {
-            return Response::error('Authentication required.');
+        $user = $this->resolveUser($request);
+        if ($user instanceof Response) {
+            return $user;
         }
 
         $validated = $request->validate([
@@ -43,7 +45,7 @@ class UpdateSubtaskTool extends Tool
             return Response::error('Subtask is orphaned.');
         }
 
-        if (! in_array($story->feature->project_id, $user->accessibleProjectIds(), true)) {
+        if (! $this->canAccessProject($user, (int) $story->feature->project_id)) {
             return Response::error('Subtask not accessible.');
         }
 

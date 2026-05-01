@@ -18,7 +18,7 @@ class FakeExecutor implements Executor
         return false;
     }
 
-    public function execute(Subtask $subtask, ?string $workingDir, ?Repo $repo, ?string $workingBranch): array
+    public function execute(Subtask $subtask, ?string $workingDir, ?Repo $repo, ?string $workingBranch): ExecutionResult
     {
         // Pass a real (but throwaway) directory so SubtaskExecutor::tools() can construct
         // a Sandbox during fake/test invocations. The tools are never actually called
@@ -27,10 +27,10 @@ class FakeExecutor implements Executor
         $response = $agent->prompt($agent->buildPrompt());
         $output = $response->toArray();
 
-        return [
-            'summary' => (string) ($output['summary'] ?? ''),
-            'files_changed' => array_map('strval', $output['files_changed'] ?? []),
-            'commit_message' => (string) ($output['commit_message'] ?? ''),
-        ];
+        return new ExecutionResult(
+            summary: (string) ($output['summary'] ?? ''),
+            filesChanged: array_values(array_map('strval', $output['files_changed'] ?? [])),
+            commitMessage: (string) ($output['commit_message'] ?? ''),
+        );
     }
 }

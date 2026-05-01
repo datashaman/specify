@@ -2,8 +2,7 @@
 
 namespace App\Mcp\Tools;
 
-use App\Mcp\Auth;
-use App\Models\Project;
+use App\Mcp\Concerns\ResolvesProjectAccess;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Laravel\Mcp\Request;
 use Laravel\Mcp\Response;
@@ -13,13 +12,15 @@ use Laravel\Mcp\Server\Tool;
 #[Description('Mark a repo as the project’s primary. Clears any other primary on the project.')]
 class SetPrimaryRepoTool extends Tool
 {
+    use ResolvesProjectAccess;
+
     protected string $name = 'set-primary-repo';
 
     public function handle(Request $request): Response
     {
-        $user = Auth::resolve($request);
-        if (! $user) {
-            return Response::error('Authentication required.');
+        $user = $this->resolveUser($request);
+        if ($user instanceof Response) {
+            return $user;
         }
 
         $validated = $request->validate([
@@ -32,11 +33,10 @@ class SetPrimaryRepoTool extends Tool
             return Response::error('No project_id provided and no current project set.');
         }
 
-        if (! in_array($projectId, $user->accessibleProjectIds(), true)) {
-            return Response::error('Project not accessible.');
+        $project = $this->resolveAccessibleProject($projectId, $user);
+        if ($project instanceof Response) {
+            return $project;
         }
-
-        $project = Project::query()->findOrFail($projectId);
 
         if (! $user->canApproveInProject($project)) {
             return Response::error('You do not have manage rights in this project.');

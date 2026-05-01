@@ -4,7 +4,6 @@ use App\Enums\RepoProvider;
 use App\Models\Repo;
 use App\Models\Workspace;
 use App\Services\PullRequests\GitlabPullRequestProvider;
-use App\Services\PullRequests\PullRequestManager;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
 
@@ -61,9 +60,9 @@ test('GitLab provider raises on missing token', function () {
         ->toThrow(RuntimeException::class, 'access_token');
 });
 
-test('PullRequestManager returns the GitLab driver for gitlab repos', function () {
+test('Repo::pullRequestProvider returns the GitLab driver for gitlab repos', function () {
     $ws = Workspace::factory()->create();
     $repo = Repo::factory()->for($ws)->create(['provider' => RepoProvider::Gitlab]);
 
-    expect((new PullRequestManager)->for($repo))->toBeInstanceOf(GitlabPullRequestProvider::class);
+    expect($repo->pullRequestProvider())->toBeInstanceOf(GitlabPullRequestProvider::class);
 });

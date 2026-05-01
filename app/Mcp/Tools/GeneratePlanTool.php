@@ -3,8 +3,7 @@
 namespace App\Mcp\Tools;
 
 use App\Enums\StoryStatus;
-use App\Mcp\Auth;
-use App\Models\Story;
+use App\Mcp\Concerns\ResolvesProjectAccess;
 use App\Services\ExecutionService;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Laravel\Mcp\Request;
@@ -15,13 +14,15 @@ use Laravel\Mcp\Server\Tool;
 #[Description('Generate the plan (tasks + subtasks) for an Approved story using the planning agent. One task per acceptance criterion, each with one or more subtasks. The story must be Approved and have no existing tasks. Generated plan reopens approval — the story flips back to PendingApproval (revision bumped) so a human can review the breakdown before execution.')]
 class GeneratePlanTool extends Tool
 {
+    use ResolvesProjectAccess;
+
     protected string $name = 'generate-plan';
 
     public function handle(Request $request, ExecutionService $execution): Response
     {
-        $user = Auth::resolve($request);
-        if (! $user) {
-            return Response::error('Authentication required.');
+        $user = $this->resolveUser($request);
+        if ($user instanceof Response) {
+            return $user;
         }
 
         $storyId = $request->integer('story_id');
@@ -29,13 +30,9 @@ class GeneratePlanTool extends Tool
             return Response::error('story_id is required.');
         }
 
-        $story = Story::query()->with('feature')->find($storyId);
-        if (! $story) {
-            return Response::error('Story not found.');
-        }
-
-        if (! in_array($story->feature->project_id, $user->accessibleProjectIds(), true)) {
-            return Response::error('Story not accessible.');
+        $story = $this->resolveAccessibleStory($storyId, $user);
+        if ($story instanceof Response) {
+            return $story;
         }
 
         if ($story->status !== StoryStatus::Approved) {

@@ -2,7 +2,7 @@
 
 namespace App\Mcp\Tools;
 
-use App\Mcp\Auth;
+use App\Mcp\Concerns\ResolvesProjectAccess;
 use App\Models\Repo;
 use App\Models\WebhookEvent;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
@@ -14,13 +14,15 @@ use Laravel\Mcp\Server\Tool;
 #[Description('List recent webhook events. Filter by repo_id (required unless project_id given). Newest first.')]
 class ListEventsTool extends Tool
 {
+    use ResolvesProjectAccess;
+
     protected string $name = 'list-events';
 
     public function handle(Request $request): Response
     {
-        $user = Auth::resolve($request);
-        if (! $user) {
-            return Response::error('Authentication required.');
+        $user = $this->resolveUser($request);
+        if ($user instanceof Response) {
+            return $user;
         }
 
         $repoId = $request->integer('repo_id') ?: null;
@@ -41,7 +43,7 @@ class ListEventsTool extends Tool
             }
             $repoIds = [$repo->id];
         } elseif ($projectId) {
-            if (! in_array($projectId, $accessible, true)) {
+            if (! $this->canAccessProject($user, $projectId)) {
                 return Response::error('Project not accessible.');
             }
             $repoIds = Repo::query()

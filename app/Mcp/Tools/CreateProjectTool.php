@@ -5,7 +5,7 @@ namespace App\Mcp\Tools;
 use App\Enums\ProjectStatus;
 use App\Enums\RepoProvider;
 use App\Enums\TeamRole;
-use App\Mcp\Auth;
+use App\Mcp\Concerns\ResolvesProjectAccess;
 use App\Mcp\GithubRepoCatalog;
 use App\Models\Project;
 use App\Models\Repo;
@@ -20,13 +20,15 @@ use Laravel\Mcp\Server\Tool;
 #[Description('Create a project. Optionally attach GitHub repos in the same call. Switches the user’s current_project_id to the new project.')]
 class CreateProjectTool extends Tool
 {
+    use ResolvesProjectAccess;
+
     protected string $name = 'create-project';
 
     public function handle(Request $request): Response
     {
-        $user = Auth::resolve($request);
-        if (! $user) {
-            return Response::error('Authentication required.');
+        $user = $this->resolveUser($request);
+        if ($user instanceof Response) {
+            return $user;
         }
 
         $validated = $request->validate([

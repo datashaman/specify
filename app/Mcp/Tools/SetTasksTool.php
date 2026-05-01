@@ -2,14 +2,10 @@
 
 namespace App\Mcp\Tools;
 
-use App\Enums\StoryStatus;
-use App\Mcp\Auth;
-use App\Models\Story;
-use App\Models\Subtask;
-use App\Models\Task;
-use App\Services\ApprovalService;
+use App\Mcp\Concerns\ResolvesProjectAccess;
+use App\Services\PlanWriter;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
-use Illuminate\Support\Facades\DB;
+use InvalidArgumentException;
 use Laravel\Mcp\Request;
 use Laravel\Mcp\Response;
 use Laravel\Mcp\Server\Attributes\Description;
@@ -18,13 +14,15 @@ use Laravel\Mcp\Server\Tool;
 #[Description('Replace the entire task list for a story in one transaction. Each task gets 1+ ordered subtasks; tasks may declare task-level dependencies via positions; each task may link to one acceptance_criterion_id belonging to the story. If the story is currently Approved, this resets it to PendingApproval. Markdown is supported in description fields.')]
 class SetTasksTool extends Tool
 {
+    use ResolvesProjectAccess;
+
     protected string $name = 'set-tasks';
 
-    public function handle(Request $request): Response
+    public function handle(Request $request, PlanWriter $planWriter): Response
     {
-        $user = Auth::resolve($request);
-        if (! $user) {
-            return Response::error('Authentication required.');
+        $user = $this->resolveUser($request);
+        if ($user instanceof Response) {
+            return $user;
         }
 
         $validated = $request->validate([
@@ -42,87 +40,16 @@ class SetTasksTool extends Tool
             'tasks.*.subtasks.*.description' => ['nullable', 'string'],
         ]);
 
-        $story = Story::query()->with('feature', 'acceptanceCriteria:id,story_id')->find($validated['story_id']);
-        if (! $story) {
-            return Response::error('Story not found.');
+        $story = $this->resolveAccessibleStory($validated['story_id'], $user);
+        if ($story instanceof Response) {
+            return $story;
         }
 
-        if (! in_array($story->feature->project_id, $user->accessibleProjectIds(), true)) {
-            return Response::error('Story not accessible.');
+        try {
+            $result = $planWriter->replacePlan($story, $validated['tasks']);
+        } catch (InvalidArgumentException $e) {
+            return Response::error($e->getMessage());
         }
-
-        $taskPositions = array_column($validated['tasks'], 'position');
-        if (count($taskPositions) !== count(array_unique($taskPositions))) {
-            return Response::error('Task positions must be unique within a story.');
-        }
-
-        $allowedAcIds = $story->acceptanceCriteria->pluck('id')->all();
-        foreach ($validated['tasks'] as $t) {
-            if (! empty($t['acceptance_criterion_id']) && ! in_array($t['acceptance_criterion_id'], $allowedAcIds, true)) {
-                return Response::error("acceptance_criterion_id {$t['acceptance_criterion_id']} does not belong to this story.");
-            }
-            $subPositions = array_column($t['subtasks'], 'position');
-            if (count($subPositions) !== count(array_unique($subPositions))) {
-                return Response::error("Subtask positions must be unique within task at position {$t['position']}.");
-            }
-        }
-
-        $usedAcIds = array_filter(array_column($validated['tasks'], 'acceptance_criterion_id'));
-        if (count($usedAcIds) !== count(array_unique($usedAcIds))) {
-            return Response::error('Each acceptance_criterion_id may only be linked to one task.');
-        }
-
-        $result = DB::transaction(function () use ($story, $validated) {
-            $story->tasks()->delete();
-
-            $tasksByPosition = [];
-
-            foreach ($validated['tasks'] as $taskData) {
-                $task = Task::create([
-                    'story_id' => $story->getKey(),
-                    'acceptance_criterion_id' => $taskData['acceptance_criterion_id'] ?? null,
-                    'position' => $taskData['position'],
-                    'name' => $taskData['name'],
-                    'description' => $taskData['description'] ?? null,
-                ]);
-
-                foreach ($taskData['subtasks'] as $subtaskData) {
-                    Subtask::create([
-                        'task_id' => $task->getKey(),
-                        'position' => $subtaskData['position'],
-                        'name' => $subtaskData['name'],
-                        'description' => $subtaskData['description'] ?? null,
-                    ]);
-                }
-
-                $tasksByPosition[$taskData['position']] = $task;
-            }
-
-            foreach ($validated['tasks'] as $taskData) {
-                foreach ($taskData['depends_on_positions'] ?? [] as $depPosition) {
-                    if (! isset($tasksByPosition[$taskData['position']], $tasksByPosition[$depPosition])) {
-                        continue;
-                    }
-                    $tasksByPosition[$taskData['position']]->addDependency($tasksByPosition[$depPosition]);
-                }
-            }
-
-            if ($story->status === StoryStatus::Approved) {
-                $story->silentlyForceFill([
-                    'status' => StoryStatus::PendingApproval->value,
-                    'revision' => ($story->revision ?? 1) + 1,
-                ]);
-            } elseif ($story->status === StoryStatus::ChangesRequested) {
-                $story->silentlyForceFill(['status' => StoryStatus::PendingApproval->value]);
-            }
-
-            return [
-                'task_count' => count($tasksByPosition),
-                'subtask_count' => Subtask::whereIn('task_id', collect($tasksByPosition)->map->getKey()->all())->count(),
-            ];
-        });
-
-        app(ApprovalService::class)->recompute($story->fresh());
 
         return Response::json([
             'story_id' => $story->id,

@@ -3,6 +3,10 @@
 namespace App\Models;
 
 use App\Enums\RepoProvider;
+use App\Services\PullRequests\BitbucketPullRequestProvider;
+use App\Services\PullRequests\GithubPullRequestProvider;
+use App\Services\PullRequests\GitlabPullRequestProvider;
+use App\Services\PullRequests\PullRequestProvider;
 use Database\Factories\RepoFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -188,6 +192,20 @@ class Repo extends Model
     public function webhookUrl(): string
     {
         return route('webhooks.github', $this);
+    }
+
+    /**
+     * Resolve the pull-request adapter for this repo's provider, or null
+     * when the provider doesn't support PR creation (Generic, etc.).
+     */
+    public function pullRequestProvider(): ?PullRequestProvider
+    {
+        return match ($this->provider) {
+            RepoProvider::Github => app(GithubPullRequestProvider::class),
+            RepoProvider::Gitlab => app(GitlabPullRequestProvider::class),
+            RepoProvider::Bitbucket => app(BitbucketPullRequestProvider::class),
+            default => null,
+        };
     }
 
     /**

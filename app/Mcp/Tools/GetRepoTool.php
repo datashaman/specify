@@ -2,7 +2,7 @@
 
 namespace App\Mcp\Tools;
 
-use App\Mcp\Auth;
+use App\Mcp\Concerns\ResolvesProjectAccess;
 use App\Models\Repo;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Laravel\Mcp\Request;
@@ -13,13 +13,15 @@ use Laravel\Mcp\Server\Tool;
 #[Description('Get a repository in detail, including the latest commit on the default branch.')]
 class GetRepoTool extends Tool
 {
+    use ResolvesProjectAccess;
+
     protected string $name = 'get-repo';
 
     public function handle(Request $request): Response
     {
-        $user = Auth::resolve($request);
-        if (! $user) {
-            return Response::error('Authentication required.');
+        $user = $this->resolveUser($request);
+        if ($user instanceof Response) {
+            return $user;
         }
 
         $repoId = $request->integer('repo_id');

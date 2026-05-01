@@ -2,7 +2,7 @@
 
 namespace App\Mcp\Tools;
 
-use App\Mcp\Auth;
+use App\Mcp\Concerns\ResolvesProjectAccess;
 use App\Models\AgentRun;
 use App\Models\Story;
 use App\Models\Subtask;
@@ -16,13 +16,15 @@ use Laravel\Mcp\Server\Tool;
 #[Description('List recent agent runs filtered by story, task, or subtask. Newest first.')]
 class ListRunsTool extends Tool
 {
+    use ResolvesProjectAccess;
+
     protected string $name = 'list-runs';
 
     public function handle(Request $request): Response
     {
-        $user = Auth::resolve($request);
-        if (! $user) {
-            return Response::error('Authentication required.');
+        $user = $this->resolveUser($request);
+        if ($user instanceof Response) {
+            return $user;
         }
 
         $storyId = $request->integer('story_id') ?: null;
@@ -42,7 +44,7 @@ class ListRunsTool extends Tool
                 return Response::error('Subtask not found.');
             }
             $projectId = $subtask->task?->story?->feature?->project_id;
-            if (! $projectId || ! in_array($projectId, $user->accessibleProjectIds(), true)) {
+            if (! $projectId || ! $this->canAccessProject($user, (int) $projectId)) {
                 return Response::error('Subtask not accessible.');
             }
             $query->where('runnable_type', Subtask::class)->where('runnable_id', $subtask->id);
@@ -51,7 +53,7 @@ class ListRunsTool extends Tool
             if (! $task) {
                 return Response::error('Task not found.');
             }
-            if (! in_array($task->story->feature->project_id, $user->accessibleProjectIds(), true)) {
+            if (! $this->canAccessProject($user, (int) $task->story->feature->project_id)) {
                 return Response::error('Task not accessible.');
             }
             $subtaskIds = $task->subtasks->pluck('id')->all();
@@ -70,7 +72,7 @@ class ListRunsTool extends Tool
             if (! $story) {
                 return Response::error('Story not found.');
             }
-            if (! in_array($story->feature->project_id, $user->accessibleProjectIds(), true)) {
+            if (! $this->canAccessProject($user, (int) $story->feature->project_id)) {
                 return Response::error('Story not accessible.');
             }
             $taskIds = $story->tasks->pluck('id')->all();

@@ -52,10 +52,10 @@ test('CliExecutor runs the configured binary in cwd, captures stdout, observes g
     $executor = new CliExecutor([$bin]);
     $output = $executor->execute($subtask, $workingDir, repo: null, workingBranch: 'specify/test');
 
-    expect($output['summary'])->toContain('agent ran successfully')
-        ->and($output['files_changed'])->toContain('new-from-agent.txt')
-        ->and($output['files_changed'])->toContain('prompt-received.txt')
-        ->and($output['commit_message'])->toBe('feat: add export')
+    expect($output->summary)->toContain('agent ran successfully')
+        ->and($output->filesChanged)->toContain('new-from-agent.txt')
+        ->and($output->filesChanged)->toContain('prompt-received.txt')
+        ->and($output->commitMessage)->toBe('feat: add export')
         ->and(File::get($workingDir.'/prompt-received.txt'))->toContain('add export');
 });
 

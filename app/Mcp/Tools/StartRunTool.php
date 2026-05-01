@@ -2,8 +2,7 @@
 
 namespace App\Mcp\Tools;
 
-use App\Mcp\Auth;
-use App\Models\Story;
+use App\Mcp\Concerns\ResolvesProjectAccess;
 use App\Services\ExecutionService;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Laravel\Mcp\Request;
@@ -14,13 +13,15 @@ use Laravel\Mcp\Server\Tool;
 #[Description('Start (or resume) execution of an Approved story. Dispatches agent runs for the next actionable subtasks (parent task dependencies satisfied AND lower-position siblings done). The story must already be Approved.')]
 class StartRunTool extends Tool
 {
+    use ResolvesProjectAccess;
+
     protected string $name = 'start-run';
 
     public function handle(Request $request, ExecutionService $execution): Response
     {
-        $user = Auth::resolve($request);
-        if (! $user) {
-            return Response::error('Authentication required.');
+        $user = $this->resolveUser($request);
+        if ($user instanceof Response) {
+            return $user;
         }
 
         $storyId = $request->integer('story_id');
@@ -28,13 +29,9 @@ class StartRunTool extends Tool
             return Response::error('story_id is required.');
         }
 
-        $story = Story::query()->with('feature')->find($storyId);
-        if (! $story) {
-            return Response::error('Story not found.');
-        }
-
-        if (! in_array($story->feature->project_id, $user->accessibleProjectIds(), true)) {
-            return Response::error('Story not accessible.');
+        $story = $this->resolveAccessibleStory($storyId, $user);
+        if ($story instanceof Response) {
+            return $story;
         }
 
         try {

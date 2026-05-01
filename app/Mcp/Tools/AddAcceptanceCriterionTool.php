@@ -2,8 +2,7 @@
 
 namespace App\Mcp\Tools;
 
-use App\Mcp\Auth;
-use App\Models\Story;
+use App\Mcp\Concerns\ResolvesProjectAccess;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Laravel\Mcp\Request;
 use Laravel\Mcp\Response;
@@ -13,13 +12,15 @@ use Laravel\Mcp\Server\Tool;
 #[Description('Add an acceptance criterion to a story. Position auto-increments unless supplied.')]
 class AddAcceptanceCriterionTool extends Tool
 {
+    use ResolvesProjectAccess;
+
     protected string $name = 'add-acceptance-criterion';
 
     public function handle(Request $request): Response
     {
-        $user = Auth::resolve($request);
-        if (! $user) {
-            return Response::error('Authentication required.');
+        $user = $this->resolveUser($request);
+        if ($user instanceof Response) {
+            return $user;
         }
 
         $validated = $request->validate([
@@ -28,13 +29,9 @@ class AddAcceptanceCriterionTool extends Tool
             'position' => ['nullable', 'integer'],
         ]);
 
-        $story = Story::query()->with('feature')->find($validated['story_id']);
-        if (! $story) {
-            return Response::error('Story not found.');
-        }
-
-        if (! in_array($story->feature->project_id, $user->accessibleProjectIds(), true)) {
-            return Response::error('Story not accessible.');
+        $story = $this->resolveAccessibleStory($validated['story_id'], $user);
+        if ($story instanceof Response) {
+            return $story;
         }
 
         $position = $validated['position']

@@ -3,8 +3,7 @@
 namespace App\Mcp\Tools;
 
 use App\Enums\ApprovalDecision;
-use App\Mcp\Auth;
-use App\Models\Project;
+use App\Mcp\Concerns\ResolvesProjectAccess;
 use App\Models\Story;
 use App\Services\ApprovalService;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
@@ -16,13 +15,15 @@ use Laravel\Mcp\Server\Tool;
 #[Description('Request changes on a story. Resets prior approvals and moves the story to ChangesRequested.')]
 class RequestStoryChangesTool extends Tool
 {
+    use ResolvesProjectAccess;
+
     protected string $name = 'request-story-changes';
 
     public function handle(Request $request, ApprovalService $approvals): Response
     {
-        $user = Auth::resolve($request);
-        if (! $user) {
-            return Response::error('Authentication required.');
+        $user = $this->resolveUser($request);
+        if ($user instanceof Response) {
+            return $user;
         }
 
         $validated = $request->validate([
@@ -30,12 +31,12 @@ class RequestStoryChangesTool extends Tool
             'notes' => ['required', 'string'],
         ]);
 
-        $story = Story::query()->with('feature')->find($validated['story_id']);
+        $story = Story::query()->with('feature.project')->find($validated['story_id']);
         if (! $story) {
             return Response::error('Story not found.');
         }
 
-        $project = Project::query()->find($story->feature->project_id);
+        $project = $story->feature->project;
         if (! $project || ! $user->canApproveInProject($project)) {
             return Response::error('You do not have approver rights in this project.');
         }

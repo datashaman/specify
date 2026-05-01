@@ -15,8 +15,6 @@ interface Executor
 
     /**
      * Run the executor against a Subtask.
-     *
-     * @return array{summary: string, files_changed: array<int, string>, commit_message: string}
      */
-    public function execute(Subtask $subtask, ?string $workingDir, ?Repo $repo, ?string $workingBranch): array;
+    public function execute(Subtask $subtask, ?string $workingDir, ?Repo $repo, ?string $workingBranch): ExecutionResult;
 }

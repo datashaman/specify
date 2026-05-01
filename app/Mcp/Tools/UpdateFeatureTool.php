@@ -3,8 +3,7 @@
 namespace App\Mcp\Tools;
 
 use App\Enums\FeatureStatus;
-use App\Mcp\Auth;
-use App\Models\Feature;
+use App\Mcp\Concerns\ResolvesProjectAccess;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Laravel\Mcp\Request;
 use Laravel\Mcp\Response;
@@ -14,13 +13,15 @@ use Laravel\Mcp\Server\Tool;
 #[Description('Update an existing feature’s name, description, or status.')]
 class UpdateFeatureTool extends Tool
 {
+    use ResolvesProjectAccess;
+
     protected string $name = 'update-feature';
 
     public function handle(Request $request): Response
     {
-        $user = Auth::resolve($request);
-        if (! $user) {
-            return Response::error('Authentication required.');
+        $user = $this->resolveUser($request);
+        if ($user instanceof Response) {
+            return $user;
         }
 
         $validated = $request->validate([
@@ -31,13 +32,9 @@ class UpdateFeatureTool extends Tool
             'status' => ['nullable', 'string', 'in:'.implode(',', array_column(FeatureStatus::cases(), 'value'))],
         ]);
 
-        $feature = Feature::query()->find($validated['feature_id']);
-        if (! $feature) {
-            return Response::error('Feature not found.');
-        }
-
-        if (! in_array($feature->project_id, $user->accessibleProjectIds(), true)) {
-            return Response::error('Feature not accessible.');
+        $feature = $this->resolveAccessibleFeature($validated['feature_id'], $user);
+        if ($feature instanceof Response) {
+            return $feature;
         }
 
         $changes = array_filter([

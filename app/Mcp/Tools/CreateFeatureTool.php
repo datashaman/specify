@@ -3,8 +3,7 @@
 namespace App\Mcp\Tools;
 
 use App\Enums\FeatureStatus;
-use App\Mcp\Auth;
-use App\Models\Project;
+use App\Mcp\Concerns\ResolvesProjectAccess;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Laravel\Mcp\Request;
 use Laravel\Mcp\Response;
@@ -14,13 +13,15 @@ use Laravel\Mcp\Server\Tool;
 #[Description('Create a feature in a project. Defaults to the authenticated user’s current project. Required before creating stories.')]
 class CreateFeatureTool extends Tool
 {
+    use ResolvesProjectAccess;
+
     protected string $name = 'create-feature';
 
     public function handle(Request $request): Response
     {
-        $user = Auth::resolve($request);
-        if (! $user) {
-            return Response::error('Authentication required.');
+        $user = $this->resolveUser($request);
+        if ($user instanceof Response) {
+            return $user;
         }
 
         $validated = $request->validate([
@@ -36,11 +37,10 @@ class CreateFeatureTool extends Tool
             return Response::error('No project_id provided and no current project set.');
         }
 
-        if (! in_array($projectId, $user->accessibleProjectIds(), true)) {
-            return Response::error('Project not accessible.');
+        $project = $this->resolveAccessibleProject($projectId, $user);
+        if ($project instanceof Response) {
+            return $project;
         }
-
-        $project = Project::query()->findOrFail($projectId);
 
         $feature = $project->features()->create([
             'name' => $validated['name'],

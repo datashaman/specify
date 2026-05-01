@@ -4,7 +4,7 @@ namespace App\Mcp\Tools;
 
 use App\Enums\StoryStatus;
 use App\Enums\TaskStatus;
-use App\Mcp\Auth;
+use App\Mcp\Concerns\ResolvesProjectAccess;
 use App\Models\Task;
 use App\Services\ApprovalService;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
@@ -17,13 +17,15 @@ use Laravel\Mcp\Server\Tool;
 #[Description('Update a single task. Any of: name, description (markdown), status, acceptance_criterion_id, depends_on_positions (replaces existing). Editing structural fields (name/description/dependencies/AC link) on an Approved story resets it to PendingApproval.')]
 class UpdateTaskTool extends Tool
 {
+    use ResolvesProjectAccess;
+
     protected string $name = 'update-task';
 
     public function handle(Request $request): Response
     {
-        $user = Auth::resolve($request);
-        if (! $user) {
-            return Response::error('Authentication required.');
+        $user = $this->resolveUser($request);
+        if ($user instanceof Response) {
+            return $user;
         }
 
         $validated = $request->validate([
@@ -41,7 +43,7 @@ class UpdateTaskTool extends Tool
             return Response::error('Task not found.');
         }
 
-        if (! in_array($task->story->feature->project_id, $user->accessibleProjectIds(), true)) {
+        if (! $this->canAccessProject($user, (int) $task->story->feature->project_id)) {
             return Response::error('Task not accessible.');
         }
 

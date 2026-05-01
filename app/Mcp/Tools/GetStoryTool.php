@@ -3,8 +3,7 @@
 namespace App\Mcp\Tools;
 
 use App\Enums\TaskStatus;
-use App\Mcp\Auth;
-use App\Models\Story;
+use App\Mcp\Concerns\ResolvesProjectAccess;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Laravel\Mcp\Request;
 use Laravel\Mcp\Response;
@@ -14,13 +13,15 @@ use Laravel\Mcp\Server\Tool;
 #[Description('Get a story in detail, including its acceptance criteria and task progress counts.')]
 class GetStoryTool extends Tool
 {
+    use ResolvesProjectAccess;
+
     protected string $name = 'get-story';
 
     public function handle(Request $request): Response
     {
-        $user = Auth::resolve($request);
-        if (! $user) {
-            return Response::error('Authentication required.');
+        $user = $this->resolveUser($request);
+        if ($user instanceof Response) {
+            return $user;
         }
 
         $storyId = $request->integer('story_id');
@@ -28,14 +29,11 @@ class GetStoryTool extends Tool
             return Response::error('story_id is required.');
         }
 
-        $story = Story::query()->with(['feature', 'acceptanceCriteria.task:id,acceptance_criterion_id,status', 'tasks:id,story_id,status'])->find($storyId);
-        if (! $story) {
-            return Response::error('Story not found.');
+        $story = $this->resolveAccessibleStory($storyId, $user);
+        if ($story instanceof Response) {
+            return $story;
         }
-
-        if (! in_array($story->feature->project_id, $user->accessibleProjectIds(), true)) {
-            return Response::error('Story not accessible.');
-        }
+        $story->load(['acceptanceCriteria.task:id,acceptance_criterion_id,status', 'tasks:id,story_id,status']);
 
         $tasksTotal = $story->tasks->count();
         $tasksDone = $story->tasks->filter(fn ($t) => $t->status === TaskStatus::Done)->count();

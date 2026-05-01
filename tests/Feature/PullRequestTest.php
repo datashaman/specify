@@ -13,7 +13,6 @@ use App\Models\Workspace;
 use App\Services\ExecutionService;
 use App\Services\Executors\Executor;
 use App\Services\PullRequests\GithubPullRequestProvider;
-use App\Services\PullRequests\PullRequestManager;
 use App\Services\WorkspaceRunner;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\File;
@@ -114,17 +113,17 @@ test('GitHub provider surfaces non-2xx responses as exceptions', function () {
         ->toThrow(RuntimeException::class, '422');
 });
 
-test('PullRequestManager returns null for Generic provider', function () {
+test('Repo::pullRequestProvider returns null for Generic provider', function () {
     $ws = Workspace::factory()->create();
     $repo = Repo::factory()->for($ws)->create(['provider' => RepoProvider::Generic]);
-    expect((new PullRequestManager)->for($repo))->toBeNull();
+    expect($repo->pullRequestProvider())->toBeNull();
 });
 
-test('PullRequestManager returns the GitHub driver for github repos', function () {
+test('Repo::pullRequestProvider returns the GitHub driver for github repos', function () {
     $ws = Workspace::factory()->create();
     $repo = Repo::factory()->for($ws)->create(['provider' => RepoProvider::Github]);
 
-    expect((new PullRequestManager)->for($repo))
+    expect($repo->pullRequestProvider())
         ->toBeInstanceOf(GithubPullRequestProvider::class);
 });
 

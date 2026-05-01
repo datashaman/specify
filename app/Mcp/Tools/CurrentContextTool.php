@@ -2,7 +2,7 @@
 
 namespace App\Mcp\Tools;
 
-use App\Mcp\Auth;
+use App\Mcp\Concerns\ResolvesProjectAccess;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Laravel\Mcp\Request;
 use Laravel\Mcp\Response;
@@ -12,13 +12,15 @@ use Laravel\Mcp\Server\Tool;
 #[Description('Return the acting user, their current workspace, current team, and current project. Useful for orienting at the start of a session.')]
 class CurrentContextTool extends Tool
 {
+    use ResolvesProjectAccess;
+
     protected string $name = 'current-context';
 
     public function handle(Request $request): Response
     {
-        $user = Auth::resolve($request);
-        if (! $user) {
-            return Response::error('Authentication required.');
+        $user = $this->resolveUser($request);
+        if ($user instanceof Response) {
+            return $user;
         }
 
         $workspace = $user->currentWorkspace();

@@ -2,9 +2,8 @@
 
 namespace App\Mcp\Tools;
 
-use App\Mcp\Auth;
+use App\Mcp\Concerns\ResolvesProjectAccess;
 use App\Models\Feature;
-use App\Models\Project;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Laravel\Mcp\Request;
 use Laravel\Mcp\Response;
@@ -14,13 +13,15 @@ use Laravel\Mcp\Server\Tool;
 #[Description('List features in a project. Defaults to the authenticated user’s current project.')]
 class ListFeaturesTool extends Tool
 {
+    use ResolvesProjectAccess;
+
     protected string $name = 'list-features';
 
     public function handle(Request $request): Response
     {
-        $user = Auth::resolve($request);
-        if (! $user) {
-            return Response::error('Authentication required.');
+        $user = $this->resolveUser($request);
+        if ($user instanceof Response) {
+            return $user;
         }
 
         $projectId = $request->integer('project_id') ?: $user->current_project_id;
@@ -28,11 +29,10 @@ class ListFeaturesTool extends Tool
             return Response::error('No project_id provided and no current project set.');
         }
 
-        if (! in_array($projectId, $user->accessibleProjectIds(), true)) {
-            return Response::error('Project not accessible.');
+        $project = $this->resolveAccessibleProject($projectId, $user);
+        if ($project instanceof Response) {
+            return $project;
         }
-
-        $project = Project::query()->findOrFail($projectId);
 
         $features = $project->features()
             ->orderBy('name')

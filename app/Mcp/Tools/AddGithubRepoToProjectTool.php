@@ -3,9 +3,8 @@
 namespace App\Mcp\Tools;
 
 use App\Enums\RepoProvider;
-use App\Mcp\Auth;
+use App\Mcp\Concerns\ResolvesProjectAccess;
 use App\Mcp\GithubRepoCatalog;
-use App\Models\Project;
 use App\Models\Repo;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Laravel\Mcp\Request;
@@ -16,13 +15,15 @@ use Laravel\Mcp\Server\Tool;
 #[Description('Pick a GitHub repo and attach it to a project. Mirrors the Repos page picker: creates the Repo with the user’s OAuth token, installs the webhook, and attaches. Set set_primary=true to mark it primary in the same call.')]
 class AddGithubRepoToProjectTool extends Tool
 {
+    use ResolvesProjectAccess;
+
     protected string $name = 'add-github-repo-to-project';
 
     public function handle(Request $request): Response
     {
-        $user = Auth::resolve($request);
-        if (! $user) {
-            return Response::error('Authentication required.');
+        $user = $this->resolveUser($request);
+        if ($user instanceof Response) {
+            return $user;
         }
 
         $validated = $request->validate([
@@ -36,11 +37,11 @@ class AddGithubRepoToProjectTool extends Tool
             return Response::error('No project_id provided and no current project set.');
         }
 
-        if (! in_array($projectId, $user->accessibleProjectIds(), true)) {
-            return Response::error('Project not accessible.');
+        $project = $this->resolveAccessibleProject($projectId, $user);
+        if ($project instanceof Response) {
+            return $project;
         }
-
-        $project = Project::query()->with('team')->findOrFail($projectId);
+        $project->load('team');
 
         if (! $user->canApproveInProject($project)) {
             return Response::error('You do not have manage rights in this project.');

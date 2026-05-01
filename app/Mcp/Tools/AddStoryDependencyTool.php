@@ -2,8 +2,7 @@
 
 namespace App\Mcp\Tools;
 
-use App\Mcp\Auth;
-use App\Models\Story;
+use App\Mcp\Concerns\ResolvesProjectAccess;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Laravel\Mcp\Request;
 use Laravel\Mcp\Response;
@@ -13,13 +12,15 @@ use Laravel\Mcp\Server\Tool;
 #[Description('Mark a story as depending on another story. Both stories must be in projects the user can access.')]
 class AddStoryDependencyTool extends Tool
 {
+    use ResolvesProjectAccess;
+
     protected string $name = 'add-story-dependency';
 
     public function handle(Request $request): Response
     {
-        $user = Auth::resolve($request);
-        if (! $user) {
-            return Response::error('Authentication required.');
+        $user = $this->resolveUser($request);
+        if ($user instanceof Response) {
+            return $user;
         }
 
         $validated = $request->validate([
@@ -27,17 +28,23 @@ class AddStoryDependencyTool extends Tool
             'depends_on_story_id' => ['required', 'integer', 'different:story_id'],
         ]);
 
-        $story = Story::query()->with('feature')->find($validated['story_id']);
-        $dependency = Story::query()->with('feature')->find($validated['depends_on_story_id']);
-
-        if (! $story || ! $dependency) {
-            return Response::error('One or both stories not found.');
+        $story = $this->resolveAccessibleStory(
+            $validated['story_id'],
+            $user,
+            notFoundMessage: 'One or both stories not found.',
+            forbiddenMessage: 'One or both stories are not accessible.',
+        );
+        if ($story instanceof Response) {
+            return $story;
         }
-
-        $accessible = $user->accessibleProjectIds();
-        if (! in_array($story->feature->project_id, $accessible, true)
-            || ! in_array($dependency->feature->project_id, $accessible, true)) {
-            return Response::error('One or both stories are not accessible.');
+        $dependency = $this->resolveAccessibleStory(
+            $validated['depends_on_story_id'],
+            $user,
+            notFoundMessage: 'One or both stories not found.',
+            forbiddenMessage: 'One or both stories are not accessible.',
+        );
+        if ($dependency instanceof Response) {
+            return $dependency;
         }
 
         $story->dependencies()->syncWithoutDetaching([$dependency->id]);

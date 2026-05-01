@@ -27,7 +27,7 @@ class CliExecutor implements Executor
         return true;
     }
 
-    public function execute(Subtask $subtask, ?string $workingDir, ?Repo $repo, ?string $workingBranch): array
+    public function execute(Subtask $subtask, ?string $workingDir, ?Repo $repo, ?string $workingBranch): ExecutionResult
     {
         if ($workingDir === null) {
             throw new RuntimeException('CliExecutor requires a working directory.');
@@ -53,11 +53,11 @@ class CliExecutor implements Executor
         $stdout = $process->getOutput();
         $files = $this->changedFiles($workingDir);
 
-        return [
-            'summary' => trim($stdout),
-            'files_changed' => $files,
-            'commit_message' => $this->commitMessageFor($subtask),
-        ];
+        return new ExecutionResult(
+            summary: trim($stdout),
+            filesChanged: $files,
+            commitMessage: $this->commitMessageFor($subtask),
+        );
     }
 
     private function buildPrompt(Subtask $subtask, ?Repo $repo, ?string $workingBranch): string

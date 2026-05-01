@@ -2,7 +2,7 @@
 
 namespace App\Mcp\Tools;
 
-use App\Mcp\Auth;
+use App\Mcp\Concerns\ResolvesProjectAccess;
 use App\Models\Project;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Laravel\Mcp\Request;
@@ -13,13 +13,15 @@ use Laravel\Mcp\Server\Tool;
 #[Description('List projects accessible to the authenticated user.')]
 class ListProjectsTool extends Tool
 {
+    use ResolvesProjectAccess;
+
     protected string $name = 'list-projects';
 
     public function handle(Request $request): Response
     {
-        $user = Auth::resolve($request);
-        if (! $user) {
-            return Response::error('Authentication required.');
+        $user = $this->resolveUser($request);
+        if ($user instanceof Response) {
+            return $user;
         }
 
         $projects = Project::query()

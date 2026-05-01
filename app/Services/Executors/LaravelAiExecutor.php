@@ -17,7 +17,7 @@ class LaravelAiExecutor implements Executor
         return true;
     }
 
-    public function execute(Subtask $subtask, ?string $workingDir, ?Repo $repo, ?string $workingBranch): array
+    public function execute(Subtask $subtask, ?string $workingDir, ?Repo $repo, ?string $workingBranch): ExecutionResult
     {
         $context = [
             'subtask_id' => $subtask->getKey(),
@@ -77,10 +77,6 @@ class LaravelAiExecutor implements Executor
             );
         }
 
-        return [
-            'summary' => $summary,
-            'files_changed' => $files,
-            'commit_message' => $commitMessage,
-        ];
+        return new ExecutionResult($summary, $files, $commitMessage);
     }
 }
