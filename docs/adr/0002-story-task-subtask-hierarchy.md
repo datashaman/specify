@@ -16,7 +16,7 @@ Drop the `Plan` model. Tasks attach directly to Stories. Each Task carries one o
 - Migration `2026_04_30_092722_drop_plan_attach_tasks_to_stories_add_subtasks` removed the `plans` table, repointed `tasks.story_id`, and added the `subtasks` table.
 - `Task` is the engineering contract for **one acceptance criterion**.
 - `Subtask` is the unit the executor runs (one Subtask per `ExecuteSubtaskJob` invocation).
-- Plan-generation language survives in the agent name (`PlanGenerator`) and the MCP tool slug (`generate-plan`) for caller continuity, but the artifact produced is a list of Tasks + Subtasks under the Story, not a `Plan` row.
+- The agent and the MCP tool slug were renamed to align with the model: the agent is `TasksGenerator` and the MCP tool slug is `generate-tasks`. Greenfield; no `Plan`-named artefact survives.
 
 ## Consequences
 
@@ -27,7 +27,6 @@ Easier:
 
 Harder / accepted trade-offs:
 - A Story can no longer hold multiple alternative plans for comparison; if reviewers want to see alternatives they request changes and the next regeneration replaces the task list.
-- Naming continuity costs: external callers still see "generate-plan" as the MCP tool slug while the internal model talks about Tasks. The MCP layer is the only place this leaks.
 
 Follow-ups:
-- Consider renaming `PlanGenerator` and the `generate-plan` MCP tool to align with the internal model, with a deprecation period.
+- (none — naming aligned at the same time the Plan model was retired.)

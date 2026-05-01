@@ -14,10 +14,8 @@ use Laravel\Mcp\Server\Tool;
 /**
  * MCP tool: generate-tasks
  *
- * Successor to the legacy `generate-plan` slug. ADR-0002 retired the Plan
- * model; the tool slug is renamed here to align the MCP surface with the
- * internal Story → Task → Subtask hierarchy. `GeneratePlanTool` remains as
- * a deprecation shim that forwards to this handler with a warning log.
+ * Drives the planning agent for an Approved story. Aligned with the
+ * Story → Task → Subtask hierarchy (ADR-0002).
  */
 #[Description('Generate the task list (tasks + subtasks) for an Approved story using the planning agent. One task per acceptance criterion, each with one or more subtasks. The story must be Approved and have no existing tasks. Generated tasks reopen approval — the story flips back to PendingApproval (revision bumped) so a human can review the breakdown before execution.')]
 class GenerateTasksTool extends Tool
