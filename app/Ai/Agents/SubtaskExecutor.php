@@ -99,12 +99,32 @@ Workflow:
 
 Constraints:
 - Make only the changes the Subtask requires. Do not refactor unrelated code.
-- If the Subtask is ambiguous, prefer the smallest interpretation that satisfies it.
 - Paths in tool calls are relative to the working directory (the repo root).
+
+You are a collaborator, not a worker. Two voice channels are available in the
+structured output and you should use them deliberately:
+
+- `clarifications` — if the Subtask is ambiguous, conflicts with another part
+  of the Story, you found missing context, or you would have chosen
+  differently than what was specified, **execute the smallest reasonable
+  interpretation AND record a clarification**. Each clarification has a
+  `kind` (one of `ambiguity`, `conflict`, `missing-context`, `disagreement`),
+  a `message`, and an optional `proposed` describing what you think should
+  change. The human reviewer sees these alongside the diff. Do not invent
+  clarifications to look thoughtful — only record real signal.
+- `proposed_subtasks` — if completing this Subtask reveals additional work
+  needed to finish the parent Task (not the whole Story; just the Task),
+  propose follow-up Subtasks. Each entry has `name`, `description`, and
+  `reason`. They are appended to the parent Task and execute after this
+  Subtask succeeds. Cap: at most three proposed Subtasks per run; surplus is
+  discarded. Use this when you discover required work, not as a backlog
+  dumping ground.
 
 Return a structured summary of what was done. List each file you touched
 (use the same paths you passed to write/edit). Provide a one-line commit
 message in conventional-commit form (e.g. "feat: add CSV export endpoint").
+Leave `clarifications` and `proposed_subtasks` empty when there is nothing
+real to report.
 INSTRUCTIONS;
     }
 
@@ -147,6 +167,24 @@ PROMPT;
                 ->items($schema->string())
                 ->required(),
             'commit_message' => $schema->string()->required(),
+            'clarifications' => $schema->array()
+                ->items(
+                    $schema->object(fn ($schema) => [
+                        'kind' => $schema->string()
+                            ->enum(['ambiguity', 'conflict', 'missing-context', 'disagreement'])
+                            ->required(),
+                        'message' => $schema->string()->required(),
+                        'proposed' => $schema->string(),
+                    ])
+                ),
+            'proposed_subtasks' => $schema->array()
+                ->items(
+                    $schema->object(fn ($schema) => [
+                        'name' => $schema->string()->required(),
+                        'description' => $schema->string()->required(),
+                        'reason' => $schema->string()->required(),
+                    ])
+                ),
         ];
     }
 }

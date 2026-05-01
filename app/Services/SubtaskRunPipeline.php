@@ -6,6 +6,7 @@ use App\Models\AgentRun;
 use App\Models\Repo;
 use App\Models\Subtask;
 use App\Services\Executors\Executor;
+use App\Services\Executors\ProposedSubtask;
 use App\Services\PullRequests\PrPayloadBuilder;
 use Illuminate\Support\Facades\Log;
 use RuntimeException;
@@ -26,6 +27,7 @@ class SubtaskRunPipeline
     public function __construct(
         public Executor $executor,
         public WorkspaceRunner $workspace,
+        public PlanWriter $planWriter,
     ) {}
 
     /**
@@ -65,6 +67,19 @@ class SubtaskRunPipeline
 
         $result = $this->executor->execute($subtask, $workingDir, $repo, $agentRun->working_branch);
         $output = $result->toArray();
+
+        $appended = $this->appendProposedSubtasks($subtask, $result->proposedSubtasks, $agentRun);
+        if ($appended !== []) {
+            $output['appended_subtasks'] = array_map(fn ($s) => [
+                'id' => $s->getKey(),
+                'position' => $s->position,
+                'name' => $s->name,
+            ], $appended);
+            Log::info('specify.subtask.proposed_subtasks.appended', $logCtx + [
+                'count' => count($appended),
+                'subtask_ids' => array_map(fn ($s) => $s->getKey(), $appended),
+            ]);
+        }
 
         if ($workingDir === null) {
             $diff = $result->filesChanged === [] ? null : implode("\n", $result->filesChanged);
@@ -157,6 +172,46 @@ class SubtaskRunPipeline
     private function branchFor(AgentRun $agentRun): string
     {
         return $agentRun->working_branch ?? 'specify/run-'.$agentRun->getKey();
+    }
+
+    /**
+     * Append executor-proposed follow-up Subtasks to the parent Task (ADR-0005).
+     *
+     * Returns the created Subtasks (empty if the executor proposed none or has
+     * no parent Task). Failures are non-fatal — appending a follow-up should
+     * never tank the run that just succeeded — so we log and continue.
+     *
+     * @param  list<ProposedSubtask>  $proposed
+     * @return list<Subtask>
+     */
+    private function appendProposedSubtasks(Subtask $subtask, array $proposed, AgentRun $agentRun): array
+    {
+        if ($proposed === []) {
+            return [];
+        }
+
+        $task = $subtask->task;
+        if ($task === null) {
+            Log::warning('specify.subtask.proposed_subtasks.skipped', [
+                'run_id' => $agentRun->getKey(),
+                'reason' => 'no parent task',
+            ]);
+
+            return [];
+        }
+
+        try {
+            return $this->planWriter->appendProposedSubtasks($task, $proposed, $agentRun);
+        } catch (Throwable $e) {
+            Log::warning('specify.subtask.proposed_subtasks.failed', [
+                'run_id' => $agentRun->getKey(),
+                'task_id' => $task->getKey(),
+                'exception' => $e::class,
+                'message' => $e->getMessage(),
+            ]);
+
+            return [];
+        }
     }
 
     /**
