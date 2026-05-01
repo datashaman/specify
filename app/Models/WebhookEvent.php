@@ -13,7 +13,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * `webhook_secret`; `matched_run_id` links the event to the AgentRun whose
  * push triggered it (when one can be matched).
  */
-#[Fillable(['repo_id', 'provider', 'event', 'action', 'signature_valid', 'matched_run_id', 'payload'])]
+#[Fillable(['repo_id', 'provider', 'event', 'action', 'delivery_id', 'signature_valid', 'matched_run_id', 'payload'])]
 class WebhookEvent extends Model
 {
     protected function casts(): array

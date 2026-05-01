@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\AgentRunKind;
 use App\Enums\AgentRunStatus;
 use Database\Factories\AgentRunFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
@@ -18,10 +19,15 @@ use RuntimeException;
  * (for execution). `authorizing_approval` ties the run back to the
  * StoryApproval that authorised it. Stores the agent's input, output, diff,
  * token usage, and timing for audit and replay.
+ *
+ * `kind` distinguishes the historical `Execute` run (produces the Subtask
+ * diff and opens a PR) from `RespondToReview` (ADR-0008 — pushes a
+ * `fix(review):` commit on the originating Subtask's open PR). The cascade
+ * gate ignores RespondToReview runs.
  */
 #[Fillable([
     'runnable_type', 'runnable_id',
-    'repo_id', 'working_branch', 'executor_driver',
+    'repo_id', 'working_branch', 'executor_driver', 'kind',
     'authorizing_approval_type', 'authorizing_approval_id',
     'status', 'agent_name', 'model_id',
     'input', 'output', 'diff', 'error_message',
@@ -42,6 +48,7 @@ class AgentRun extends Model
     {
         return [
             'status' => AgentRunStatus::class,
+            'kind' => AgentRunKind::class,
             'input' => 'array',
             'output' => 'array',
             'tokens_input' => 'integer',
