@@ -130,6 +130,8 @@ PROMPT;
                         'reason' => $schema->string()->required(),
                     ])
                 ),
+            'already_complete' => $schema->boolean(),
+            'already_complete_evidence' => $schema->array()->items($schema->string()),
         ];
     }
 }

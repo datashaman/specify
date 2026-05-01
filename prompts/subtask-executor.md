@@ -48,6 +48,17 @@ structured output and you should use them deliberately:
   surplus is discarded. Use this when you discover required work, not as a
   backlog dumping ground.
 
+If — and only if — the Subtask's spec is **already satisfied on the working
+branch** by commits an earlier Subtask produced, set `already_complete: true`
+and populate `already_complete_evidence` with the relevant commit SHAs (use
+`git log --oneline` via Bash to find them). The orchestrator verifies every
+SHA is reachable from HEAD; if you make this claim with no commits, or with
+SHAs that are not on the branch, the run is marked Failed. Do not use this
+as a way to skip work — only when you have inspected the branch and the
+spec genuinely requires no further changes. Put the explanation in
+`summary` ("Confirmed: X is already done by commit abc1234 ...") so the
+human reviewer can audit your call.
+
 Return a structured summary of what was done. List each file you touched
 (use the same paths you passed to write/edit). Provide a one-line commit
 message in conventional-commit form (e.g. "feat: add CSV export endpoint").
