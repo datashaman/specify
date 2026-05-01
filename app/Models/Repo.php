@@ -27,7 +27,7 @@ use Illuminate\Support\Str;
  * `webhook_secret` are stored encrypted. M:N with Project via the
  * `project_repo` pivot (carrying `role` and `is_primary`).
  */
-#[Fillable(['workspace_id', 'name', 'provider', 'url', 'default_branch', 'access_token', 'webhook_secret', 'metadata'])]
+#[Fillable(['workspace_id', 'name', 'provider', 'url', 'default_branch', 'access_token', 'webhook_secret', 'review_response_enabled', 'max_review_response_cycles', 'metadata'])]
 class Repo extends Model
 {
     /** @use HasFactory<RepoFactory> */
@@ -39,6 +39,8 @@ class Repo extends Model
             'provider' => RepoProvider::class,
             'access_token' => 'encrypted',
             'webhook_secret' => 'encrypted',
+            'review_response_enabled' => 'boolean',
+            'max_review_response_cycles' => 'integer',
             'metadata' => 'array',
         ];
     }

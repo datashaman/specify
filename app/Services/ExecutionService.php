@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Enums\AgentRunKind;
 use App\Enums\AgentRunStatus;
 use App\Enums\StoryStatus;
 use App\Enums\TaskStatus;
@@ -253,6 +254,15 @@ class ExecutionService
      */
     private function finalizeSubtaskFromRun(AgentRun $run): void
     {
+        // ADR-0008: review-response runs do not decide cascade — the Subtask
+        // is already Done by the time review feedback arrives, and the
+        // RespondToReview run only pushes a `fix(review):` commit on its
+        // open PR. Returning here keeps the cascade gate purely about
+        // Execute-kind run terminations.
+        if ($run->kind === AgentRunKind::RespondToReview) {
+            return;
+        }
+
         DB::transaction(function () use ($run) {
             $subtask = Subtask::query()->whereKey($run->runnable_id)->lockForUpdate()->first();
             if (! $subtask) {
@@ -262,6 +272,7 @@ class ExecutionService
             $siblings = AgentRun::query()
                 ->where('runnable_type', $run->runnable_type)
                 ->where('runnable_id', $subtask->getKey())
+                ->where('kind', AgentRunKind::Execute->value)
                 ->get();
 
             $stillOpen = $siblings->contains(fn (AgentRun $r) => in_array(
