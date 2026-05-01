@@ -141,6 +141,9 @@ class SubtaskRunPipeline
             }
 
             $reason = 'Agent produced no diff. The subtask was not executed.';
+            if ($result->alreadyComplete) {
+                $reason .= ' Agent claimed already_complete but the cited commit SHAs were empty or not all reachable from HEAD; rejected per ADR-0007.';
+            }
             if ($summary !== '') {
                 $reason .= ' Agent summary: '.$summary;
             }
@@ -218,24 +221,37 @@ class SubtaskRunPipeline
     }
 
     /**
-     * Filter the agent's claimed evidence SHAs down to those that actually
-     * exist on the working branch. Returns the subset reachable from HEAD;
-     * an empty result tells the pipeline to reject the alreadyComplete claim
-     * and fall through to the no_diff failure path. ADR-0007.
+     * Verify that *every* claimed evidence SHA exists on the working branch.
+     *
+     * Returns the trimmed/deduped input list only when all SHAs are
+     * reachable from HEAD; otherwise returns an empty array so the pipeline
+     * rejects the alreadyComplete claim and falls through to the no_diff
+     * failure path (ADR-0007). All-or-nothing — partial evidence (some real
+     * commits + some hallucinated SHAs) is treated the same as no evidence,
+     * because a single hallucinated SHA is enough to make the whole claim
+     * untrustworthy.
      *
      * @param  list<string>  $shas
      * @return list<string>
      */
     private function verifyAlreadyCompleteEvidence(string $workingDir, array $shas): array
     {
-        $verified = [];
-        foreach ($shas as $sha) {
-            if ($this->workspace->isCommitReachableFromHead($workingDir, $sha)) {
-                $verified[] = $sha;
+        $normalized = array_values(array_unique(array_filter(
+            array_map(static fn ($sha) => trim((string) $sha), $shas),
+            static fn ($sha) => $sha !== '',
+        )));
+
+        if ($normalized === []) {
+            return [];
+        }
+
+        foreach ($normalized as $sha) {
+            if (! $this->workspace->isCommitReachableFromHead($workingDir, $sha)) {
+                return [];
             }
         }
 
-        return array_values(array_unique($verified));
+        return $normalized;
     }
 
     /**

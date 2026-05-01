@@ -331,6 +331,72 @@ test('alreadyComplete falls through to noDiff when evidence is empty (ADR-0007 s
     expect($outcome->state)->toBe(SubtaskRunOutcome::STATE_NO_DIFF);
 });
 
+test('alreadyComplete falls through to noDiff when ANY cited SHA is unreachable, even if others verify (ADR-0007 all-or-nothing)', function () {
+    $task = makeApprovedTask();
+    $subtask = Subtask::factory()->for($task)->create(['name' => 'partial-claim', 'position' => 1]);
+    $repo = Repo::factory()->for($task->story->feature->project->team->workspace)->create();
+    $run = AgentRun::create([
+        'runnable_type' => Subtask::class,
+        'runnable_id' => $subtask->getKey(),
+        'repo_id' => $repo->getKey(),
+        'working_branch' => 'specify/test',
+        'status' => AgentRunStatus::Running,
+    ]);
+
+    $executor = new class implements Executor
+    {
+        public function needsWorkingDirectory(): bool
+        {
+            return true;
+        }
+
+        public function execute(Subtask $subtask, ?string $workingDir, ?Repo $repo, ?string $workingBranch, ?string $contextBrief = null): ExecutionResult
+        {
+            return new ExecutionResult(
+                summary: 'One real, one made up',
+                filesChanged: [],
+                commitMessage: 'noop',
+                alreadyComplete: true,
+                alreadyCompleteEvidence: ['abc1234', 'deadbeef'],
+            );
+        }
+    };
+
+    $workspace = new class extends WorkspaceRunner
+    {
+        public function __construct() {}
+
+        public function prepare(Repo $repo, AgentRun $run): string
+        {
+            return sys_get_temp_dir();
+        }
+
+        public function checkoutBranch(string $workingDir, string $branch, ?string $baseBranch = null): void {}
+
+        public function commit(string $workingDir, string $message): ?string
+        {
+            return null;
+        }
+
+        public function diff(string $workingDir, ?string $base = null): string
+        {
+            return '';
+        }
+
+        public function isCommitReachableFromHead(string $workingDir, string $sha): bool
+        {
+            return $sha === 'abc1234';
+        }
+    };
+
+    $pipeline = new SubtaskRunPipeline($executor, $workspace, app(PlanWriter::class), new NullContextBuilder);
+    $outcome = $pipeline->run($run);
+
+    expect($outcome->state)->toBe(SubtaskRunOutcome::STATE_NO_DIFF)
+        ->and($outcome->error)->toContain('already_complete')
+        ->and($outcome->error)->toContain('not all reachable');
+});
+
 test('alreadyComplete falls through to noDiff when none of the cited SHAs are reachable (ADR-0007 safety net)', function () {
     $task = makeApprovedTask();
     $subtask = Subtask::factory()->for($task)->create(['name' => 'hallucinated', 'position' => 1]);
