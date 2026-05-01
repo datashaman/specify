@@ -2,6 +2,7 @@
 
 namespace App\Enums;
 
+/** Lifecycle of a Project: Planned → Active → Completed → Archived. */
 enum ProjectStatus: string
 {
     case Planned = 'planned';

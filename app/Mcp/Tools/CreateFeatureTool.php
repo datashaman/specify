@@ -10,6 +10,9 @@ use Laravel\Mcp\Response;
 use Laravel\Mcp\Server\Attributes\Description;
 use Laravel\Mcp\Server\Tool;
 
+/**
+ * MCP tool: create-feature
+ */
 #[Description('Create a feature in a project. Defaults to the authenticated user’s current project. Required before creating stories.')]
 class CreateFeatureTool extends Tool
 {
@@ -17,6 +20,9 @@ class CreateFeatureTool extends Tool
 
     protected string $name = 'create-feature';
 
+    /**
+     * Handle the MCP tool invocation.
+     */
     public function handle(Request $request): Response
     {
         $user = $this->resolveUser($request);

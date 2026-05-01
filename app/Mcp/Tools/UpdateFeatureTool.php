@@ -10,6 +10,9 @@ use Laravel\Mcp\Response;
 use Laravel\Mcp\Server\Attributes\Description;
 use Laravel\Mcp\Server\Tool;
 
+/**
+ * MCP tool: update-feature
+ */
 #[Description('Update an existing feature’s name, description, or status.')]
 class UpdateFeatureTool extends Tool
 {
@@ -17,6 +20,9 @@ class UpdateFeatureTool extends Tool
 
     protected string $name = 'update-feature';
 
+    /**
+     * Handle the MCP tool invocation.
+     */
     public function handle(Request $request): Response
     {
         $user = $this->resolveUser($request);

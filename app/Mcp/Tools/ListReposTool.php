@@ -10,6 +10,9 @@ use Laravel\Mcp\Response;
 use Laravel\Mcp\Server\Attributes\Description;
 use Laravel\Mcp\Server\Tool;
 
+/**
+ * MCP tool: list-repos
+ */
 #[Description('List repositories attached to a project. Defaults to the user’s current project.')]
 class ListReposTool extends Tool
 {
@@ -17,6 +20,9 @@ class ListReposTool extends Tool
 
     protected string $name = 'list-repos';
 
+    /**
+     * Handle the MCP tool invocation.
+     */
     public function handle(Request $request): Response
     {
         $user = $this->resolveUser($request);

@@ -11,6 +11,9 @@ use Laravel\Mcp\Response;
 use Laravel\Mcp\Server\Attributes\Description;
 use Laravel\Mcp\Server\Tool;
 
+/**
+ * MCP tool: update-story
+ */
 #[Description('Update an existing story’s name, description, or status.')]
 class UpdateStoryTool extends Tool
 {
@@ -18,6 +21,9 @@ class UpdateStoryTool extends Tool
 
     protected string $name = 'update-story';
 
+    /**
+     * Handle the MCP tool invocation.
+     */
     public function handle(Request $request): Response
     {
         $user = $this->resolveUser($request);

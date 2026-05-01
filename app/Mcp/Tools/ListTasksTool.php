@@ -11,6 +11,9 @@ use Laravel\Mcp\Response;
 use Laravel\Mcp\Server\Attributes\Description;
 use Laravel\Mcp\Server\Tool;
 
+/**
+ * MCP tool: list-tasks
+ */
 #[Description('List the tasks attached to a story, in position order. Each entry includes subtask counts and the linked acceptance criterion text.')]
 class ListTasksTool extends Tool
 {
@@ -18,6 +21,9 @@ class ListTasksTool extends Tool
 
     protected string $name = 'list-tasks';
 
+    /**
+     * Handle the MCP tool invocation.
+     */
     public function handle(Request $request): Response
     {
         $user = $this->resolveUser($request);

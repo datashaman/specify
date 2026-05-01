@@ -11,6 +11,9 @@ use Laravel\Mcp\Response;
 use Laravel\Mcp\Server\Attributes\Description;
 use Laravel\Mcp\Server\Tool;
 
+/**
+ * MCP tool: generate-plan
+ */
 #[Description('Generate the plan (tasks + subtasks) for an Approved story using the planning agent. One task per acceptance criterion, each with one or more subtasks. The story must be Approved and have no existing tasks. Generated plan reopens approval — the story flips back to PendingApproval (revision bumped) so a human can review the breakdown before execution.')]
 class GeneratePlanTool extends Tool
 {
@@ -18,6 +21,9 @@ class GeneratePlanTool extends Tool
 
     protected string $name = 'generate-plan';
 
+    /**
+     * Handle the MCP tool invocation.
+     */
     public function handle(Request $request, ExecutionService $execution): Response
     {
         $user = $this->resolveUser($request);

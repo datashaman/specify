@@ -10,6 +10,9 @@ use Laravel\Mcp\Response;
 use Laravel\Mcp\Server\Attributes\Description;
 use Laravel\Mcp\Server\Tool;
 
+/**
+ * MCP tool: get-story
+ */
 #[Description('Get a story in detail, including its acceptance criteria and task progress counts.')]
 class GetStoryTool extends Tool
 {
@@ -17,6 +20,9 @@ class GetStoryTool extends Tool
 
     protected string $name = 'get-story';
 
+    /**
+     * Handle the MCP tool invocation.
+     */
     public function handle(Request $request): Response
     {
         $user = $this->resolveUser($request);

@@ -11,6 +11,9 @@ use Laravel\Mcp\Response;
 use Laravel\Mcp\Server\Attributes\Description;
 use Laravel\Mcp\Server\Tool;
 
+/**
+ * MCP tool: list-events
+ */
 #[Description('List recent webhook events. Filter by repo_id (required unless project_id given). Newest first.')]
 class ListEventsTool extends Tool
 {
@@ -18,6 +21,9 @@ class ListEventsTool extends Tool
 
     protected string $name = 'list-events';
 
+    /**
+     * Handle the MCP tool invocation.
+     */
     public function handle(Request $request): Response
     {
         $user = $this->resolveUser($request);

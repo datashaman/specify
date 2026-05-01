@@ -10,6 +10,9 @@ use Laravel\Mcp\Response;
 use Laravel\Mcp\Server\Attributes\Description;
 use Laravel\Mcp\Server\Tool;
 
+/**
+ * MCP tool: list-features
+ */
 #[Description('List features in a project. Defaults to the authenticated user’s current project.')]
 class ListFeaturesTool extends Tool
 {
@@ -17,6 +20,9 @@ class ListFeaturesTool extends Tool
 
     protected string $name = 'list-features';
 
+    /**
+     * Handle the MCP tool invocation.
+     */
     public function handle(Request $request): Response
     {
         $user = $this->resolveUser($request);

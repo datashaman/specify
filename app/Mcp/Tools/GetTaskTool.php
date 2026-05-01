@@ -10,6 +10,9 @@ use Laravel\Mcp\Response;
 use Laravel\Mcp\Server\Attributes\Description;
 use Laravel\Mcp\Server\Tool;
 
+/**
+ * MCP tool: get-task
+ */
 #[Description('Get a task in detail, including its subtasks (positions, statuses) and dependency positions.')]
 class GetTaskTool extends Tool
 {
@@ -17,6 +20,9 @@ class GetTaskTool extends Tool
 
     protected string $name = 'get-task';
 
+    /**
+     * Handle the MCP tool invocation.
+     */
     public function handle(Request $request): Response
     {
         $user = $this->resolveUser($request);

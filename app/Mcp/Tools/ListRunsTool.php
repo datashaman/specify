@@ -13,6 +13,9 @@ use Laravel\Mcp\Response;
 use Laravel\Mcp\Server\Attributes\Description;
 use Laravel\Mcp\Server\Tool;
 
+/**
+ * MCP tool: list-runs
+ */
 #[Description('List recent agent runs filtered by story, task, or subtask. Newest first.')]
 class ListRunsTool extends Tool
 {
@@ -20,6 +23,9 @@ class ListRunsTool extends Tool
 
     protected string $name = 'list-runs';
 
+    /**
+     * Handle the MCP tool invocation.
+     */
     public function handle(Request $request): Response
     {
         $user = $this->resolveUser($request);

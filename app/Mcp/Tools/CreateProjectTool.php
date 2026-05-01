@@ -17,6 +17,9 @@ use Laravel\Mcp\Response;
 use Laravel\Mcp\Server\Attributes\Description;
 use Laravel\Mcp\Server\Tool;
 
+/**
+ * MCP tool: create-project
+ */
 #[Description('Create a project. Optionally attach GitHub repos in the same call. Switches the user’s current_project_id to the new project.')]
 class CreateProjectTool extends Tool
 {
@@ -24,6 +27,9 @@ class CreateProjectTool extends Tool
 
     protected string $name = 'create-project';
 
+    /**
+     * Handle the MCP tool invocation.
+     */
     public function handle(Request $request): Response
     {
         $user = $this->resolveUser($request);

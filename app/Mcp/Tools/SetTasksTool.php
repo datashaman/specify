@@ -11,6 +11,9 @@ use Laravel\Mcp\Response;
 use Laravel\Mcp\Server\Attributes\Description;
 use Laravel\Mcp\Server\Tool;
 
+/**
+ * MCP tool: set-tasks
+ */
 #[Description('Replace the entire task list for a story in one transaction. Each task gets 1+ ordered subtasks; tasks may declare task-level dependencies via positions; each task may link to one acceptance_criterion_id belonging to the story. If the story is currently Approved, this resets it to PendingApproval. Markdown is supported in description fields.')]
 class SetTasksTool extends Tool
 {
@@ -18,6 +21,9 @@ class SetTasksTool extends Tool
 
     protected string $name = 'set-tasks';
 
+    /**
+     * Handle the MCP tool invocation.
+     */
     public function handle(Request $request, PlanWriter $planWriter): Response
     {
         $user = $this->resolveUser($request);

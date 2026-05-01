@@ -9,6 +9,9 @@ use Laravel\Mcp\Response;
 use Laravel\Mcp\Server\Attributes\Description;
 use Laravel\Mcp\Server\Tool;
 
+/**
+ * MCP tool: get-feature
+ */
 #[Description('Get a feature in detail, including story count.')]
 class GetFeatureTool extends Tool
 {
@@ -16,6 +19,9 @@ class GetFeatureTool extends Tool
 
     protected string $name = 'get-feature';
 
+    /**
+     * Handle the MCP tool invocation.
+     */
     public function handle(Request $request): Response
     {
         $user = $this->resolveUser($request);

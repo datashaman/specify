@@ -12,6 +12,9 @@ use Laravel\Mcp\Response;
 use Laravel\Mcp\Server\Attributes\Description;
 use Laravel\Mcp\Server\Tool;
 
+/**
+ * MCP tool: add-github-repo-to-project
+ */
 #[Description('Pick a GitHub repo and attach it to a project. Mirrors the Repos page picker: creates the Repo with the user’s OAuth token, installs the webhook, and attaches. Set set_primary=true to mark it primary in the same call.')]
 class AddGithubRepoToProjectTool extends Tool
 {
@@ -19,6 +22,9 @@ class AddGithubRepoToProjectTool extends Tool
 
     protected string $name = 'add-github-repo-to-project';
 
+    /**
+     * Handle the MCP tool invocation.
+     */
     public function handle(Request $request): Response
     {
         $user = $this->resolveUser($request);

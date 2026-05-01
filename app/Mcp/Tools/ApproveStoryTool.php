@@ -12,6 +12,9 @@ use Laravel\Mcp\Response;
 use Laravel\Mcp\Server\Attributes\Description;
 use Laravel\Mcp\Server\Tool;
 
+/**
+ * MCP tool: approve-story
+ */
 #[Description('Record an Approve decision on a story. Authorisation: user must have approver rights in the story’s project. Notes optional.')]
 class ApproveStoryTool extends Tool
 {
@@ -19,6 +22,9 @@ class ApproveStoryTool extends Tool
 
     protected string $name = 'approve-story';
 
+    /**
+     * Handle the MCP tool invocation.
+     */
     public function handle(Request $request, ApprovalService $approvals): Response
     {
         $user = $this->resolveUser($request);

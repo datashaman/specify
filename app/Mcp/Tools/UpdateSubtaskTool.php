@@ -13,6 +13,9 @@ use Laravel\Mcp\Response;
 use Laravel\Mcp\Server\Attributes\Description;
 use Laravel\Mcp\Server\Tool;
 
+/**
+ * MCP tool: update-subtask
+ */
 #[Description('Update a single subtask. Any of: name, description (markdown), status, position. Editing structural fields (name/description/position) on an Approved story resets it to PendingApproval.')]
 class UpdateSubtaskTool extends Tool
 {
@@ -20,6 +23,9 @@ class UpdateSubtaskTool extends Tool
 
     protected string $name = 'update-subtask';
 
+    /**
+     * Handle the MCP tool invocation.
+     */
     public function handle(Request $request): Response
     {
         $user = $this->resolveUser($request);

@@ -12,6 +12,9 @@ use Laravel\Mcp\Response;
 use Laravel\Mcp\Server\Attributes\Description;
 use Laravel\Mcp\Server\Tool;
 
+/**
+ * MCP tool: request-story-changes
+ */
 #[Description('Request changes on a story. Resets prior approvals and moves the story to ChangesRequested.')]
 class RequestStoryChangesTool extends Tool
 {
@@ -19,6 +22,9 @@ class RequestStoryChangesTool extends Tool
 
     protected string $name = 'request-story-changes';
 
+    /**
+     * Handle the MCP tool invocation.
+     */
     public function handle(Request $request, ApprovalService $approvals): Response
     {
         $user = $this->resolveUser($request);

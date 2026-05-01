@@ -10,6 +10,9 @@ use Laravel\Mcp\Response;
 use Laravel\Mcp\Server\Attributes\Description;
 use Laravel\Mcp\Server\Tool;
 
+/**
+ * MCP tool: list-stories
+ */
 #[Description('List stories under a feature.')]
 class ListStoriesTool extends Tool
 {
@@ -17,6 +20,9 @@ class ListStoriesTool extends Tool
 
     protected string $name = 'list-stories';
 
+    /**
+     * Handle the MCP tool invocation.
+     */
     public function handle(Request $request): Response
     {
         $user = $this->resolveUser($request);

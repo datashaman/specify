@@ -9,6 +9,9 @@ use Laravel\Mcp\Response;
 use Laravel\Mcp\Server\Attributes\Description;
 use Laravel\Mcp\Server\Tool;
 
+/**
+ * MCP tool: add-story-dependency
+ */
 #[Description('Mark a story as depending on another story. Both stories must be in projects the user can access.')]
 class AddStoryDependencyTool extends Tool
 {
@@ -16,6 +19,9 @@ class AddStoryDependencyTool extends Tool
 
     protected string $name = 'add-story-dependency';
 
+    /**
+     * Handle the MCP tool invocation.
+     */
     public function handle(Request $request): Response
     {
         $user = $this->resolveUser($request);

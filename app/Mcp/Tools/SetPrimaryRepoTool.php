@@ -9,6 +9,9 @@ use Laravel\Mcp\Response;
 use Laravel\Mcp\Server\Attributes\Description;
 use Laravel\Mcp\Server\Tool;
 
+/**
+ * MCP tool: set-primary-repo
+ */
 #[Description('Mark a repo as the project’s primary. Clears any other primary on the project.')]
 class SetPrimaryRepoTool extends Tool
 {
@@ -16,6 +19,9 @@ class SetPrimaryRepoTool extends Tool
 
     protected string $name = 'set-primary-repo';
 
+    /**
+     * Handle the MCP tool invocation.
+     */
     public function handle(Request $request): Response
     {
         $user = $this->resolveUser($request);

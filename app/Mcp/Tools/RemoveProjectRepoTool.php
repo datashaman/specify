@@ -10,6 +10,9 @@ use Laravel\Mcp\Response;
 use Laravel\Mcp\Server\Attributes\Description;
 use Laravel\Mcp\Server\Tool;
 
+/**
+ * MCP tool: remove-project-repo
+ */
 #[Description('Remove a repo from a project. Deletes the GitHub webhook, detaches the pivot, and deletes the Repo row. Mirrors the Repos page Remove button.')]
 class RemoveProjectRepoTool extends Tool
 {
@@ -17,6 +20,9 @@ class RemoveProjectRepoTool extends Tool
 
     protected string $name = 'remove-project-repo';
 
+    /**
+     * Handle the MCP tool invocation.
+     */
     public function handle(Request $request): Response
     {
         $user = $this->resolveUser($request);

@@ -14,6 +14,9 @@ use Laravel\Mcp\Response;
 use Laravel\Mcp\Server\Attributes\Description;
 use Laravel\Mcp\Server\Tool;
 
+/**
+ * MCP tool: update-task
+ */
 #[Description('Update a single task. Any of: name, description (markdown), status, acceptance_criterion_id, depends_on_positions (replaces existing). Editing structural fields (name/description/dependencies/AC link) on an Approved story resets it to PendingApproval.')]
 class UpdateTaskTool extends Tool
 {
@@ -21,6 +24,9 @@ class UpdateTaskTool extends Tool
 
     protected string $name = 'update-task';
 
+    /**
+     * Handle the MCP tool invocation.
+     */
     public function handle(Request $request): Response
     {
         $user = $this->resolveUser($request);

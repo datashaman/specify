@@ -9,6 +9,9 @@ use Laravel\Mcp\Response;
 use Laravel\Mcp\Server\Attributes\Description;
 use Laravel\Mcp\Server\Tool;
 
+/**
+ * MCP tool: switch-project
+ */
 #[Description('Set the user’s current project. Subsequent tools that default to the current project will use this one.')]
 class SwitchProjectTool extends Tool
 {
@@ -16,6 +19,9 @@ class SwitchProjectTool extends Tool
 
     protected string $name = 'switch-project';
 
+    /**
+     * Handle the MCP tool invocation.
+     */
     public function handle(Request $request): Response
     {
         $user = $this->resolveUser($request);

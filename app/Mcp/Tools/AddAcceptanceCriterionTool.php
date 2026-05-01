@@ -9,6 +9,9 @@ use Laravel\Mcp\Response;
 use Laravel\Mcp\Server\Attributes\Description;
 use Laravel\Mcp\Server\Tool;
 
+/**
+ * MCP tool: add-acceptance-criterion
+ */
 #[Description('Add an acceptance criterion to a story. Position auto-increments unless supplied.')]
 class AddAcceptanceCriterionTool extends Tool
 {
@@ -16,6 +19,9 @@ class AddAcceptanceCriterionTool extends Tool
 
     protected string $name = 'add-acceptance-criterion';
 
+    /**
+     * Handle the MCP tool invocation.
+     */
     public function handle(Request $request): Response
     {
         $user = $this->resolveUser($request);

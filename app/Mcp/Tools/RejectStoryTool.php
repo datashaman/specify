@@ -12,6 +12,9 @@ use Laravel\Mcp\Response;
 use Laravel\Mcp\Server\Attributes\Description;
 use Laravel\Mcp\Server\Tool;
 
+/**
+ * MCP tool: reject-story
+ */
 #[Description('Reject a story. Terminal — no further decisions accepted on this story revision.')]
 class RejectStoryTool extends Tool
 {
@@ -19,6 +22,9 @@ class RejectStoryTool extends Tool
 
     protected string $name = 'reject-story';
 
+    /**
+     * Handle the MCP tool invocation.
+     */
     public function handle(Request $request, ApprovalService $approvals): Response
     {
         $user = $this->resolveUser($request);

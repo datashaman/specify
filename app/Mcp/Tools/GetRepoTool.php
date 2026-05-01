@@ -10,6 +10,9 @@ use Laravel\Mcp\Response;
 use Laravel\Mcp\Server\Attributes\Description;
 use Laravel\Mcp\Server\Tool;
 
+/**
+ * MCP tool: get-repo
+ */
 #[Description('Get a repository in detail, including the latest commit on the default branch.')]
 class GetRepoTool extends Tool
 {
@@ -17,6 +20,9 @@ class GetRepoTool extends Tool
 
     protected string $name = 'get-repo';
 
+    /**
+     * Handle the MCP tool invocation.
+     */
     public function handle(Request $request): Response
     {
         $user = $this->resolveUser($request);

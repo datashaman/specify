@@ -9,6 +9,9 @@ use Laravel\Mcp\Response;
 use Laravel\Mcp\Server\Attributes\Description;
 use Laravel\Mcp\Server\Tool;
 
+/**
+ * MCP tool: get-project
+ */
 #[Description('Get a project in detail (counts of features, stories, repos). Defaults to the user’s current project.')]
 class GetProjectTool extends Tool
 {
@@ -16,6 +19,9 @@ class GetProjectTool extends Tool
 
     protected string $name = 'get-project';
 
+    /**
+     * Handle the MCP tool invocation.
+     */
     public function handle(Request $request): Response
     {
         $user = $this->resolveUser($request);

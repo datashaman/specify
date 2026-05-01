@@ -10,6 +10,9 @@ use Laravel\Mcp\Response;
 use Laravel\Mcp\Server\Attributes\Description;
 use Laravel\Mcp\Server\Tool;
 
+/**
+ * MCP tool: list-projects
+ */
 #[Description('List projects accessible to the authenticated user.')]
 class ListProjectsTool extends Tool
 {
@@ -17,6 +20,9 @@ class ListProjectsTool extends Tool
 
     protected string $name = 'list-projects';
 
+    /**
+     * Handle the MCP tool invocation.
+     */
     public function handle(Request $request): Response
     {
         $user = $this->resolveUser($request);

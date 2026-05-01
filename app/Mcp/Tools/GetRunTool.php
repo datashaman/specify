@@ -13,6 +13,9 @@ use Laravel\Mcp\Response;
 use Laravel\Mcp\Server\Attributes\Description;
 use Laravel\Mcp\Server\Tool;
 
+/**
+ * MCP tool: get-run
+ */
 #[Description('Get an agent run in detail (input/output/diff). Diff is omitted by default — pass include_diff=true to fetch.')]
 class GetRunTool extends Tool
 {
@@ -20,6 +23,9 @@ class GetRunTool extends Tool
 
     protected string $name = 'get-run';
 
+    /**
+     * Handle the MCP tool invocation.
+     */
     public function handle(Request $request): Response
     {
         $user = $this->resolveUser($request);

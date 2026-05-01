@@ -9,6 +9,9 @@ use Laravel\Mcp\Response;
 use Laravel\Mcp\Server\Attributes\Description;
 use Laravel\Mcp\Server\Tool;
 
+/**
+ * MCP tool: current-context
+ */
 #[Description('Return the acting user, their current workspace, current team, and current project. Useful for orienting at the start of a session.')]
 class CurrentContextTool extends Tool
 {
@@ -16,6 +19,9 @@ class CurrentContextTool extends Tool
 
     protected string $name = 'current-context';
 
+    /**
+     * Handle the MCP tool invocation.
+     */
     public function handle(Request $request): Response
     {
         $user = $this->resolveUser($request);
