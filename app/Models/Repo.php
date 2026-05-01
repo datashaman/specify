@@ -18,6 +18,13 @@ use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 
+/**
+ * Workspace-scoped git repository with provider-specific auth.
+ *
+ * `provider` selects the matching `PullRequestProvider`; `access_token` and
+ * `webhook_secret` are stored encrypted. M:N with Project via the
+ * `project_repo` pivot (carrying `role` and `is_primary`).
+ */
 #[Fillable(['workspace_id', 'name', 'provider', 'url', 'default_branch', 'access_token', 'webhook_secret', 'metadata'])]
 class Repo extends Model
 {

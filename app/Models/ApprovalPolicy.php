@@ -5,6 +5,13 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 
+/**
+ * Approval rule attached to a Workspace, Project, or Story (cascade).
+ *
+ * `Story::effectivePolicy()` walks up Story → Project → Workspace and falls
+ * back to `default()`. Holds the threshold (`required_approvals`) and
+ * the `allow_self_approval` / `auto_approve` flags ApprovalService consults.
+ */
 #[Fillable(['scope_type', 'scope_id', 'required_approvals', 'allow_self_approval', 'auto_approve', 'notes'])]
 class ApprovalPolicy extends Model
 {

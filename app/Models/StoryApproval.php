@@ -8,6 +8,12 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use RuntimeException;
 
+/**
+ * Immutable record of an approval decision against a Story revision.
+ *
+ * Update and delete are blocked at the model level — corrections are made by
+ * recording a new decision (e.g. `Revoke` followed by `Approve`).
+ */
 #[Fillable(['story_id', 'story_revision', 'approver_id', 'decision', 'notes'])]
 class StoryApproval extends Model
 {

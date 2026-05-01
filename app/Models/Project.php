@@ -16,6 +16,13 @@ use Illuminate\Database\Eloquent\Relations\HasManyThrough;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 
+/**
+ * Workspace-scoped product line owned by a Team.
+ *
+ * Contains Features (and, transitively, Stories) and is M:N with Repos via the
+ * `project_repo` pivot. Use `attachRepo()` / `setPrimaryRepo()` to manage repo
+ * attachment so the single-primary invariant is preserved.
+ */
 #[Fillable(['team_id', 'created_by_id', 'name', 'slug', 'description', 'status'])]
 class Project extends Model
 {

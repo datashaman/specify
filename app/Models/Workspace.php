@@ -10,6 +10,12 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasManyThrough;
 
+/**
+ * Tenant boundary, owned by a single User.
+ *
+ * Owns Teams and Repos directly, and Projects transitively through Teams.
+ * Auto-provisioned for new users by the Fortify register hook.
+ */
 #[Fillable(['owner_id', 'name', 'slug', 'description'])]
 class Workspace extends Model
 {

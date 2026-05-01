@@ -18,6 +18,13 @@ use InvalidArgumentException;
 use Laravel\Fortify\TwoFactorAuthenticatable;
 
 #[Fillable(['name', 'email', 'password', 'current_team_id', 'current_project_id', 'github_id', 'avatar_url', 'github_token', 'github_refresh_token', 'github_token_expires_at', 'github_scopes'])]
+/**
+ * Authenticated user.
+ *
+ * Carries the GitHub OAuth bundle (id, token, refresh, scopes) plus session
+ * pointers (`current_team_id`, `current_project_id`) so MCP tools can default
+ * to the user's active context. Members of multiple Teams across Workspaces.
+ */
 #[Hidden(['password', 'two_factor_secret', 'two_factor_recovery_codes', 'remember_token', 'github_token', 'github_refresh_token'])]
 class User extends Authenticatable
 {

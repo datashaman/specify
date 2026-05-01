@@ -6,6 +6,7 @@ use App\Models\User;
 // use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
 
+/** Top-level seeder. Creates the `test@example.com` development user. */
 class DatabaseSeeder extends Seeder
 {
     /**

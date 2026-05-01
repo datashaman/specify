@@ -15,6 +15,13 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
 use InvalidArgumentException;
 
+/**
+ * Product owner's unit of value within a Feature.
+ *
+ * Carries acceptance criteria, an immutable `revision` counter (auto-bumped
+ * on plan replacement), and the only approval gate in the system
+ * (see ADR-0001). Tasks attach directly to the Story (ADR-0002).
+ */
 #[Fillable(['feature_id', 'created_by_id', 'name', 'slug', 'description', 'notes', 'status', 'revision'])]
 class Story extends Model
 {

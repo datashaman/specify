@@ -11,6 +11,14 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
 use RuntimeException;
 
+/**
+ * Append-only record of one AI dispatch — task generation or subtask execution.
+ *
+ * `runnable` is polymorphic over Story (for task generation) and Subtask
+ * (for execution). `authorizing_approval` ties the run back to the
+ * StoryApproval that authorised it. Stores the agent's input, output, diff,
+ * token usage, and timing for audit and replay.
+ */
 #[Fillable([
     'runnable_type', 'runnable_id',
     'repo_id', 'working_branch',

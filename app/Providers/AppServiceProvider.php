@@ -14,6 +14,11 @@ use Illuminate\Support\ServiceProvider;
 use Illuminate\Validation\Rules\Password;
 use InvalidArgumentException;
 
+/**
+ * Wires the `Executor` interface to the configured driver and registers other
+ * application-level singletons (WorkspaceRunner, immutable dates, default
+ * password rules).
+ */
 class AppServiceProvider extends ServiceProvider
 {
     /**

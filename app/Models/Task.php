@@ -12,6 +12,12 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use InvalidArgumentException;
 
+/**
+ * Engineering contract for one acceptance criterion.
+ *
+ * Holds 1+ Subtasks (the actual executor steps) and a DAG of task-level
+ * `dependencies`/`dependents` (cycle-checked via `dependsOnTransitively`).
+ */
 #[Fillable(['story_id', 'acceptance_criterion_id', 'position', 'name', 'description', 'status'])]
 class Task extends Model
 {

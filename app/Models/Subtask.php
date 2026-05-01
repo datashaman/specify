@@ -10,6 +10,12 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
 
+/**
+ * Engineering step the executor runs. One `ExecuteSubtaskJob` invocation per Subtask.
+ *
+ * Subtasks under a Task run in `position` order; the next one isn't dispatched
+ * until the previous Subtask is Done (see `ExecutionService::nextActionableSubtasks`).
+ */
 #[Fillable(['task_id', 'position', 'name', 'description', 'status'])]
 class Subtask extends Model
 {

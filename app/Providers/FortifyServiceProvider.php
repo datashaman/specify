@@ -11,6 +11,10 @@ use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Str;
 use Laravel\Fortify\Fortify;
 
+/**
+ * Configures Fortify auth flows: user creation, password reset, login
+ * rate-limiter, and the auto-provisioning of a Workspace + Team for new users.
+ */
 class FortifyServiceProvider extends ServiceProvider
 {
     /**

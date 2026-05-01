@@ -10,6 +10,10 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
+/**
+ * Workspace-scoped role grouping. M:N with Users via the `team_user` pivot,
+ * which carries the per-user TeamRole (Owner/Admin/Member).
+ */
 #[Fillable(['workspace_id', 'name', 'slug', 'description'])]
 class Team extends Model
 {

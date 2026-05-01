@@ -6,6 +6,13 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
+/**
+ * Inbound webhook payload (push, PR, etc.) routed to a Repo.
+ *
+ * `signature_valid` records HMAC verification against the Repo's
+ * `webhook_secret`; `matched_run_id` links the event to the AgentRun whose
+ * push triggered it (when one can be matched).
+ */
 #[Fillable(['repo_id', 'provider', 'event', 'action', 'signature_valid', 'matched_run_id', 'payload'])]
 class WebhookEvent extends Model
 {

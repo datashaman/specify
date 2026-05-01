@@ -11,6 +11,9 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 
+/**
+ * Observable behaviour a Story must satisfy. Maps 1:1 to a Task once a plan exists.
+ */
 #[Fillable(['story_id', 'position', 'criterion'])]
 class AcceptanceCriterion extends Model
 {

@@ -11,6 +11,9 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
+/**
+ * Product owner's framing of a capability under a Project. Container for Stories.
+ */
 #[Fillable(['project_id', 'name', 'slug', 'description', 'notes', 'status'])]
 class Feature extends Model
 {
