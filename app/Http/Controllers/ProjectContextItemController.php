@@ -3,14 +3,16 @@
 namespace App\Http\Controllers;
 
 use App\Enums\TeamRole;
+use App\Http\Requests\StoreProjectContextItemRequest;
 use App\Http\Resources\ContextItemResource;
 use App\Models\Project;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 
 class ProjectContextItemController extends Controller
 {
-    public function __invoke(Request $request, Project $project): AnonymousResourceCollection
+    public function index(Request $request, Project $project): AnonymousResourceCollection
     {
         abort_unless(
             in_array($request->user()->roleInTeam($project->team_id), TeamRole::cases(), true),
@@ -22,5 +24,49 @@ class ProjectContextItemController extends Controller
                 ->orderBy('id')
                 ->get(),
         );
+    }
+
+    public function store(StoreProjectContextItemRequest $request, Project $project): JsonResponse
+    {
+        $validated = $request->validated();
+
+        $contextItem = $project->contextItems()->create([
+            'type' => $validated['type'],
+            'title' => $validated['title'],
+            'description' => $validated['description'] ?? null,
+            'metadata' => $this->metadataFor($request, $project, $validated),
+        ]);
+
+        return (new ContextItemResource($contextItem))
+            ->response()
+            ->setStatusCode(201);
+    }
+
+    /**
+     * @param  array{type: string, url?: string, body?: string}  $validated
+     * @return array<string, mixed>
+     */
+    private function metadataFor(StoreProjectContextItemRequest $request, Project $project, array $validated): array
+    {
+        if ($validated['type'] === 'link') {
+            return ['url' => $validated['url']];
+        }
+
+        if ($validated['type'] === 'text') {
+            return ['body' => $validated['body']];
+        }
+
+        $file = $request->file('file');
+        $path = $file->store("context-items/{$project->getKey()}", 'local');
+
+        abort_if($path === false, 500, 'The context file could not be stored.');
+
+        return [
+            'disk' => 'local',
+            'path' => $path,
+            'original_name' => $file->getClientOriginalName(),
+            'mime_type' => $file->getClientMimeType(),
+            'size' => $file->getSize(),
+        ];
     }
 }

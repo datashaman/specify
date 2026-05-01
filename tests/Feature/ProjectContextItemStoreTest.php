@@ -1,0 +1,115 @@
+<?php
+
+use App\Enums\TeamRole;
+use App\Models\ContextItem;
+use App\Models\Project;
+use App\Models\Team;
+use App\Models\User;
+use App\Models\Workspace;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
+
+function projectContextItemStoreScene(TeamRole $role = TeamRole::Admin): array
+{
+    $workspace = Workspace::factory()->create();
+    $team = Team::factory()->for($workspace)->create();
+    $user = User::factory()->create();
+    $team->addMember($user, $role);
+    $project = Project::factory()->for($team)->create(['name' => 'Specify']);
+
+    return compact('user', 'project');
+}
+
+function contextItemStoreRequest($test): mixed
+{
+    return $test
+        ->withSession(['_token' => 'context-token'])
+        ->withHeader('X-CSRF-TOKEN', 'context-token');
+}
+
+test('guest cannot create a project context item', function () {
+    $project = Project::factory()->create();
+
+    contextItemStoreRequest($this)->postJson(route('projects.context-items.store', $project), [
+        'type' => 'link',
+        'title' => 'Design reference',
+        'url' => 'https://example.com/design',
+    ])->assertUnauthorized();
+});
+
+test('admin can create a link context item', function () {
+    ['user' => $user, 'project' => $project] = projectContextItemStoreScene();
+
+    contextItemStoreRequest($this)->actingAs($user)
+        ->postJson(route('projects.context-items.store', $project), [
+            'type' => 'link',
+            'title' => 'Design reference',
+            'description' => 'Source material for the UI.',
+            'url' => 'https://example.com/design',
+        ])
+        ->assertCreated()
+        ->assertJsonPath('data.type', 'link')
+        ->assertJsonPath('data.title', 'Design reference')
+        ->assertJsonPath('data.description', 'Source material for the UI.')
+        ->assertJsonPath('data.metadata.url', 'https://example.com/design');
+
+    $contextItem = ContextItem::query()->sole();
+
+    expect($contextItem->project->is($project))->toBeTrue()
+        ->and($contextItem->metadata)->toBe(['url' => 'https://example.com/design']);
+});
+
+test('admin can create a text context item', function () {
+    ['user' => $user, 'project' => $project] = projectContextItemStoreScene();
+
+    contextItemStoreRequest($this)->actingAs($user)
+        ->postJson(route('projects.context-items.store', $project), [
+            'type' => 'text',
+            'title' => 'Domain notes',
+            'body' => 'Projects collect context before subtasks are executed.',
+        ])
+        ->assertCreated()
+        ->assertJsonPath('data.type', 'text')
+        ->assertJsonPath('data.metadata.body', 'Projects collect context before subtasks are executed.');
+
+    expect(ContextItem::query()->sole()->metadata)
+        ->toBe(['body' => 'Projects collect context before subtasks are executed.']);
+});
+
+test('admin can create a file context item', function () {
+    Storage::fake('local');
+
+    ['user' => $user, 'project' => $project] = projectContextItemStoreScene();
+    $file = UploadedFile::fake()->create('brief.pdf', 12, 'application/pdf');
+
+    $response = contextItemStoreRequest($this)->actingAs($user)
+        ->postJson(route('projects.context-items.store', $project), [
+            'type' => 'file',
+            'title' => 'Project brief',
+            'file' => $file,
+        ])
+        ->assertCreated()
+        ->assertJsonPath('data.type', 'file')
+        ->assertJsonPath('data.metadata.disk', 'local')
+        ->assertJsonPath('data.metadata.original_name', 'brief.pdf')
+        ->assertJsonPath('data.metadata.mime_type', 'application/pdf');
+
+    $path = $response->json('data.metadata.path');
+
+    expect($path)->toStartWith("context-items/{$project->id}/");
+    Storage::disk('local')->assertExists($path);
+});
+
+test('team member cannot create a project context item', function () {
+    ['user' => $user, 'project' => $project] = projectContextItemStoreScene(TeamRole::Member);
+
+    contextItemStoreRequest($this)->actingAs($user)
+        ->postJson(route('projects.context-items.store', $project), [
+            'type' => 'link',
+            'title' => 'Design reference',
+            'url' => 'https://example.com/design',
+        ])
+        ->assertForbidden();
+
+    expect(ContextItem::query()->count())->toBe(0);
+});

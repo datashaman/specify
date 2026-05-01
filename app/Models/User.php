@@ -140,13 +140,18 @@ class User extends Authenticatable
         return $value ? TeamRole::from($value) : null;
     }
 
-    public function canApproveInProject(Project $project): bool
+    public function canManageProject(Project $project): bool
     {
         return in_array(
             $this->roleInTeam($project->team_id),
             [TeamRole::Owner, TeamRole::Admin],
             true,
         );
+    }
+
+    public function canApproveInProject(Project $project): bool
+    {
+        return $this->canManageProject($project);
     }
 
     public function switchTeam(Team $team): void
