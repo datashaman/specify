@@ -23,6 +23,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::livewire('projects/{project}/context', 'pages::projects.context.index')->name('projects.context.index');
     Route::get('projects/{project}/context-items', [ProjectContextItemController::class, 'index'])->name('projects.context-items.index');
     Route::post('projects/{project}/context-items', [ProjectContextItemController::class, 'store'])->name('projects.context-items.store');
+    Route::patch('projects/{project}/context-items/{contextItem}', [ProjectContextItemController::class, 'update'])->name('projects.context-items.update');
+    Route::delete('projects/{project}/context-items/{contextItem}', [ProjectContextItemController::class, 'destroy'])->name('projects.context-items.destroy');
     Route::livewire('projects/{project}', 'pages::projects.show')->name('projects.show');
     Route::livewire('projects/{project}/features/{feature}', 'pages::features.show')->name('features.show');
     Route::livewire('stories', 'pages::stories.index')->name('stories.index');
