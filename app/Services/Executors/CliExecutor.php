@@ -56,13 +56,36 @@ class CliExecutor implements Executor
         }
 
         $stdout = $process->getOutput();
+        $stderr = $process->getErrorOutput();
         $files = $this->changedFiles($workingDir);
 
         return new ExecutionResult(
             summary: trim($stdout),
             filesChanged: $files,
             commitMessage: $this->commitMessageFor($subtask),
+            executorLog: $this->buildExecutorLog($stdout, $stderr),
         );
+    }
+
+    /**
+     * Capture the agent's full transcript so debugging a run does not require
+     * re-running the model. Truncates at 64 KB to keep AgentRun.output bounded.
+     */
+    private function buildExecutorLog(string $stdout, string $stderr): ?string
+    {
+        $combined = trim($stdout);
+        $stderr = trim($stderr);
+        if ($stderr !== '') {
+            $combined .= ($combined === '' ? '' : "\n\n").'--- stderr ---'."\n".$stderr;
+        }
+        if ($combined === '') {
+            return null;
+        }
+        if (strlen($combined) > 65_536) {
+            $combined = substr($combined, 0, 65_536)."\n[truncated]";
+        }
+
+        return $combined;
     }
 
     private function buildPrompt(Subtask $subtask, ?Repo $repo, ?string $workingBranch): string

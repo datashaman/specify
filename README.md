@@ -27,7 +27,7 @@ See `docs/adr/` for the load-bearing decisions in detail.
 
 ```
 Story approved
-  → Tasks generated (GenerateTasksJob → PlanGenerator agent, structured output)
+  → Tasks generated (GenerateTasksJob → TasksGenerator agent, structured output)
   → Story re-approved (any task edit resets to PendingApproval)
   → Subtasks dispatched (ExecuteSubtaskJob)
       → SubtaskRunPipeline: prepare workdir → checkout branch → executor edits
