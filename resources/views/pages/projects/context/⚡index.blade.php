@@ -1,9 +1,7 @@
 <?php
 
-use App\Models\ContextItem;
 use App\Models\Project;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Str;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Title;
 use Livewire\Component;
@@ -28,16 +26,6 @@ new #[Title('Project context')] class extends Component {
             ->find($this->project_id);
     }
 
-    /**
-     * @return \Illuminate\Database\Eloquent\Collection<int, ContextItem>
-     */
-    #[Computed]
-    public function contextItems()
-    {
-        return $this->project
-            ? $this->project->contextItems()->orderBy('id')->get()
-            : collect();
-    }
 };
 ?>
 
@@ -61,23 +49,121 @@ new #[Title('Project context')] class extends Component {
             </div>
         </div>
 
-        <section class="flex flex-col gap-3">
-            @forelse ($this->contextItems as $contextItem)
-                <flux:card wire:key="context-item-{{ $contextItem->id }}">
-                    <div class="flex flex-wrap items-center gap-2">
-                        <flux:badge variant="solid">{{ Str::headline($contextItem->type) }}</flux:badge>
-                        <flux:text class="ml-auto text-xs text-zinc-500">#{{ $contextItem->id }}</flux:text>
+        <section
+            class="flex flex-col gap-3"
+            x-data="{
+                endpoint: {{ \Illuminate\Support\Js::from(route('projects.context-items.index', $this->project)) }},
+                errorMessage: {{ \Illuminate\Support\Js::from(__('Context items could not be loaded.')) }},
+                defaultType: {{ \Illuminate\Support\Js::from(__('Context')) }},
+                contextItems: Array(),
+                error: null,
+                loading: true,
+                async load() {
+                    this.loading = true;
+                    this.error = null;
+
+                    try {
+                        const response = await fetch(this.endpoint, {
+                            headers: { Accept: 'application/json' },
+                            credentials: 'same-origin',
+                        });
+
+                        if (! response.ok) {
+                            throw new Error(`${this.errorMessage} (${response.status})`);
+                        }
+
+                        const payload = await response.json();
+                        this.contextItems = Array.isArray(payload.data) ? payload.data : Array();
+                    } catch (error) {
+                        this.contextItems = Array();
+                        this.error = error.message || this.errorMessage;
+                    } finally {
+                        this.loading = false;
+                    }
+                },
+                formatType(type) {
+                    return String(type || this.defaultType)
+                        .replace(/[-_]+/g, ' ')
+                        .replace(/\w\S*/g, (word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase());
+                },
+                metadataEntries(metadata) {
+                    return Object.entries(metadata || {});
+                },
+                metadataValue(value) {
+                    if (value === null) {
+                        return 'null';
+                    }
+
+                    if (typeof value === 'object') {
+                        return JSON.stringify(value);
+                    }
+
+                    return String(value);
+                },
+            }"
+            x-init="load()"
+        >
+            <template x-if="loading">
+                <div class="flex flex-col gap-3" aria-live="polite">
+                    <flux:card>
+                        <div class="flex flex-col gap-3">
+                            <flux:skeleton class="h-5 w-28" />
+                            <flux:skeleton class="h-6 w-2/3" />
+                            <flux:skeleton class="h-4 w-full" />
+                            <flux:skeleton class="h-4 w-3/4" />
+                        </div>
+                    </flux:card>
+                    <flux:text class="text-sm text-zinc-500">{{ __('Loading context items...') }}</flux:text>
+                </div>
+            </template>
+
+            <template x-if="! loading && error">
+                <flux:callout variant="danger" icon="exclamation-triangle">
+                    <flux:callout.heading>{{ __('Unable to load context items') }}</flux:callout.heading>
+                    <flux:callout.text x-text="error"></flux:callout.text>
+                    <x-slot name="actions">
+                        <flux:button size="sm" x-on:click="load()">{{ __('Retry') }}</flux:button>
+                    </x-slot>
+                </flux:callout>
+            </template>
+
+            <template x-if="! loading && ! error && contextItems.length === 0">
+                <flux:card>
+                    <div class="flex flex-col gap-1">
+                        <flux:heading>{{ __('No context items yet.') }}</flux:heading>
+                        <flux:text class="text-sm text-zinc-500">{{ __('Context attached to this project will appear here.') }}</flux:text>
                     </div>
-
-                    <flux:heading class="mt-2">{{ $contextItem->title }}</flux:heading>
-
-                    @if ($contextItem->description)
-                        <flux:text class="mt-1">{{ $contextItem->description }}</flux:text>
-                    @endif
                 </flux:card>
-            @empty
-                <flux:text class="text-zinc-500">{{ __('No context items yet.') }}</flux:text>
-            @endforelse
+            </template>
+
+            <template x-if="! loading && ! error && contextItems.length > 0">
+                <div class="flex flex-col gap-3">
+                    <template x-for="contextItem in contextItems" :key="`context-item-${contextItem.id}`">
+                        <flux:card>
+                            <div class="flex flex-col gap-4">
+                                <div class="flex flex-wrap items-center gap-2">
+                                    <flux:badge variant="solid" x-text="formatType(contextItem.type)"></flux:badge>
+                                    <flux:text class="ml-auto text-xs text-zinc-500" x-text="`#${contextItem.id}`"></flux:text>
+                                </div>
+
+                                <div class="flex flex-col gap-1">
+                                    <flux:heading x-text="contextItem.title"></flux:heading>
+                                    <flux:text class="text-sm text-zinc-600 dark:text-zinc-400" x-show="contextItem.description" x-text="contextItem.description"></flux:text>
+                                </div>
+
+                                <div class="flex flex-wrap gap-2" x-show="metadataEntries(contextItem.metadata).length > 0">
+                                    <template x-for="[key, value] in metadataEntries(contextItem.metadata)" :key="key">
+                                        <span class="inline-flex max-w-full items-center gap-1 rounded border border-zinc-200 px-2 py-1 text-xs text-zinc-600 dark:border-zinc-700 dark:text-zinc-300">
+                                            <span class="font-medium" x-text="formatType(key)"></span>
+                                            <span class="truncate text-zinc-500 dark:text-zinc-400" x-text="metadataValue(value)"></span>
+                                        </span>
+                                    </template>
+                                </div>
+                            </div>
+                        </flux:card>
+                    </template>
+                </div>
+            </template>
         </section>
     @endif
 </div>

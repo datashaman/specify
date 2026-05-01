@@ -27,6 +27,7 @@ test('admin can open the project context screen', function () {
         'type' => 'repository',
         'title' => 'Primary repository',
         'description' => 'The implementation repository.',
+        'metadata' => ['branch' => 'main', 'visibility' => 'private'],
     ]);
     ContextItem::factory()->create(['title' => 'Hidden context']);
 
@@ -35,14 +36,27 @@ test('admin can open the project context screen', function () {
     Livewire::test('pages::projects.context.index', ['project' => $project->id])
         ->assertSee('Project context')
         ->assertSee('Specify')
-        ->assertSee('Primary repository')
-        ->assertSee('The implementation repository.')
+        ->assertSee('context-items')
+        ->assertSee('Loading context items')
+        ->assertSee('Unable to load context items')
+        ->assertSee('No context items yet.')
+        ->assertSee('contextItem.title', false)
+        ->assertSee('contextItem.description', false)
+        ->assertSee('metadataEntries(contextItem.metadata)', false)
         ->assertDontSee('Hidden context');
 
     $this->get(route('projects.context.index', $project))
         ->assertSuccessful()
         ->assertSee('Project context')
-        ->assertSee('Primary repository');
+        ->assertSee('context-items');
+
+    $this->getJson(route('projects.context-items.index', $project))
+        ->assertSuccessful()
+        ->assertJsonPath('data.0.type', 'repository')
+        ->assertJsonPath('data.0.title', 'Primary repository')
+        ->assertJsonPath('data.0.description', 'The implementation repository.')
+        ->assertJsonPath('data.0.metadata.branch', 'main')
+        ->assertJsonPath('data.0.metadata.visibility', 'private');
 });
 
 test('member cannot open the project context screen', function () {
