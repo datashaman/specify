@@ -42,13 +42,27 @@ class ExecutorFactory
     }
 
     /**
+     * Race driver names from config, validated against the registry. A typo
+     * in `SPECIFY_EXECUTOR_RACE` fails fast here with a clear message rather
+     * than dispatching AgentRuns that crash later inside the queue worker.
+     *
      * @return list<string>
      */
     public function raceDrivers(): array
     {
         $race = (array) config('specify.executor.race', []);
+        $names = array_values(array_filter(array_map('strval', $race), fn ($name) => $name !== ''));
 
-        return array_values(array_filter(array_map('strval', $race), fn ($name) => $name !== ''));
+        $drivers = (array) config('specify.executor.drivers', []);
+        foreach ($names as $name) {
+            if (! isset($drivers[$name])) {
+                throw new InvalidArgumentException(
+                    "Race driver [{$name}] is not registered in specify.executor.drivers."
+                );
+            }
+        }
+
+        return $names;
     }
 
     public function defaultDriver(): string

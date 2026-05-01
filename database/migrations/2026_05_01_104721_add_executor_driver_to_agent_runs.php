@@ -1,5 +1,6 @@
 <?php
 
+use App\Models\Subtask;
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
@@ -17,7 +18,7 @@ return new class extends Migration
         // load-bearing for every Subtask run, not just race runs.
         $default = (string) config('specify.executor.default', config('specify.executor.driver', 'laravel-ai'));
         DB::table('agent_runs')
-            ->where('runnable_type', 'App\\Models\\Subtask')
+            ->where('runnable_type', (new Subtask)->getMorphClass())
             ->whereNull('executor_driver')
             ->update(['executor_driver' => $default]);
     }

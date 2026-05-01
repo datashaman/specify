@@ -242,47 +242,48 @@ class ExecutionService
      *   - any Succeeded   → Subtask Done, advance the cascade
      *   - none Succeeded  → Subtask Blocked, no cascade
      *
-     * Concurrency: not transactionally locked. Two terminal callbacks
-     * arriving simultaneously on the last two siblings *can* both pass the
-     * "no still-open" check — that's intentional. The race is safe because
-     * (a) `forceFill(['status' => Done])` is idempotent under repeat writes
-     * to the same value, and (b) `advanceFromSubtask` re-queries
-     * `Queued|Running` siblings on the next Subtask before dispatching, so
-     * a double cascade cannot double-dispatch downstream work. If the
-     * downstream guard ever changes, this method must move to a row-locked
-     * transaction.
+     * Concurrency: serialised on the parent Subtask row via
+     * `lockForUpdate` inside a transaction. Without the lock, two terminal
+     * callbacks arriving simultaneously on the last two siblings could both
+     * pass the "no still-open" check, both call `advanceFromSubtask`, and
+     * both dispatch the *next* Subtask before either AgentRun was committed
+     * — duplicating downstream runs. The lock makes the cascade decision
+     * (read siblings → write Subtask status → dispatch next) atomic per
+     * Subtask.
      */
     private function finalizeSubtaskFromRun(AgentRun $run): void
     {
-        $subtask = Subtask::find($run->runnable_id);
-        if (! $subtask) {
-            return;
-        }
+        DB::transaction(function () use ($run) {
+            $subtask = Subtask::query()->whereKey($run->runnable_id)->lockForUpdate()->first();
+            if (! $subtask) {
+                return;
+            }
 
-        $siblings = AgentRun::query()
-            ->where('runnable_type', Subtask::class)
-            ->where('runnable_id', $subtask->getKey())
-            ->get();
+            $siblings = AgentRun::query()
+                ->where('runnable_type', $run->runnable_type)
+                ->where('runnable_id', $subtask->getKey())
+                ->get();
 
-        $stillOpen = $siblings->contains(fn (AgentRun $r) => in_array(
-            $r->status,
-            [AgentRunStatus::Queued, AgentRunStatus::Running],
-            true,
-        ));
-        if ($stillOpen) {
-            return;
-        }
+            $stillOpen = $siblings->contains(fn (AgentRun $r) => in_array(
+                $r->status,
+                [AgentRunStatus::Queued, AgentRunStatus::Running],
+                true,
+            ));
+            if ($stillOpen) {
+                return;
+            }
 
-        $anySucceeded = $siblings->contains(fn (AgentRun $r) => $r->status === AgentRunStatus::Succeeded);
+            $anySucceeded = $siblings->contains(fn (AgentRun $r) => $r->status === AgentRunStatus::Succeeded);
 
-        if ($anySucceeded) {
-            $subtask->forceFill(['status' => TaskStatus::Done->value])->save();
-            $this->advanceFromSubtask($subtask->fresh(), $run->authorizingApproval);
+            if ($anySucceeded) {
+                $subtask->forceFill(['status' => TaskStatus::Done->value])->save();
+                $this->advanceFromSubtask($subtask->fresh(), $run->authorizingApproval);
 
-            return;
-        }
+                return;
+            }
 
-        $subtask->forceFill(['status' => TaskStatus::Blocked->value])->save();
+            $subtask->forceFill(['status' => TaskStatus::Blocked->value])->save();
+        });
     }
 
     private function advanceFromSubtask(?Subtask $subtask, $authorizingApproval): void
