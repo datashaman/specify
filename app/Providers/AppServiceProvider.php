@@ -5,10 +5,8 @@ namespace App\Providers;
 use App\Services\Context\ContextBuilder;
 use App\Services\Context\NullContextBuilder;
 use App\Services\Context\RecencyContextBuilder;
-use App\Services\Executors\CliExecutor;
 use App\Services\Executors\Executor;
-use App\Services\Executors\FakeExecutor;
-use App\Services\Executors\LaravelAiExecutor;
+use App\Services\Executors\ExecutorFactory;
 use App\Services\Prompts\PromptLoader;
 use App\Services\WorkspaceRunner;
 use Carbon\CarbonImmutable;
@@ -52,19 +50,14 @@ class AppServiceProvider extends ServiceProvider
             };
         });
 
-        $this->app->bind(Executor::class, function ($app) {
-            $driver = config('specify.executor.driver', 'laravel-ai');
+        $this->app->singleton(ExecutorFactory::class, fn ($app) => new ExecutorFactory($app));
 
-            return match ($driver) {
-                'laravel-ai' => new LaravelAiExecutor,
-                'cli' => new CliExecutor(
-                    command: (array) config('specify.executor.cli.command'),
-                    timeout: (int) config('specify.executor.cli.timeout', 1800),
-                ),
-                'fake' => new FakeExecutor,
-                default => throw new InvalidArgumentException("Unknown executor driver [{$driver}]."),
-            };
-        });
+        $this->app->bind(
+            Executor::class,
+            fn ($app) => $app->make(ExecutorFactory::class)->make(
+                $app->make(ExecutorFactory::class)->defaultDriver(),
+            ),
+        );
     }
 
     /**

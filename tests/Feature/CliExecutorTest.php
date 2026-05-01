@@ -153,7 +153,7 @@ test('CliExecutor surfaces non-zero exit codes as exceptions', function () {
 
 test('full pipeline with cli driver: clone → branch → cli edits → commit → diff → subtask Done', function () {
     config(['queue.default' => 'sync']);
-    config(['specify.executor.driver' => 'cli']);
+    config(['specify.executor.default' => 'cli']);
     config(['specify.workspace.open_pr_after_push' => false]);
 
     // Build a source bare repo seeded with one commit on main.
@@ -175,7 +175,7 @@ test('full pipeline with cli driver: clone → branch → cli edits → commit �
         echo "new" > AGENT_NOTE.md
         echo "ok"
     BASH);
-    config(['specify.executor.cli.command' => [$bin]]);
+    config(['specify.executor.drivers.cli.command' => [$bin]]);
 
     config(['specify.runs_path' => sys_get_temp_dir().'/specify-runs-'.uniqid()]);
     app()->forgetInstance(WorkspaceRunner::class);

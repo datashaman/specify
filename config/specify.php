@@ -1,5 +1,9 @@
 <?php
 
+use App\Services\Executors\CliExecutor;
+use App\Services\Executors\FakeExecutor;
+use App\Services\Executors\LaravelAiExecutor;
+
 return [
     /*
     |--------------------------------------------------------------------------
@@ -73,12 +77,52 @@ return [
         'user_email' => env('MCP_USER_EMAIL'),
     ],
 
-    'executor' => [
-        'driver' => env('SPECIFY_EXECUTOR_DRIVER', env('SPECIFY_EXECUTOR', 'laravel-ai')),
+    /*
+    |--------------------------------------------------------------------------
+    | Executor drivers
+    |--------------------------------------------------------------------------
+    |
+    | The `drivers` map registers every available executor by name. `default`
+    | is the driver used when nothing else asks. `race`, when non-empty,
+    | turns each Subtask dispatch into a *fan-out* — one AgentRun per
+    | driver in the list, each on its own branch, each opening its own PR.
+    | The reviewer picks one to merge; the choice is the data.
+    |
+    | Race driver names must exist in `drivers`. Single-driver mode
+    | (race=[]) is the default and matches pre-race behaviour.
+    |
+    */
 
-        'cli' => [
-            'command' => array_values(array_filter(explode(' ', (string) env('SPECIFY_CLI_COMMAND', 'claude -p')))),
-            'timeout' => (int) env('SPECIFY_CLI_TIMEOUT', 1800),
+    'executor' => [
+        'default' => env('SPECIFY_EXECUTOR_DRIVER', env('SPECIFY_EXECUTOR', 'laravel-ai')),
+
+        'race' => array_values(array_filter(array_map(
+            'trim',
+            explode(',', (string) env('SPECIFY_EXECUTOR_RACE', ''))
+        ))),
+
+        'drivers' => [
+            'laravel-ai' => [
+                'class' => LaravelAiExecutor::class,
+            ],
+            'cli' => [
+                'class' => CliExecutor::class,
+                'command' => array_values(array_filter(explode(' ', (string) env('SPECIFY_CLI_COMMAND', 'claude -p')))),
+                'timeout' => (int) env('SPECIFY_CLI_TIMEOUT', 1800),
+            ],
+            'cli-claude' => [
+                'class' => CliExecutor::class,
+                'command' => ['claude', '-p'],
+                'timeout' => (int) env('SPECIFY_CLI_TIMEOUT', 1800),
+            ],
+            'cli-codex' => [
+                'class' => CliExecutor::class,
+                'command' => ['codex', 'exec'],
+                'timeout' => (int) env('SPECIFY_CLI_TIMEOUT', 1800),
+            ],
+            'fake' => [
+                'class' => FakeExecutor::class,
+            ],
         ],
     ],
 

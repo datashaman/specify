@@ -1,6 +1,6 @@
 # Proposal 0001 — Multi-executor race driver
 
-Status: Draft
+Status: Implemented (see ADR-0006). The shape that landed differs from the original sketch: race fan-out lives in `ExecutionService` and produces sibling AgentRuns, not a wrapper executor.
 Date: 2026-05-01
 Source: AI strategy audit, Bucket 3 #1
 

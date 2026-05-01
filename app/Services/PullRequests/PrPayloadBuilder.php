@@ -19,7 +19,7 @@ class PrPayloadBuilder
      * Reviewers triaging a queue of agent PRs benefit from the story id and
      * AC position — the bare subtask name does not place the change.
      */
-    public static function title(Subtask $subtask): string
+    public static function title(Subtask $subtask, ?string $driver = null): string
     {
         $task = $subtask->task;
         $story = $task?->story;
@@ -29,8 +29,13 @@ class PrPayloadBuilder
             ? sprintf('[Story #%d AC#%d]', $story->getKey(), $acPos)
             : ($story ? sprintf('[Story #%d]', $story->getKey()) : '');
 
-        return $tag !== ''
-            ? sprintf('Specify %s: %s', $tag, (string) $subtask->name)
+        // Driver tag lets reviewers triage a race-mode queue: identical
+        // titles on three PRs becomes "by-cli", "by-laravel-ai", etc.
+        $driverTag = $driver !== null && $driver !== '' ? '['.$driver.']' : '';
+        $combined = trim($tag.$driverTag);
+
+        return $combined !== ''
+            ? sprintf('Specify %s: %s', $combined, (string) $subtask->name)
             : sprintf('Specify: %s', (string) $subtask->name);
     }
 

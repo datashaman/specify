@@ -5,6 +5,7 @@ namespace App\Jobs;
 use App\Models\AgentRun;
 use App\Models\Subtask;
 use App\Services\ExecutionService;
+use App\Services\Executors\ExecutorFactory;
 use App\Services\SubtaskRunOutcome;
 use App\Services\SubtaskRunPipeline;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -15,10 +16,14 @@ use Throwable;
 /**
  * Queue job that runs a single Subtask AgentRun via `SubtaskRunPipeline`.
  *
- * Owns only queue-lifecycle concerns: load the AgentRun, mark Running, hand
- * off to the pipeline, then translate the outcome into a markSucceeded /
- * markFailed call. Exceptions from the pipeline mark Failed and rethrow so
- * the queue can decide whether to retry.
+ * Owns only queue-lifecycle concerns: load the AgentRun, mark Running, resolve
+ * the executor named on the run via `ExecutorFactory`, hand off to the
+ * pipeline, then translate the outcome into a markSucceeded / markFailed
+ * call. Exceptions from the pipeline mark Failed and rethrow so the queue
+ * can decide whether to retry.
+ *
+ * The executor is resolved per-run from `AgentRun.executor_driver` so race-
+ * mode siblings each run on the driver they were dispatched with.
  */
 class ExecuteSubtaskJob implements ShouldQueue
 {
@@ -27,7 +32,7 @@ class ExecuteSubtaskJob implements ShouldQueue
     public function __construct(public int $agentRunId) {}
 
     /** Queue handler — see class docblock. */
-    public function handle(ExecutionService $execution, SubtaskRunPipeline $pipeline): void
+    public function handle(ExecutionService $execution, SubtaskRunPipeline $pipeline, ExecutorFactory $executors): void
     {
         $run = AgentRun::findOrFail($this->agentRunId);
 
@@ -39,12 +44,16 @@ class ExecuteSubtaskJob implements ShouldQueue
 
         $execution->markRunning($run);
 
+        $driver = $run->executor_driver ?? $executors->defaultDriver();
+
         try {
-            $outcome = $pipeline->run($run);
+            $executor = $executors->make($driver);
+            $outcome = $pipeline->run($run, $executor);
         } catch (Throwable $e) {
             Log::error('specify.subtask.run.failed', [
                 'run_id' => $run->getKey(),
                 'subtask_id' => $run->runnable->getKey(),
+                'executor_driver' => $driver,
                 'exception' => $e::class,
                 'message' => $e->getMessage(),
             ]);

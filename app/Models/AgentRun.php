@@ -21,7 +21,7 @@ use RuntimeException;
  */
 #[Fillable([
     'runnable_type', 'runnable_id',
-    'repo_id', 'working_branch',
+    'repo_id', 'working_branch', 'executor_driver',
     'authorizing_approval_type', 'authorizing_approval_id',
     'status', 'agent_name', 'model_id',
     'input', 'output', 'diff', 'error_message',
