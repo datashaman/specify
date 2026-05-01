@@ -56,11 +56,13 @@ new #[Title('Project context')] class extends Component {
                 csrfToken: {{ \Illuminate\Support\Js::from(csrf_token()) }},
                 errorMessage: {{ \Illuminate\Support\Js::from(__('Context items could not be loaded.')) }},
                 createErrorMessage: {{ \Illuminate\Support\Js::from(__('Context item could not be added.')) }},
+                updateErrorMessage: {{ \Illuminate\Support\Js::from(__('Context item could not be updated.')) }},
                 defaultType: {{ \Illuminate\Support\Js::from(__('Context')) }},
                 contextItems: Array(),
                 error: null,
                 loading: true,
                 saving: false,
+                updating: false,
                 form: {
                     type: 'file',
                     title: '',
@@ -68,8 +70,15 @@ new #[Title('Project context')] class extends Component {
                     url: '',
                     body: '',
                 },
+                editForm: {
+                    id: null,
+                    title: '',
+                    description: '',
+                },
                 fieldErrors: {},
+                editFieldErrors: {},
                 createError: null,
+                editError: null,
                 async load() {
                     this.loading = true;
                     this.error = null;
@@ -110,6 +119,12 @@ new #[Title('Project context')] class extends Component {
                 },
                 firstError(field) {
                     return this.fieldErrors[field]?.[0] || '';
+                },
+                firstEditError(field) {
+                    return this.editFieldErrors[field]?.[0] || '';
+                },
+                updateEndpoint(id) {
+                    return `${this.endpoint}/${id}`;
                 },
                 async create() {
                     this.saving = true;
@@ -163,6 +178,76 @@ new #[Title('Project context')] class extends Component {
                         this.createError = error.message || this.createErrorMessage;
                     } finally {
                         this.saving = false;
+                    }
+                },
+                openEdit(contextItem) {
+                    this.editForm = {
+                        id: contextItem.id,
+                        title: contextItem.title || '',
+                        description: contextItem.description || '',
+                    };
+                    this.editFieldErrors = {};
+                    this.editError = null;
+                    this.$flux.modal('edit-context-item-modal').show();
+                },
+                resetEditForm() {
+                    this.editForm = {
+                        id: null,
+                        title: '',
+                        description: '',
+                    };
+                    this.editFieldErrors = {};
+                    this.editError = null;
+                },
+                async update() {
+                    if (! this.editForm.id) {
+                        return;
+                    }
+
+                    this.updating = true;
+                    this.editFieldErrors = {};
+                    this.editError = null;
+
+                    try {
+                        const response = await fetch(this.updateEndpoint(this.editForm.id), {
+                            method: 'PATCH',
+                            headers: {
+                                Accept: 'application/json',
+                                'Content-Type': 'application/json',
+                                'X-CSRF-TOKEN': this.csrfToken,
+                            },
+                            credentials: 'same-origin',
+                            body: JSON.stringify({
+                                title: this.editForm.title,
+                                description: this.editForm.description || null,
+                            }),
+                        });
+
+                        if (response.status === 422) {
+                            const payload = await response.json();
+                            this.editFieldErrors = payload.errors || {};
+                            this.editError = payload.message || this.updateErrorMessage;
+
+                            return;
+                        }
+
+                        if (! response.ok) {
+                            throw new Error(`${this.updateErrorMessage} (${response.status})`);
+                        }
+
+                        const payload = await response.json();
+                        const updatedContextItem = payload.data;
+
+                        this.contextItems = this.contextItems.map((contextItem) => (
+                            contextItem.id === updatedContextItem.id ? updatedContextItem : contextItem
+                        ));
+
+                        this.$flux.modal('edit-context-item-modal').close();
+                        this.resetEditForm();
+                    } catch (error) {
+                        this.editError = error.message || this.updateErrorMessage;
+                    } finally {
+                        this.updating = false;
                     }
                 },
                 formatType(type) {
@@ -268,6 +353,49 @@ new #[Title('Project context')] class extends Component {
                 </form>
             </flux:modal>
 
+            <flux:modal name="edit-context-item-modal" class="md:w-[34rem]">
+                <form class="flex flex-col gap-5" x-on:submit.prevent="update()">
+                    <div class="flex flex-col gap-1">
+                        <flux:heading>{{ __('Edit context item') }}</flux:heading>
+                        <flux:text class="text-sm text-zinc-500">
+                            {{ __('Update the title and description shown in the project context list.') }}
+                        </flux:text>
+                    </div>
+
+                    <template x-if="editError">
+                        <flux:callout variant="danger" icon="exclamation-triangle">
+                            <flux:callout.heading>{{ __('Unable to update context item') }}</flux:callout.heading>
+                            <flux:callout.text x-text="editError"></flux:callout.text>
+                        </flux:callout>
+                    </template>
+
+                    <flux:field>
+                        <flux:label>{{ __('Title') }}</flux:label>
+                        <flux:input x-model="editForm.title" required />
+                        <flux:error name="edit-title" x-text="firstEditError('title')" />
+                    </flux:field>
+
+                    <flux:field>
+                        <flux:label>{{ __('Description') }}</flux:label>
+                        <flux:textarea x-model="editForm.description" rows="4" />
+                        <flux:error name="edit-description" x-text="firstEditError('description')" />
+                    </flux:field>
+
+                    <div class="flex justify-end gap-2">
+                        <flux:modal.close>
+                            <flux:button type="button" variant="ghost" x-on:click="resetEditForm()">
+                                {{ __('Cancel') }}
+                            </flux:button>
+                        </flux:modal.close>
+
+                        <flux:button type="submit" variant="primary" x-bind:disabled="updating">
+                            <span x-show="! updating">{{ __('Save changes') }}</span>
+                            <span x-show="updating">{{ __('Saving...') }}</span>
+                        </flux:button>
+                    </div>
+                </form>
+            </flux:modal>
+
             <template x-if="loading">
                 <div class="flex flex-col gap-3" aria-live="polite">
                     <flux:card>
@@ -308,6 +436,14 @@ new #[Title('Project context')] class extends Component {
                             <div class="flex flex-col gap-4">
                                 <div class="flex flex-wrap items-center gap-2">
                                     <flux:badge variant="solid" x-text="formatType(contextItem.type)"></flux:badge>
+                                    <flux:button
+                                        size="sm"
+                                        variant="ghost"
+                                        icon="pencil-square"
+                                        x-on:click="openEdit(contextItem)"
+                                    >
+                                        {{ __('Edit') }}
+                                    </flux:button>
                                     <flux:text class="ml-auto text-xs text-zinc-500" x-text="`#${contextItem.id}`"></flux:text>
                                 </div>
 
