@@ -1,16 +1,23 @@
 <?php
 
+use App\Enums\AgentRunStatus;
 use App\Enums\StoryStatus;
 use App\Enums\TaskStatus;
 use App\Models\AcceptanceCriterion;
 use App\Models\AgentRun;
+use App\Models\Repo;
 use App\Models\Story;
 use App\Models\Subtask;
 use App\Models\Task;
+use App\Services\Executors\ExecutionResult;
+use App\Services\Executors\Executor;
 use App\Services\Executors\ExecutorClarification;
 use App\Services\Executors\ProposedSubtask;
 use App\Services\PlanWriter;
 use App\Services\PullRequests\PrPayloadBuilder;
+use App\Services\SubtaskRunOutcome;
+use App\Services\SubtaskRunPipeline;
+use App\Services\WorkspaceRunner;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);
@@ -120,6 +127,73 @@ test('PR body renders the Proposed follow-up subtasks section when the pipeline 
         ->toContain('automatically (ADR-0005)')
         ->toContain('#2 — add tests')
         ->toContain('#3 — document endpoint');
+});
+
+test('SubtaskRunPipeline does NOT append proposed subtasks when the run ends in noDiff', function () {
+    // Regression: an executor proposes follow-ups, but the run produces no
+    // commit (noDiff). The appended subtasks must not be persisted, or they
+    // would be orphaned under a Task whose run was marked Failed.
+    $task = makeApprovedTask();
+    $subtask = Subtask::factory()->for($task)->create(['name' => 'main', 'position' => 1]);
+    $repo = Repo::factory()->for($task->story->feature->project->team->workspace)->create();
+    $run = AgentRun::create([
+        'runnable_type' => Subtask::class,
+        'runnable_id' => $subtask->getKey(),
+        'repo_id' => $repo->getKey(),
+        'working_branch' => 'specify/test',
+        'status' => AgentRunStatus::Running,
+    ]);
+
+    $executor = new class implements Executor
+    {
+        public function needsWorkingDirectory(): bool
+        {
+            return true;
+        }
+
+        public function execute(Subtask $subtask, ?string $workingDir, ?Repo $repo, ?string $workingBranch): ExecutionResult
+        {
+            return new ExecutionResult(
+                summary: 'I tried but produced no diff',
+                filesChanged: [],
+                commitMessage: 'noop',
+                proposedSubtasks: [
+                    new ProposedSubtask('would-be-followup', 'should not exist', 'never run is the test'),
+                ],
+            );
+        }
+    };
+
+    $workspace = new class extends WorkspaceRunner
+    {
+        public function __construct() {}
+
+        public function prepare(Repo $repo, AgentRun $run): string
+        {
+            return sys_get_temp_dir();
+        }
+
+        public function checkoutBranch(string $workingDir, string $branch, ?string $baseBranch = null): void {}
+
+        public function commit(string $workingDir, string $message): ?string
+        {
+            return null;
+        }
+
+        public function diff(string $workingDir, ?string $base = null): string
+        {
+            return '';
+        }
+    };
+
+    $pipeline = new SubtaskRunPipeline($executor, $workspace, app(PlanWriter::class));
+
+    $beforeCount = $task->subtasks()->count();
+    $outcome = $pipeline->run($run);
+    $afterCount = $task->fresh()->subtasks()->count();
+
+    expect($outcome->state)->toBe(SubtaskRunOutcome::STATE_NO_DIFF)
+        ->and($afterCount)->toBe($beforeCount);
 });
 
 test('PR body renders clarifications with their proposed alternative when present', function () {

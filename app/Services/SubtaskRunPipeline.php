@@ -68,22 +68,10 @@ class SubtaskRunPipeline
         $result = $this->executor->execute($subtask, $workingDir, $repo, $agentRun->working_branch);
         $output = $result->toArray();
 
-        $appended = $this->appendProposedSubtasks($subtask, $result->proposedSubtasks, $agentRun);
-        if ($appended !== []) {
-            $output['appended_subtasks'] = array_map(fn ($s) => [
-                'id' => $s->getKey(),
-                'position' => $s->position,
-                'name' => $s->name,
-            ], $appended);
-            Log::info('specify.subtask.proposed_subtasks.appended', $logCtx + [
-                'count' => count($appended),
-                'subtask_ids' => array_map(fn ($s) => $s->getKey(), $appended),
-            ]);
-        }
-
         if ($workingDir === null) {
             $diff = $result->filesChanged === [] ? null : implode("\n", $result->filesChanged);
             $output['commit_sha'] = null;
+            $output = $this->applyProposedSubtasks($subtask, $result->proposedSubtasks, $agentRun, $output, $logCtx);
             Log::info('specify.subtask.run.succeeded', $logCtx + ['commit_sha' => null]);
 
             return SubtaskRunOutcome::succeeded($output, $diff);
@@ -109,6 +97,7 @@ class SubtaskRunPipeline
         }
 
         $output['commit_sha'] = $commitSha;
+        $output = $this->applyProposedSubtasks($subtask, $result->proposedSubtasks, $agentRun, $output, $logCtx);
 
         if (config('specify.workspace.push_after_commit', true)) {
             $branch = $this->branchFor($agentRun);
@@ -172,6 +161,39 @@ class SubtaskRunPipeline
     private function branchFor(AgentRun $agentRun): string
     {
         return $agentRun->working_branch ?? 'specify/run-'.$agentRun->getKey();
+    }
+
+    /**
+     * Append-and-merge: persist proposed follow-up Subtasks (ADR-0005) and
+     * record them in the AgentRun output so the PR body can render them.
+     *
+     * Called only on paths that have produced real work — describe-only
+     * success or post-commit success — so a `noDiff` outcome cannot strand
+     * orphaned Subtasks.
+     *
+     * @param  list<ProposedSubtask>  $proposed
+     * @param  array<string, mixed>  $output
+     * @param  array<string, mixed>  $logCtx
+     * @return array<string, mixed>
+     */
+    private function applyProposedSubtasks(Subtask $subtask, array $proposed, AgentRun $agentRun, array $output, array $logCtx): array
+    {
+        $appended = $this->appendProposedSubtasks($subtask, $proposed, $agentRun);
+        if ($appended === []) {
+            return $output;
+        }
+
+        $output['appended_subtasks'] = array_map(fn ($s) => [
+            'id' => $s->getKey(),
+            'position' => $s->position,
+            'name' => $s->name,
+        ], $appended);
+        Log::info('specify.subtask.proposed_subtasks.appended', $logCtx + [
+            'count' => count($appended),
+            'subtask_ids' => array_map(fn ($s) => $s->getKey(), $appended),
+        ]);
+
+        return $output;
     }
 
     /**

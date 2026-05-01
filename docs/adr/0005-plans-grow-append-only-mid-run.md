@@ -5,7 +5,7 @@ Status: Accepted
 
 ## Context
 
-The original execution model treats the plan (a Story's task list) as a frozen artefact: TasksGenerator runs once on Story approval, the human approves, and the executor walks the plan in linear order without amending it. This is the pre-AI "PRD → tickets → execution queue" pattern, accelerated by AI but not reshaped by it. The audit at `~/.claude/code-skills/audit-ai-strategy/reports/specify/2026-05-01-ai-strategy.md` flagged it as the single largest "bad idea amplified" finding.
+The original execution model treats the plan (a Story's task list) as a frozen artefact: TasksGenerator runs once on Story approval, the human approves, and the executor walks the plan in linear order without amending it. This is the pre-AI "PRD → tickets → execution queue" pattern, accelerated by AI but not reshaped by it — a "bad idea amplified" in the sense that AI makes the rot of frozen plans cheaper to produce, not better. Once a Subtask is running, the model has no way to course-correct beyond shoehorning extra work into the current Subtask or failing.
 
 Two consequences fall out of the frozen-plan model:
 
@@ -24,7 +24,7 @@ Concrete shape:
   - `clarifications: list<{kind, message, proposed?}>` — voice channel for ambiguity, conflict, missing-context, or disagreement (Proposal 0004).
   - `proposed_subtasks: list<{name, description, reason}>` — follow-up engineering steps the executor judges necessary to complete the parent Task. Restricted to the parent Task only.
 - A new `subtasks.proposed_by_run_id` nullable FK records which `AgentRun` appended a Subtask (NULL for human-authored or generator-authored Subtasks). This is the audit trail; nothing in the running pipeline reads it.
-- `PlanWriter::appendProposedSubtasks(Task, list, AgentRun)` is the only seam that creates Subtasks via this path. It validates that the parent Task still exists, assigns positions after the current maximum, and **does not** call `ApprovalService::recompute()`. The Story's revision is unchanged.
+- `PlanWriter::appendProposedSubtasks(Task, list, AgentRun)` is the only seam that creates Subtasks via this path. It assigns positions after the current maximum, caps at three appended Subtasks per call (surplus discarded with a warning), and **does not** call `ApprovalService::recompute()`. The Story's revision is unchanged.
 - After a successful run, `SubtaskRunPipeline` calls `appendProposedSubtasks` and dispatches the new Subtasks via `ExecutionService::dispatchSubtaskExecution`. Newly-appended Subtasks join the same authorising approval as the run that produced them.
 - The PR body (`PrPayloadBuilder`) renders proposed subtasks under a "Proposed follow-up subtasks" section so the human reviewer sees the growth at merge time. The PR remains the diff-review surface (ADR-0001).
 

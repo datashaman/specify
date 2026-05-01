@@ -52,7 +52,7 @@ Voice and scope, very important:
 - A STORY is a product owner's framing of a unit of value — typically "as a {role}, I {want}, so that {outcome}." Acceptance criteria describe observable behaviour. Not implementation detail.
 - A TASK is the engineering contract for delivering one acceptance criterion. SUBTASKS are the engineering breakdown of a task; the executor runs one subtask at a time. The PLAN is the collective term for a story's tasks. Use generate-tasks to have the planning agent draft the task list for an Approved story (one task per AC, each with 1+ subtasks). Use set-tasks to overwrite the plan in one shot, or update-task / update-subtask for surgical edits. NEVER put schemas, class names, file paths, or migration steps in a feature or story description — that belongs in tasks/subtasks.
 
-Generating or editing the plan of an Approved story automatically resets it to PendingApproval — story approval is the only gate before execution, and humans get a chance to review the plan before it runs.
+Generating or editing the plan of an Approved story automatically resets it to PendingApproval — story approval is the only gate before execution, and humans get a chance to review the plan before it runs. Exception (ADR-0005): the executor may append follow-up subtasks to the parent Task during a running approved Subtask without resetting approval, because intent and existing subtasks are unchanged. The diff-review surface (PR) catches any unwanted growth.
 
 If a description starts drifting into "create table X with columns Y" or "add a Z service that does W", stop — that belongs in subtasks, not in the story. Rewrite the story in product-owner voice and capture the engineering breakdown via set-tasks.
 
