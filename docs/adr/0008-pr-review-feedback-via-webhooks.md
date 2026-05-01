@@ -23,10 +23,16 @@ address the comments on the same branch.
 
 ## Decision
 
-**A new GitHub webhook endpoint (`POST /webhooks/github`) listens for
-`pull_request_review` and `pull_request_review_comment` events, looks up
-the AgentRun that originated the PR, and (if the repo opted in)
-dispatches a fresh AgentRun whose `kind` is `RespondToReview`.**
+**The existing GitHub webhook endpoint (`POST /webhooks/github/{repo}`)
+grows two new handlers — `pull_request_review` and
+`pull_request_review_comment` — that look up the AgentRun that
+originated the PR and ask `ExecutionService::dispatchReviewResponse` to
+queue a fresh AgentRun whose `kind` is `RespondToReview` (subject to
+opt-in and the per-PR cycle cap). Webhook payloads are stored in the
+existing `webhook_events` table; idempotency on `X-GitHub-Delivery` is
+enforced by a unique index on `webhook_events.delivery_id`. AgentRun
+creation continues to live exclusively in `ExecutionService` (the
+controller calls a service method, not `AgentRun::create` directly).**
 
 Concrete shape:
 
@@ -50,11 +56,14 @@ Concrete shape:
     many `respond_to_review` runs may be dispatched for a single
     PR. When the cap is hit the webhook is acked but no new run
     fires; reviewers fall back to humans.
-- `github_webhook_deliveries (id, delivery_id UNIQUE, repo_id, event,
-  action, received_at)` is the idempotency table. The webhook
-  controller upserts on `delivery_id` (GitHub's `X-GitHub-Delivery`
-  header) and ignores duplicates so an at-least-once webhook
-  delivery doesn't fire twice.
+- `webhook_events.delivery_id` (nullable, unique) is the idempotency
+  column on the existing webhook-events table. Signature validation
+  runs FIRST; a request that fails signature validation persists with
+  NULL `delivery_id` so an attacker cannot occupy the unique slot for
+  a legitimate later delivery. Concurrent identical (signature-valid)
+  deliveries are de-duped via the unique index — the second insert
+  hits a constraint violation that the controller catches and converts
+  into `{duplicate: true}`. No separate idempotency table is needed.
 - A new agent `App\Ai\Agents\ReviewResponder` runs the
   `respond_to_review` AgentRun. Same tool box as `SubtaskExecutor`
   (Read/Write/Edit/Bash/Grep/Find/Ls), different prompt — the prompt
@@ -62,11 +71,27 @@ Concrete shape:
   the review comments grouped by file/line, and instructs the agent
   to produce focused fixes for each comment (or a `clarification`
   if a comment requires redesign).
-- `ReviewResponseRunPipeline` reuses `WorkspaceRunner` (prepare +
-  checkoutBranch — the workspace fix from ADR-0006's stack means
-  the branch syncs to origin). Commit message convention:
+- `RespondToPrReviewJob` is the queue job that owns one
+  `RespondToReview` run end-to-end. It reuses `WorkspaceRunner`
+  (prepare + checkoutBranch — the workspace fix from ADR-0006's
+  stack means the branch syncs to origin), pulls open review
+  comments through `ReviewCommentsFetcher`, hands off to
+  `ReviewResponder`, commits, and pushes. Commit message convention:
   `fix(review): address PR #N review`. **No PR is opened** — the
   PR is already open; the new commit lands on its head branch.
+- The job serialises against itself via a `Cache::lock` keyed by
+  repo+branch. Two `RespondToPrReviewJob`s for the same PR share
+  the on-disk story-scoped working dir; the lock guarantees one runs
+  to completion (commit + push) before the next acquires the
+  workspace, so review-burst dispatches don't race on
+  `checkoutBranch` / `commit` / `push`.
+- Cycle-cap and AgentRun creation live inside
+  `ExecutionService::dispatchReviewResponse`, wrapped in a
+  transaction with `lockForUpdate` on the `Repo` row. Two webhook
+  events arriving concurrently observe the cap atomically; one
+  dispatches, the other reports `max_cycles_reached`. The controller
+  never calls `AgentRun::create` directly — the "AgentRun creation
+  lives only in `ExecutionService`" rule is preserved.
 
 ## Consequences
 

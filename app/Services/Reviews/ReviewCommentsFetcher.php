@@ -13,12 +13,24 @@ use RuntimeException;
  *
  * GitHub-only for now — Bitbucket / GitLab can grow their own fetcher and
  * register against a multi-provider seam if/when needed.
+ *
+ * Failure model: every API call must succeed. A non-2xx response throws a
+ * `RuntimeException` with the status + body so the dispatching job marks
+ * its AgentRun failed (and the queue can decide whether to retry).
+ * Silent fallthrough would let an auth error or rate-limit hide as
+ * "no review content" and silently no-op the response loop.
  */
 class ReviewCommentsFetcher
 {
+    /** Hard ceiling on inline-comment pages so we never loop forever. */
+    private const MAX_COMMENT_PAGES = 20;
+
     /**
      * @return array{0: string, 1: list<array{path: ?string, line: ?int, body: string, author: ?string}>}
      *                                                                                                    [reviewSummaryBody, inlineComments]
+     *
+     * @throws RuntimeException When auth is missing, the URL is unparseable,
+     *                          or any GitHub API call returns non-2xx.
      */
     public function fetch(Repo $repo, int $pullRequestNumber): array
     {
@@ -39,26 +51,45 @@ class ReviewCommentsFetcher
         $reviewsResponse = Http::withHeaders($headers)->get(
             "{$apiBase}/repos/{$owner}/{$name}/pulls/{$pullRequestNumber}/reviews"
         );
-        if ($reviewsResponse->successful()) {
-            $reviews = (array) $reviewsResponse->json();
-            // Most-recent review with a non-empty body wins.
-            usort($reviews, fn ($a, $b) => strcmp((string) ($b['submitted_at'] ?? ''), (string) ($a['submitted_at'] ?? '')));
-            foreach ($reviews as $review) {
-                $body = trim((string) ($review['body'] ?? ''));
-                if ($body !== '') {
-                    $reviewSummary = $body;
-                    break;
-                }
+        if (! $reviewsResponse->successful()) {
+            throw new RuntimeException(sprintf(
+                'GitHub reviews fetch failed (%d): %s',
+                $reviewsResponse->status(),
+                $reviewsResponse->body(),
+            ));
+        }
+        $reviews = (array) $reviewsResponse->json();
+        // Most-recent review with a non-empty body wins.
+        usort($reviews, fn ($a, $b) => strcmp((string) ($b['submitted_at'] ?? ''), (string) ($a['submitted_at'] ?? '')));
+        foreach ($reviews as $review) {
+            $body = trim((string) ($review['body'] ?? ''));
+            if ($body !== '') {
+                $reviewSummary = $body;
+                break;
             }
         }
 
         $comments = [];
-        $commentsResponse = Http::withHeaders($headers)->get(
-            "{$apiBase}/repos/{$owner}/{$name}/pulls/{$pullRequestNumber}/comments",
-            ['per_page' => 100],
-        );
-        if ($commentsResponse->successful()) {
-            foreach ((array) $commentsResponse->json() as $c) {
+        $page = 1;
+        while ($page <= self::MAX_COMMENT_PAGES) {
+            $commentsResponse = Http::withHeaders($headers)->get(
+                "{$apiBase}/repos/{$owner}/{$name}/pulls/{$pullRequestNumber}/comments",
+                ['per_page' => 100, 'page' => $page],
+            );
+            if (! $commentsResponse->successful()) {
+                throw new RuntimeException(sprintf(
+                    'GitHub review comments fetch failed (page %d, %d): %s',
+                    $page,
+                    $commentsResponse->status(),
+                    $commentsResponse->body(),
+                ));
+            }
+            $batch = (array) $commentsResponse->json();
+            if ($batch === []) {
+                break;
+            }
+
+            foreach ($batch as $c) {
                 $comments[] = [
                     'path' => isset($c['path']) ? (string) $c['path'] : null,
                     'line' => isset($c['line']) ? (int) $c['line'] : (isset($c['original_line']) ? (int) $c['original_line'] : null),
@@ -66,6 +97,11 @@ class ReviewCommentsFetcher
                     'author' => isset($c['user']['login']) ? (string) $c['user']['login'] : null,
                 ];
             }
+
+            if (count($batch) < 100) {
+                break;
+            }
+            $page++;
         }
 
         return [$reviewSummary, $comments];

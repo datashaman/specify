@@ -307,6 +307,49 @@ test('approved review with no body is ignored (no spurious dispatch)', function 
     Queue::assertNothingPushed();
 });
 
+test('replayed delivery_id from an UNAUTHENTICATED caller does not poison the unique slot', function () {
+    Queue::fake();
+    $ws = Workspace::factory()->create();
+    $repo = Repo::factory()->for($ws)->create([
+        'provider' => RepoProvider::Github,
+        'webhook_secret' => 's3cret',
+        'review_response_enabled' => true,
+    ]);
+    reviewSubtaskRun($repo, 17);
+
+    // Attacker first: bad signature, but supplies a delivery_id.
+    test()->call(
+        method: 'POST',
+        uri: route('webhooks.github', $repo),
+        server: [
+            'CONTENT_TYPE' => 'application/json',
+            'HTTP_X_GITHUB_EVENT' => 'pull_request_review',
+            'HTTP_X_HUB_SIGNATURE_256' => 'sha256=bogus',
+            'HTTP_X_GITHUB_DELIVERY' => 'delivery-poison-1',
+        ],
+        content: json_encode(reviewPayload(17)),
+    )->assertStatus(401);
+
+    // Legitimate webhook arrives with the same delivery_id and a valid signature.
+    $body = json_encode(reviewPayload(17));
+    $sig = 'sha256='.hash_hmac('sha256', $body, 's3cret');
+    test()->call(
+        method: 'POST',
+        uri: route('webhooks.github', $repo),
+        server: [
+            'CONTENT_TYPE' => 'application/json',
+            'HTTP_X_GITHUB_EVENT' => 'pull_request_review',
+            'HTTP_X_HUB_SIGNATURE_256' => $sig,
+            'HTTP_X_GITHUB_DELIVERY' => 'delivery-poison-1',
+        ],
+        content: $body,
+    )->assertOk()->assertJson(['matched' => true, 'dispatched' => true]);
+
+    // The invalid attempt must NOT have occupied delivery_id; the valid request lands.
+    expect(WebhookEvent::where('delivery_id', 'delivery-poison-1')->where('signature_valid', true)->count())->toBe(1);
+    expect(WebhookEvent::where('delivery_id', 'delivery-poison-1')->where('signature_valid', false)->count())->toBe(0);
+});
+
 test('cascade gate ignores RespondToReview kind runs (ADR-0008)', function () {
     $ws = Workspace::factory()->create();
     $repo = Repo::factory()->for($ws)->create(['provider' => RepoProvider::Github]);

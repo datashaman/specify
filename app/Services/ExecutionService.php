@@ -8,6 +8,7 @@ use App\Enums\StoryStatus;
 use App\Enums\TaskStatus;
 use App\Jobs\ExecuteSubtaskJob;
 use App\Jobs\GenerateTasksJob;
+use App\Jobs\RespondToPrReviewJob;
 use App\Models\AgentRun;
 use App\Models\Repo;
 use App\Models\Story;
@@ -85,6 +86,60 @@ class ExecutionService
         }
 
         return $first;
+    }
+
+    /**
+     * Create a `RespondToReview` AgentRun for the given originating Execute
+     * run (if the repo opted in and the per-PR cycle cap isn't hit), queue
+     * the matching `RespondToPrReviewJob`, and return a result describing
+     * what happened (ADR-0008). All decisions happen inside a transaction
+     * with `lockForUpdate` on the Repo row so two webhook events arriving
+     * concurrently can't both observe under-cap and double-dispatch.
+     *
+     * Possible result `status` values:
+     *   - 'dispatched' — new run + job queued
+     *   - 'review_response_disabled' — repo flag is off
+     *   - 'max_cycles_reached' — count of existing RespondToReview runs ≥ cap
+     *
+     * @return array{status: string, run?: AgentRun, cycle?: int, cycles?: int}
+     */
+    public function dispatchReviewResponse(Repo $repo, AgentRun $originRun, int $pullRequestNumber): array
+    {
+        return DB::transaction(function () use ($repo, $originRun, $pullRequestNumber) {
+            $repo = Repo::query()->whereKey($repo->getKey())->lockForUpdate()->first() ?? $repo;
+
+            if (! $repo->review_response_enabled) {
+                return ['status' => 'review_response_disabled'];
+            }
+
+            $cycles = AgentRun::query()
+                ->where('repo_id', $repo->getKey())
+                ->where('kind', AgentRunKind::RespondToReview->value)
+                ->whereJsonContains('output->pull_request_number', $pullRequestNumber)
+                ->count();
+
+            if ($cycles >= ($repo->max_review_response_cycles ?? 3)) {
+                return ['status' => 'max_cycles_reached', 'cycles' => $cycles];
+            }
+
+            $run = AgentRun::create([
+                'runnable_type' => $originRun->runnable_type,
+                'runnable_id' => $originRun->runnable_id,
+                'repo_id' => $repo->getKey(),
+                'working_branch' => $originRun->working_branch,
+                'executor_driver' => $originRun->executor_driver,
+                'kind' => AgentRunKind::RespondToReview->value,
+                'status' => AgentRunStatus::Queued->value,
+                'output' => [
+                    'pull_request_number' => $pullRequestNumber,
+                    'origin_run_id' => $originRun->getKey(),
+                ],
+            ]);
+
+            RespondToPrReviewJob::dispatch($run->getKey());
+
+            return ['status' => 'dispatched', 'run' => $run, 'cycle' => $cycles + 1];
+        });
     }
 
     private function createAndDispatchRun(Subtask $subtask, ?StoryApproval $approval, ?Repo $repo, string $driver, ?string $branchSuffix): AgentRun

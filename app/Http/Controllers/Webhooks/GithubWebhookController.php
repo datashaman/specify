@@ -3,12 +3,12 @@
 namespace App\Http\Controllers\Webhooks;
 
 use App\Enums\AgentRunKind;
-use App\Enums\AgentRunStatus;
 use App\Http\Controllers\Controller;
-use App\Jobs\RespondToPrReviewJob;
 use App\Models\AgentRun;
 use App\Models\Repo;
 use App\Models\WebhookEvent;
+use App\Services\ExecutionService;
+use Illuminate\Database\QueryException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -19,15 +19,24 @@ use Illuminate\Http\Request;
  *   - `pull_request` — stamp lifecycle state (opened/closed/merged) onto the
  *     originating AgentRun's `output`.
  *   - `pull_request_review` / `pull_request_review_comment` — when the repo
- *     opted into automatic review responses, dispatch a `RespondToPrReviewJob`
- *     that creates a new `RespondToReview` AgentRun and pushes a fix on the
- *     originating Subtask's branch (ADR-0008).
+ *     opted into automatic review responses, ask `ExecutionService` to
+ *     dispatch a RespondToReview run that pushes a fix on the originating
+ *     Subtask's branch (ADR-0008). All AgentRun creation / cycle-cap /
+ *     race-safety lives in `ExecutionService::dispatchReviewResponse`.
  *
- * Idempotency is enforced via the `webhook_events.delivery_id` unique index:
- * a duplicate `X-GitHub-Delivery` is acked once and ignored on retry.
+ * Order of operations: signature validation runs FIRST. Idempotency on
+ * `X-GitHub-Delivery` only applies to signature-valid requests, so an
+ * unauthenticated caller cannot pre-poison or replay a delivery_id.
+ *
+ * Concurrent identical deliveries are de-duped via the
+ * `webhook_events.delivery_id` unique index — the first request lands the
+ * row; the second hits a unique-constraint violation that we catch and
+ * convert into a `{duplicate: true}` response.
  */
 class GithubWebhookController extends Controller
 {
+    public function __construct(public ExecutionService $execution) {}
+
     public function __invoke(Request $request, Repo $repo): JsonResponse
     {
         $secret = $repo->webhook_secret;
@@ -40,25 +49,43 @@ class GithubWebhookController extends Controller
         $payload = $request->json()->all();
         $action = $payload['action'] ?? null;
 
-        if ($deliveryId !== null) {
-            $existing = WebhookEvent::where('delivery_id', $deliveryId)->first();
-            if ($existing !== null) {
-                return response()->json(['duplicate' => true, 'event_id' => $existing->getKey()]);
-            }
+        if (! $signatureValid) {
+            // Persist invalid-signature attempts for audit, but with a NULL
+            // delivery_id so an attacker cannot occupy the unique slot for a
+            // legitimate later delivery with the same X-GitHub-Delivery.
+            WebhookEvent::create([
+                'repo_id' => $repo->getKey(),
+                'provider' => 'github',
+                'event' => $event,
+                'action' => $action,
+                'delivery_id' => null,
+                'signature_valid' => false,
+                'payload' => $payload,
+            ]);
+
+            return response()->json(['error' => 'invalid signature'], 401);
         }
 
-        $log = WebhookEvent::create([
-            'repo_id' => $repo->getKey(),
-            'provider' => 'github',
-            'event' => $event,
-            'action' => $action,
-            'delivery_id' => $deliveryId,
-            'signature_valid' => $signatureValid,
-            'payload' => $payload,
-        ]);
+        try {
+            $log = WebhookEvent::create([
+                'repo_id' => $repo->getKey(),
+                'provider' => 'github',
+                'event' => $event,
+                'action' => $action,
+                'delivery_id' => $deliveryId,
+                'signature_valid' => true,
+                'payload' => $payload,
+            ]);
+        } catch (QueryException $e) {
+            // Race / retry: the unique index on delivery_id rejected this
+            // insert because a sibling request just landed the same delivery.
+            if ($deliveryId !== null && $this->isUniqueConstraintViolation($e)) {
+                $existing = WebhookEvent::where('delivery_id', $deliveryId)->first();
 
-        if (! $signatureValid) {
-            return response()->json(['error' => 'invalid signature'], 401);
+                return response()->json(['duplicate' => true, 'event_id' => $existing?->getKey()]);
+            }
+
+            throw $e;
         }
 
         return match ($event) {
@@ -128,51 +155,34 @@ class GithubWebhookController extends Controller
             return response()->json(['ignored' => true]);
         }
 
-        $run = $this->originatingRun($repo, (int) $number);
-        if ($run === null) {
+        $origin = $this->originatingRun($repo, (int) $number);
+        if ($origin === null) {
             return response()->json(['matched' => false]);
         }
 
-        $log->forceFill(['matched_run_id' => $run->getKey()])->save();
+        $log->forceFill(['matched_run_id' => $origin->getKey()])->save();
 
-        if (! $repo->review_response_enabled) {
-            return response()->json(['matched' => true, 'dispatched' => false, 'reason' => 'review_response_disabled']);
-        }
+        $result = $this->execution->dispatchReviewResponse($repo, $origin, (int) $number);
 
-        $cycles = AgentRun::query()
-            ->where('repo_id', $repo->getKey())
-            ->where('kind', AgentRunKind::RespondToReview->value)
-            ->whereJsonContains('output->pull_request_number', (int) $number)
-            ->count();
-
-        if ($cycles >= ($repo->max_review_response_cycles ?? 3)) {
-            return response()->json([
+        return match ($result['status']) {
+            'dispatched' => response()->json([
+                'matched' => true,
+                'dispatched' => true,
+                'run_id' => $result['run']->getKey(),
+                'cycle' => $result['cycle'],
+            ]),
+            'review_response_disabled' => response()->json([
+                'matched' => true,
+                'dispatched' => false,
+                'reason' => 'review_response_disabled',
+            ]),
+            'max_cycles_reached' => response()->json([
                 'matched' => true,
                 'dispatched' => false,
                 'reason' => 'max_cycles_reached',
-                'cycles' => $cycles,
-            ]);
-        }
-
-        $newRun = AgentRun::create([
-            'runnable_type' => $run->runnable_type,
-            'runnable_id' => $run->runnable_id,
-            'repo_id' => $repo->getKey(),
-            'working_branch' => $run->working_branch,
-            'executor_driver' => $run->executor_driver,
-            'kind' => AgentRunKind::RespondToReview->value,
-            'status' => AgentRunStatus::Queued->value,
-            'output' => ['pull_request_number' => (int) $number, 'origin_run_id' => $run->getKey()],
-        ]);
-
-        RespondToPrReviewJob::dispatch($newRun->getKey());
-
-        return response()->json([
-            'matched' => true,
-            'dispatched' => true,
-            'run_id' => $newRun->getKey(),
-            'cycle' => $cycles + 1,
-        ]);
+                'cycles' => $result['cycles'],
+            ]),
+        };
     }
 
     private function originatingRun(Repo $repo, int $number): ?AgentRun
@@ -194,5 +204,25 @@ class GithubWebhookController extends Controller
         $expected = 'sha256='.hash_hmac('sha256', $body, $secret);
 
         return hash_equals($expected, $header);
+    }
+
+    /**
+     * SQLite/MySQL/Postgres all surface unique-constraint violations slightly
+     * differently — match on the SQLSTATE code (23000 / 23505) and on the
+     * driver-specific message hint. Any of these signals is enough to treat
+     * the failure as a benign duplicate-delivery race.
+     */
+    private function isUniqueConstraintViolation(QueryException $e): bool
+    {
+        $code = (string) $e->getCode();
+        if (in_array($code, ['23000', '23505'], true)) {
+            return true;
+        }
+
+        $message = $e->getMessage();
+
+        return str_contains($message, 'UNIQUE constraint failed')
+            || str_contains($message, 'Duplicate entry')
+            || str_contains($message, 'duplicate key value');
     }
 }
