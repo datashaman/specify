@@ -6,6 +6,7 @@ use App\Models\AgentRun;
 use App\Models\Repo;
 use App\Models\Subtask;
 use App\Services\Executors\Executor;
+use App\Services\PullRequests\PrPayloadBuilder;
 use Illuminate\Support\Facades\Log;
 use RuntimeException;
 use Throwable;
@@ -140,8 +141,8 @@ class SubtaskRunPipeline
                 repo: $repo,
                 head: $branch,
                 base: $repo->default_branch,
-                title: 'Specify: '.$subtask->name,
-                body: trim((string) ($output['summary'] ?? '')),
+                title: PrPayloadBuilder::title($subtask),
+                body: PrPayloadBuilder::body($subtask, $output),
             );
 
             return [

@@ -56,13 +56,61 @@ class CliExecutor implements Executor
         }
 
         $stdout = $process->getOutput();
+        $stderr = $process->getErrorOutput();
         $files = $this->changedFiles($workingDir);
 
         return new ExecutionResult(
-            summary: trim($stdout),
+            summary: $this->buildSummary($stdout),
             filesChanged: $files,
             commitMessage: $this->commitMessageFor($subtask),
+            executorLog: $this->buildExecutorLog($stdout, $stderr),
         );
+    }
+
+    /**
+     * Reduce the CLI's stdout to the trailing chunk a reviewer cares about.
+     *
+     * Agent CLIs typically print streaming progress and end with a final
+     * summary; we keep the tail (≤ 4 KB at a newline boundary) so the value
+     * embedded in PR bodies stays bounded. The full transcript lives on
+     * `executor_log`.
+     */
+    private function buildSummary(string $stdout): string
+    {
+        $trimmed = trim($stdout);
+        $limit = 4_096;
+        if (strlen($trimmed) <= $limit) {
+            return $trimmed;
+        }
+
+        $tail = substr($trimmed, -$limit);
+        $nl = strpos($tail, "\n");
+        if ($nl !== false && $nl < $limit - 64) {
+            $tail = substr($tail, $nl + 1);
+        }
+
+        return $tail;
+    }
+
+    /**
+     * Capture the agent's full transcript so debugging a run does not require
+     * re-running the model. Truncates at 64 KB to keep AgentRun.output bounded.
+     */
+    private function buildExecutorLog(string $stdout, string $stderr): ?string
+    {
+        $combined = trim($stdout);
+        $stderr = trim($stderr);
+        if ($stderr !== '') {
+            $combined .= ($combined === '' ? '' : "\n\n").'--- stderr ---'."\n".$stderr;
+        }
+        if ($combined === '') {
+            return null;
+        }
+        if (strlen($combined) > 65_536) {
+            $combined = substr($combined, 0, 65_536)."\n[truncated]";
+        }
+
+        return $combined;
     }
 
     private function buildPrompt(Subtask $subtask, ?Repo $repo, ?string $workingBranch): string

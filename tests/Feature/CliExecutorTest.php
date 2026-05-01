@@ -67,6 +67,73 @@ test('CliExecutor refuses to run when no working directory is provided', functio
         ->toThrow(RuntimeException::class, 'working directory');
 });
 
+test('CliExecutor records the full transcript on executor_log including stderr', function () {
+    $bin = fakeAgentBinary(<<<'BASH'
+        cat > /dev/null
+        echo "step 1: read files"
+        echo "step 2: edit files"
+        echo "warning: skipping mock" >&2
+        echo "done"
+    BASH);
+
+    $workingDir = sys_get_temp_dir().'/specify-cwd-'.uniqid();
+    File::ensureDirectoryExists($workingDir);
+    new Process(['git', '-c', 'init.defaultBranch=main', 'init'], $workingDir)->mustRun();
+    new Process(['git', '-c', 'user.email=t@t', '-c', 'user.name=t', 'commit', '--allow-empty', '-m', 'init'], $workingDir)->mustRun();
+
+    $subtask = Subtask::factory()->create(['name' => 'log test']);
+    $output = (new CliExecutor([$bin]))->execute($subtask, $workingDir, repo: null, workingBranch: null);
+
+    expect($output->executorLog)
+        ->toContain('step 1: read files')
+        ->toContain('step 2: edit files')
+        ->toContain('done')
+        ->toContain('--- stderr ---')
+        ->toContain('warning: skipping mock');
+
+    expect($output->toArray())->toHaveKey('executor_log');
+});
+
+test('CliExecutor clamps the summary to the trailing chunk to keep PR bodies bounded', function () {
+    $bin = fakeAgentBinary(<<<'BASH'
+        cat > /dev/null
+        for i in $(seq 1 1000); do echo "verbose line $i with extra padding to push past the limit"; done
+        echo "FINAL: agent ran successfully"
+    BASH);
+
+    $workingDir = sys_get_temp_dir().'/specify-cwd-'.uniqid();
+    File::ensureDirectoryExists($workingDir);
+    new Process(['git', '-c', 'init.defaultBranch=main', 'init'], $workingDir)->mustRun();
+    new Process(['git', '-c', 'user.email=t@t', '-c', 'user.name=t', 'commit', '--allow-empty', '-m', 'init'], $workingDir)->mustRun();
+
+    $subtask = Subtask::factory()->create(['name' => 'verbose run']);
+    $output = (new CliExecutor([$bin]))->execute($subtask, $workingDir, repo: null, workingBranch: null);
+
+    expect(strlen($output->summary))->toBeLessThanOrEqual(4_096)
+        ->and($output->summary)->toContain('FINAL: agent ran successfully');
+
+    expect(strlen((string) $output->executorLog))->toBeGreaterThan(strlen($output->summary));
+});
+
+test('CliExecutor truncates executor_log at 64 KB', function () {
+    $bin = fakeAgentBinary(<<<'BASH'
+        cat > /dev/null
+        for i in $(seq 1 50000); do echo "line $i ----------------------------------------"; done
+        echo "tail"
+    BASH);
+
+    $workingDir = sys_get_temp_dir().'/specify-cwd-'.uniqid();
+    File::ensureDirectoryExists($workingDir);
+    new Process(['git', '-c', 'init.defaultBranch=main', 'init'], $workingDir)->mustRun();
+    new Process(['git', '-c', 'user.email=t@t', '-c', 'user.name=t', 'commit', '--allow-empty', '-m', 'init'], $workingDir)->mustRun();
+
+    $subtask = Subtask::factory()->create(['name' => 'huge run']);
+    $output = (new CliExecutor([$bin]))->execute($subtask, $workingDir, repo: null, workingBranch: null);
+
+    expect(strlen((string) $output->executorLog))->toBeLessThanOrEqual(65_536 + 32)
+        ->and($output->executorLog)->toContain('[truncated]');
+});
+
 test('CliExecutor surfaces non-zero exit codes as exceptions', function () {
     $bin = fakeAgentBinary(<<<'BASH'
         echo "boom" >&2
