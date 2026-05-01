@@ -57,12 +57,14 @@ new #[Title('Project context')] class extends Component {
                 errorMessage: {{ \Illuminate\Support\Js::from(__('Context items could not be loaded.')) }},
                 createErrorMessage: {{ \Illuminate\Support\Js::from(__('Context item could not be added.')) }},
                 updateErrorMessage: {{ \Illuminate\Support\Js::from(__('Context item could not be updated.')) }},
+                deleteErrorMessage: {{ \Illuminate\Support\Js::from(__('Context item could not be deleted.')) }},
                 defaultType: {{ \Illuminate\Support\Js::from(__('Context')) }},
                 contextItems: Array(),
                 error: null,
                 loading: true,
                 saving: false,
                 updating: false,
+                deleting: false,
                 form: {
                     type: 'file',
                     title: '',
@@ -75,10 +77,15 @@ new #[Title('Project context')] class extends Component {
                     title: '',
                     description: '',
                 },
+                deleteForm: {
+                    id: null,
+                    title: '',
+                },
                 fieldErrors: {},
                 editFieldErrors: {},
                 createError: null,
                 editError: null,
+                deleteError: null,
                 async load() {
                     this.loading = true;
                     this.error = null;
@@ -190,6 +197,14 @@ new #[Title('Project context')] class extends Component {
                     this.editError = null;
                     this.$flux.modal('edit-context-item-modal').show();
                 },
+                openDelete(contextItem) {
+                    this.deleteForm = {
+                        id: contextItem.id,
+                        title: contextItem.title || '',
+                    };
+                    this.deleteError = null;
+                    this.$flux.modal('delete-context-item-modal').show();
+                },
                 resetEditForm() {
                     this.editForm = {
                         id: null,
@@ -198,6 +213,13 @@ new #[Title('Project context')] class extends Component {
                     };
                     this.editFieldErrors = {};
                     this.editError = null;
+                },
+                resetDeleteForm() {
+                    this.deleteForm = {
+                        id: null,
+                        title: '',
+                    };
+                    this.deleteError = null;
                 },
                 async update() {
                     if (! this.editForm.id) {
@@ -248,6 +270,42 @@ new #[Title('Project context')] class extends Component {
                         this.editError = error.message || this.updateErrorMessage;
                     } finally {
                         this.updating = false;
+                    }
+                },
+                async destroy() {
+                    if (! this.deleteForm.id) {
+                        return;
+                    }
+
+                    this.deleting = true;
+                    this.deleteError = null;
+
+                    try {
+                        const response = await fetch(this.updateEndpoint(this.deleteForm.id), {
+                            method: 'DELETE',
+                            headers: {
+                                Accept: 'application/json',
+                                'X-CSRF-TOKEN': this.csrfToken,
+                            },
+                            credentials: 'same-origin',
+                        });
+
+                        if (! response.ok) {
+                            throw new Error(`${this.deleteErrorMessage} (${response.status})`);
+                        }
+
+                        const deletedContextItemId = this.deleteForm.id;
+
+                        this.contextItems = this.contextItems.filter((contextItem) => (
+                            contextItem.id !== deletedContextItemId
+                        ));
+
+                        this.$flux.modal('delete-context-item-modal').close();
+                        this.resetDeleteForm();
+                    } catch (error) {
+                        this.deleteError = error.message || this.deleteErrorMessage;
+                    } finally {
+                        this.deleting = false;
                     }
                 },
                 formatType(type) {
@@ -396,6 +454,41 @@ new #[Title('Project context')] class extends Component {
                 </form>
             </flux:modal>
 
+            <flux:modal name="delete-context-item-modal" class="min-w-[22rem]">
+                <form class="flex flex-col gap-5" x-on:submit.prevent="destroy()">
+                    <div class="flex flex-col gap-1">
+                        <flux:heading>{{ __('Delete context item?') }}</flux:heading>
+                        <flux:text class="text-sm text-zinc-500">
+                            {{ __('This will remove the item from this project context.') }}
+                        </flux:text>
+                    </div>
+
+                    <div class="rounded border border-zinc-200 bg-zinc-50 px-3 py-2 dark:border-zinc-700 dark:bg-zinc-900">
+                        <flux:text class="text-sm font-medium text-zinc-900 dark:text-zinc-100" x-text="deleteForm.title"></flux:text>
+                    </div>
+
+                    <template x-if="deleteError">
+                        <flux:callout variant="danger" icon="exclamation-triangle">
+                            <flux:callout.heading>{{ __('Unable to delete context item') }}</flux:callout.heading>
+                            <flux:callout.text x-text="deleteError"></flux:callout.text>
+                        </flux:callout>
+                    </template>
+
+                    <div class="flex justify-end gap-2">
+                        <flux:modal.close>
+                            <flux:button type="button" variant="ghost" x-on:click="resetDeleteForm()">
+                                {{ __('Cancel') }}
+                            </flux:button>
+                        </flux:modal.close>
+
+                        <flux:button type="submit" variant="danger" x-bind:disabled="deleting">
+                            <span x-show="! deleting">{{ __('Delete item') }}</span>
+                            <span x-show="deleting">{{ __('Deleting...') }}</span>
+                        </flux:button>
+                    </div>
+                </form>
+            </flux:modal>
+
             <template x-if="loading">
                 <div class="flex flex-col gap-3" aria-live="polite">
                     <flux:card>
@@ -443,6 +536,14 @@ new #[Title('Project context')] class extends Component {
                                         x-on:click="openEdit(contextItem)"
                                     >
                                         {{ __('Edit') }}
+                                    </flux:button>
+                                    <flux:button
+                                        size="sm"
+                                        variant="danger"
+                                        icon="trash"
+                                        x-on:click="openDelete(contextItem)"
+                                    >
+                                        {{ __('Delete') }}
                                     </flux:button>
                                     <flux:text class="ml-auto text-xs text-zinc-500" x-text="`#${contextItem.id}`"></flux:text>
                                 </div>
