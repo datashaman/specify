@@ -81,4 +81,24 @@ return [
             'timeout' => (int) env('SPECIFY_CLI_TIMEOUT', 1800),
         ],
     ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Context builder
+    |--------------------------------------------------------------------------
+    |
+    | Per-subtask context brief prepended to the executor prompt. "recency"
+    | (default) emits a small markdown block with files mentioned in the
+    | Subtask description, recent commits touching them, and prior failed
+    | runs on the same Subtask. "null" disables the brief entirely.
+    |
+    */
+
+    'context' => [
+        'builder' => env('SPECIFY_CONTEXT_BUILDER', 'recency'),
+        'recency' => [
+            'window' => env('SPECIFY_CONTEXT_WINDOW', '30.days'),
+            'max_files' => (int) env('SPECIFY_CONTEXT_MAX_FILES', 10),
+        ],
+    ],
 ];

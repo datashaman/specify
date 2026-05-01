@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\AgentRun;
 use App\Models\Repo;
 use App\Models\Subtask;
+use App\Services\Context\ContextBuilder;
 use App\Services\Executors\Executor;
 use App\Services\Executors\ProposedSubtask;
 use App\Services\PullRequests\PrPayloadBuilder;
@@ -28,6 +29,7 @@ class SubtaskRunPipeline
         public Executor $executor,
         public WorkspaceRunner $workspace,
         public PlanWriter $planWriter,
+        public ContextBuilder $contextBuilder,
     ) {}
 
     /**
@@ -65,8 +67,18 @@ class SubtaskRunPipeline
             Log::info('specify.subtask.workspace.ready', $logCtx + ['working_dir' => $workingDir]);
         }
 
-        $result = $this->executor->execute($subtask, $workingDir, $repo, $agentRun->working_branch);
+        $contextBrief = $this->contextBuilder->build($subtask, $workingDir, $repo);
+        if ($contextBrief !== '') {
+            Log::info('specify.subtask.context_brief.built', $logCtx + [
+                'bytes' => strlen($contextBrief),
+            ]);
+        }
+
+        $result = $this->executor->execute($subtask, $workingDir, $repo, $agentRun->working_branch, $contextBrief !== '' ? $contextBrief : null);
         $output = $result->toArray();
+        if ($contextBrief !== '') {
+            $output['context_brief'] = $contextBrief;
+        }
 
         if ($workingDir === null) {
             $diff = $result->filesChanged === [] ? null : implode("\n", $result->filesChanged);

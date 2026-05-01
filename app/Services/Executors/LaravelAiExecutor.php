@@ -32,7 +32,7 @@ class LaravelAiExecutor implements Executor
      *                          or when the agent terminates without producing
      *                          summary/files/commit-message fields.
      */
-    public function execute(Subtask $subtask, ?string $workingDir, ?Repo $repo, ?string $workingBranch): ExecutionResult
+    public function execute(Subtask $subtask, ?string $workingDir, ?Repo $repo, ?string $workingBranch, ?string $contextBrief = null): ExecutionResult
     {
         $context = [
             'subtask_id' => $subtask->getKey(),
@@ -47,9 +47,13 @@ class LaravelAiExecutor implements Executor
         $start = microtime(true);
 
         $agent = new SubtaskExecutor($subtask, $repo, $workingBranch, $workingDir);
+        $prompt = $agent->buildPrompt();
+        if ($contextBrief !== null && $contextBrief !== '') {
+            $prompt = $contextBrief."\n\n".$prompt;
+        }
 
         try {
-            $response = $agent->prompt($agent->buildPrompt());
+            $response = $agent->prompt($prompt);
         } catch (RequestException $e) {
             $status = $e->response?->status();
             $body = $e->response?->body();

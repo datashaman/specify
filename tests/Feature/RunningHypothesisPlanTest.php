@@ -9,6 +9,7 @@ use App\Models\Repo;
 use App\Models\Story;
 use App\Models\Subtask;
 use App\Models\Task;
+use App\Services\Context\NullContextBuilder;
 use App\Services\Executors\ExecutionResult;
 use App\Services\Executors\Executor;
 use App\Services\Executors\ExecutorClarification;
@@ -151,7 +152,7 @@ test('SubtaskRunPipeline does NOT append proposed subtasks when the run ends in 
             return true;
         }
 
-        public function execute(Subtask $subtask, ?string $workingDir, ?Repo $repo, ?string $workingBranch): ExecutionResult
+        public function execute(Subtask $subtask, ?string $workingDir, ?Repo $repo, ?string $workingBranch, ?string $contextBrief = null): ExecutionResult
         {
             return new ExecutionResult(
                 summary: 'I tried but produced no diff',
@@ -186,7 +187,7 @@ test('SubtaskRunPipeline does NOT append proposed subtasks when the run ends in 
         }
     };
 
-    $pipeline = new SubtaskRunPipeline($executor, $workspace, app(PlanWriter::class));
+    $pipeline = new SubtaskRunPipeline($executor, $workspace, app(PlanWriter::class), new NullContextBuilder);
 
     $beforeCount = $task->subtasks()->count();
     $outcome = $pipeline->run($run);

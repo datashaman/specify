@@ -32,13 +32,16 @@ class CliExecutor implements Executor
      *
      * @throws RuntimeException When `$workingDir` is null or the CLI exits non-zero.
      */
-    public function execute(Subtask $subtask, ?string $workingDir, ?Repo $repo, ?string $workingBranch): ExecutionResult
+    public function execute(Subtask $subtask, ?string $workingDir, ?Repo $repo, ?string $workingBranch, ?string $contextBrief = null): ExecutionResult
     {
         if ($workingDir === null) {
             throw new RuntimeException('CliExecutor requires a working directory.');
         }
 
         $prompt = $this->buildPrompt($subtask, $repo, $workingBranch);
+        if ($contextBrief !== null && $contextBrief !== '') {
+            $prompt = $contextBrief."\n\n".$prompt;
+        }
 
         $process = new Process($this->command, $workingDir);
         $process->setTimeout($this->timeout);

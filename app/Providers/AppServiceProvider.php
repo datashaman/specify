@@ -2,6 +2,9 @@
 
 namespace App\Providers;
 
+use App\Services\Context\ContextBuilder;
+use App\Services\Context\NullContextBuilder;
+use App\Services\Context\RecencyContextBuilder;
 use App\Services\Executors\CliExecutor;
 use App\Services\Executors\Executor;
 use App\Services\Executors\FakeExecutor;
@@ -30,6 +33,19 @@ class AppServiceProvider extends ServiceProvider
         $this->app->singleton(PromptLoader::class, fn () => new PromptLoader(base_path('prompts')));
 
         $this->app->singleton(WorkspaceRunner::class, fn () => WorkspaceRunner::fromConfig());
+
+        $this->app->bind(ContextBuilder::class, function () {
+            $driver = config('specify.context.builder', 'recency');
+
+            return match ($driver) {
+                'recency' => new RecencyContextBuilder(
+                    window: (string) config('specify.context.recency.window', '30.days'),
+                    maxFiles: (int) config('specify.context.recency.max_files', 10),
+                ),
+                'null', null, '' => new NullContextBuilder,
+                default => throw new InvalidArgumentException("Unknown context builder [{$driver}]."),
+            };
+        });
 
         $this->app->bind(Executor::class, function ($app) {
             $driver = config('specify.executor.driver', 'laravel-ai');
