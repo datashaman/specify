@@ -38,6 +38,8 @@ new #[Title('Project context')] class extends Component {
     @if (! $this->project)
         <flux:text class="text-zinc-500">{{ __('Project not found.') }}</flux:text>
     @else
+        @php($canManage = $this->canManage)
+
         <div class="flex flex-col gap-3">
             <flux:breadcrumbs>
                 <flux:breadcrumbs.item :href="route('projects.show', $this->project)" wire:navigate>
@@ -64,7 +66,7 @@ new #[Title('Project context')] class extends Component {
                 updateErrorMessage: {{ \Illuminate\Support\Js::from(__('Context item could not be updated.')) }},
                 deleteErrorMessage: {{ \Illuminate\Support\Js::from(__('Context item could not be deleted.')) }},
                 defaultType: {{ \Illuminate\Support\Js::from(__('Context')) }},
-                canManage: {{ \Illuminate\Support\Js::from($this->canManage) }},
+                canManage: {{ \Illuminate\Support\Js::from($canManage) }},
                 contextItems: Array(),
                 error: null,
                 loading: true,
@@ -337,7 +339,7 @@ new #[Title('Project context')] class extends Component {
             }"
             x-init="load()"
         >
-            @if ($this->canManage)
+            @if ($canManage)
                 <div class="flex justify-end">
                     <flux:modal.trigger name="add-context-item-modal">
                         <flux:button variant="primary" icon="plus">
@@ -347,7 +349,7 @@ new #[Title('Project context')] class extends Component {
                 </div>
             @endif
 
-            @if ($this->canManage)
+            @if ($canManage)
                 <flux:modal name="add-context-item-modal" class="md:w-[34rem]">
                     <form class="flex flex-col gap-5" x-on:submit.prevent="create()">
                     <div class="flex flex-col gap-1">
@@ -422,7 +424,7 @@ new #[Title('Project context')] class extends Component {
                 </flux:modal>
             @endif
 
-            @if ($this->canManage)
+            @if ($canManage)
                 <flux:modal name="edit-context-item-modal" class="md:w-[34rem]">
                     <form class="flex flex-col gap-5" x-on:submit.prevent="update()">
                     <div class="flex flex-col gap-1">
@@ -467,7 +469,7 @@ new #[Title('Project context')] class extends Component {
                 </flux:modal>
             @endif
 
-            @if ($this->canManage)
+            @if ($canManage)
                 <flux:modal name="delete-context-item-modal" class="min-w-[22rem]">
                     <form class="flex flex-col gap-5" x-on:submit.prevent="destroy()">
                     <div class="flex flex-col gap-1">
@@ -544,7 +546,7 @@ new #[Title('Project context')] class extends Component {
                             <div class="flex flex-col gap-4">
                                 <div class="flex flex-wrap items-center gap-2">
                                     <flux:badge variant="solid" x-text="formatType(contextItem.type)"></flux:badge>
-                                    @if ($this->canManage)
+                                    @if ($canManage)
                                         <flux:button
                                             size="sm"
                                             variant="ghost"

@@ -109,7 +109,9 @@ test('member can open the project context screen without management controls', f
         ->assertSuccessful()
         ->assertSee('Project context')
         ->assertSee('context-items')
-        ->assertDontSee('Add context item');
+        ->assertDontSee('Add context item')
+        ->assertDontSee('Edit context item')
+        ->assertDontSee('Delete context item?');
 
     $this->getJson(route('projects.context-items.index', $project))
         ->assertSuccessful()
