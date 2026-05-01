@@ -43,20 +43,25 @@ class SubtaskRunPipeline
      *                          when the executor needs a working directory but
      *                          no repo is bound to the run.
      */
-    public function run(AgentRun $agentRun): SubtaskRunOutcome
+    public function run(AgentRun $agentRun, ?Executor $override = null): SubtaskRunOutcome
     {
         $subtask = $agentRun->runnable;
         if (! $subtask instanceof Subtask) {
             throw new RuntimeException('Subtask for AgentRun not found.');
         }
 
+        $executor = $override ?? $this->executor;
+
         $logCtx = $this->logContext($agentRun, $subtask);
-        Log::info('specify.subtask.run.starting', $logCtx + ['subtask_name' => $subtask->name]);
+        Log::info('specify.subtask.run.starting', $logCtx + [
+            'subtask_name' => $subtask->name,
+            'executor_driver' => $agentRun->executor_driver,
+        ]);
 
         $repo = $agentRun->repo;
         $workingDir = null;
 
-        if ($this->executor->needsWorkingDirectory()) {
+        if ($executor->needsWorkingDirectory()) {
             if ($repo === null) {
                 throw new RuntimeException('Executor requires a repo, but none is bound to this AgentRun.');
             }
@@ -81,7 +86,7 @@ class SubtaskRunPipeline
             ])->save();
         }
 
-        $result = $this->executor->execute($subtask, $workingDir, $repo, $agentRun->working_branch, $contextBrief !== '' ? $contextBrief : null);
+        $result = $executor->execute($subtask, $workingDir, $repo, $agentRun->working_branch, $contextBrief !== '' ? $contextBrief : null);
         $output = $result->toArray();
         if ($contextBrief !== '') {
             $output['context_brief'] = $contextBrief;
@@ -125,7 +130,7 @@ class SubtaskRunPipeline
             Log::info('specify.subtask.push', $logCtx);
 
             if (config('specify.workspace.open_pr_after_push', true) && $repo !== null) {
-                $prResult = $this->openPullRequest($repo, $subtask, $branch, $output);
+                $prResult = $this->openPullRequest($repo, $subtask, $branch, $output, $agentRun->executor_driver);
                 $output = array_merge($output, $prResult);
 
                 if (isset($prResult['pull_request_error'])) {
@@ -133,6 +138,7 @@ class SubtaskRunPipeline
 
                     return SubtaskRunOutcome::pullRequestFailed(
                         $output,
+                        $diff,
                         'Pull request creation failed: '.$prResult['pull_request_error'],
                     );
                 }
@@ -152,7 +158,7 @@ class SubtaskRunPipeline
      * @param  array<string, mixed>  $output
      * @return array<string, mixed>
      */
-    private function openPullRequest(Repo $repo, Subtask $subtask, string $branch, array $output): array
+    private function openPullRequest(Repo $repo, Subtask $subtask, string $branch, array $output, ?string $driver): array
     {
         $provider = $repo->pullRequestProvider();
         if ($provider === null) {
@@ -164,7 +170,7 @@ class SubtaskRunPipeline
                 repo: $repo,
                 head: $branch,
                 base: $repo->default_branch,
-                title: PrPayloadBuilder::title($subtask),
+                title: PrPayloadBuilder::title($subtask, $driver),
                 body: PrPayloadBuilder::body($subtask, $output),
             );
 

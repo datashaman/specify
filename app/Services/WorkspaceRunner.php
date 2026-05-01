@@ -81,6 +81,16 @@ class WorkspaceRunner
      *
      * When `$baseBranch` is supplied, hard-resets the local copy to its remote
      * tracking branch first so the executor starts from a clean upstream.
+     *
+     * If `origin/{branch}` exists, the local branch is hard-reset to it so a
+     * second run on the same branch picks up commits the previous run pushed
+     * (or commits a teammate added). Without this, the per-run working dir's
+     * stale local tip can drift from origin and the agent ends up working
+     * against an out-of-date snapshot — the bug behind the
+     * "subtask is already implemented" no-diff loop.
+     *
+     * "Remote absent, local exists" stays as-is (no upstream to sync to —
+     * the local branch is the only source of truth).
      */
     public function checkoutBranch(string $workingDir, string $branch, ?string $baseBranch = null): void
     {
@@ -90,9 +100,22 @@ class WorkspaceRunner
             $this->run(['git', 'reset', '--hard', 'origin/'.$baseBranch], $workingDir);
         }
 
-        $exists = $this->run(['git', 'rev-parse', '--verify', '--quiet', 'refs/heads/'.$branch], $workingDir, allowFailure: true);
+        $this->run(['git', 'fetch', 'origin', $branch], $workingDir, allowFailure: true);
+        $remote = $this->run(['git', 'rev-parse', '--verify', '--quiet', 'refs/remotes/origin/'.$branch], $workingDir, allowFailure: true);
+        $localExists = $this->run(['git', 'rev-parse', '--verify', '--quiet', 'refs/heads/'.$branch], $workingDir, allowFailure: true);
 
-        if ($exists['exitCode'] === 0) {
+        if ($remote['exitCode'] === 0) {
+            if ($localExists['exitCode'] === 0) {
+                $this->run(['git', 'checkout', $branch], $workingDir);
+            } else {
+                $this->run(['git', 'checkout', '-b', $branch, 'origin/'.$branch], $workingDir);
+            }
+            $this->run(['git', 'reset', '--hard', 'origin/'.$branch], $workingDir);
+
+            return;
+        }
+
+        if ($localExists['exitCode'] === 0) {
             $this->run(['git', 'checkout', $branch], $workingDir);
 
             return;

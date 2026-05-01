@@ -127,9 +127,9 @@ test('Repo::pullRequestProvider returns the GitHub driver for github repos', fun
         ->toBeInstanceOf(GithubPullRequestProvider::class);
 });
 
-test('full pipeline records pull_request_url after a successful run on a github repo', function () {
+test('full pipeline records pull_request_error after a non-fatal PR failure on a github repo (ADR-0004)', function () {
     config(['queue.default' => 'sync']);
-    config(['specify.executor.driver' => 'cli']);
+    config(['specify.executor.default' => 'cli']);
 
     Http::fake([
         'api.github.com/repos/datashaman/specify/pulls' => Http::response([
@@ -156,7 +156,7 @@ test('full pipeline records pull_request_url after a successful run on a github 
     $bin = sys_get_temp_dir().'/specify-fake-agent-'.uniqid().'.sh';
     File::put($bin, "#!/usr/bin/env bash\nset -e\necho 'edit' > NEW.md\necho ok\n");
     chmod($bin, 0o755);
-    config(['specify.executor.cli.command' => [$bin]]);
+    config(['specify.executor.drivers.cli.command' => [$bin]]);
     config(['specify.runs_path' => sys_get_temp_dir().'/specify-runs-'.uniqid()]);
     app()->forgetInstance(WorkspaceRunner::class);
     app()->forgetInstance(Executor::class);
@@ -206,9 +206,13 @@ test('full pipeline records pull_request_url after a successful run on a github 
         ->where('runnable_type', Subtask::class)
         ->latest('id')->firstOrFail();
 
-    expect($run->status)->toBe(AgentRunStatus::Failed)
-        ->and($run->error_message)->toContain('Pull request creation failed')
-        ->and($run->error_message)->toContain('parse');
+    // ADR-0004: PR-creation failure must be non-fatal. The run is marked
+    // Succeeded with the failure stamped on `output.pull_request_error`,
+    // and the cascade still advances the Subtask to Done.
+    expect($run->status)->toBe(AgentRunStatus::Succeeded)
+        ->and($run->output['pull_request_error'] ?? null)->toBeString()
+        ->and($run->output['pull_request_error'])->toContain('parse')
+        ->and($subtask->fresh()->status->value)->toBe('done');
 
     @unlink($bin);
     File::deleteDirectory($bare);
