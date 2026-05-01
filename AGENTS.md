@@ -12,6 +12,7 @@ Specify is a Laravel 13 system where humans approve AI actions on code repos. **
 | Edit Story / Task / Subtask | [ADR-0002](docs/adr/0002-story-task-subtask-hierarchy.md) |
 | Add or change an Executor | [ADR-0003](docs/adr/0003-pluggable-executor-interface.md), `app/Services/Executors/` |
 | Touch PR creation | [ADR-0004](docs/adr/0004-pr-after-push-is-non-fatal.md), `app/Services/PullRequests/` |
+| Touch advisory PR review | `app/Services/Reviews/` (`ReviewProvider`, `GithubReviewProvider`), `app/Jobs/ReviewPullRequestJob.php` — gated on `SPECIFY_REVIEW_ENABLED`, never blocks merge |
 | Add an MCP tool | `app/Mcp/Tools/` (follow the existing `#[Description]` + `handle()` shape) |
 | Edit an agent's system prompt | `prompts/*.md` (loaded by `App\Services\Prompts\PromptLoader`) |
 | Tune the per-subtask context brief | `app/Services/Context/` (`ContextBuilder` interface + `RecencyContextBuilder`) |
