@@ -80,13 +80,41 @@ test('admin can open the project context screen', function () {
         ->assertJsonPath('data.0.metadata.visibility', 'private');
 });
 
-test('member cannot open the project context screen', function () {
+test('member can open the project context screen without management controls', function () {
+    $this->withoutVite();
+
     ['user' => $user, 'project' => $project] = projectContextScreenScene(TeamRole::Member);
+    ContextItem::factory()->for($project)->create([
+        'type' => 'repository',
+        'title' => 'Primary repository',
+        'description' => 'The implementation repository.',
+        'metadata' => ['branch' => 'main'],
+    ]);
 
     $this->actingAs($user);
 
     Livewire::test('pages::projects.context.index', ['project' => $project->id])
-        ->assertStatus(403);
+        ->assertSee('Project context')
+        ->assertSee('Specify')
+        ->assertSee('context-items')
+        ->assertSee('canManage: false', false)
+        ->assertDontSee('Add context item')
+        ->assertDontSee('Edit context item')
+        ->assertDontSee('Delete context item?')
+        ->assertDontSee('Attach a file, link, or text snippet to this project.')
+        ->assertDontSee('Update the title and description shown in the project context list.')
+        ->assertDontSee('This will remove the item from this project context.');
+
+    $this->get(route('projects.context.index', $project))
+        ->assertSuccessful()
+        ->assertSee('Project context')
+        ->assertSee('context-items')
+        ->assertDontSee('Add context item');
+
+    $this->getJson(route('projects.context-items.index', $project))
+        ->assertSuccessful()
+        ->assertJsonPath('data.0.title', 'Primary repository')
+        ->assertJsonPath('meta.can_manage_project', false);
 });
 
 test('project page links admins to context screen', function () {

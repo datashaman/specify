@@ -26,7 +26,11 @@ class ProjectContextItemController extends Controller
             $project->contextItems()
                 ->orderBy('id')
                 ->get(),
-        );
+        )->additional([
+            'meta' => [
+                'can_manage_project' => $request->user()->canManageProject($project),
+            ],
+        ]);
     }
 
     public function store(StoreProjectContextItemRequest $request, Project $project): JsonResponse

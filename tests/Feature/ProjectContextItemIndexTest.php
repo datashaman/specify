@@ -48,7 +48,17 @@ test('team member can list project context items', function () {
         ->assertJsonPath('data.0.description', 'The repository to use for implementation work.')
         ->assertJsonPath('data.0.metadata.provider', 'github')
         ->assertJsonPath('data.0.metadata.default_branch', 'main')
+        ->assertJsonPath('meta.can_manage_project', false)
         ->assertJsonCount(1, 'data');
+});
+
+test('team admin context item list response exposes manage permission', function () {
+    ['user' => $user, 'project' => $project] = projectContextItemScene(TeamRole::Admin);
+
+    $this->actingAs($user)
+        ->getJson(route('projects.context-items.index', $project))
+        ->assertSuccessful()
+        ->assertJsonPath('meta.can_manage_project', true);
 });
 
 test('non member cannot list project context items', function () {

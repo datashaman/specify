@@ -14,7 +14,6 @@ new #[Title('Project context')] class extends Component {
         $this->project_id = $project;
 
         abort_unless($this->project, 404);
-        abort_unless(Auth::user()->canApproveInProject($this->project), 403);
     }
 
     #[Computed]
@@ -24,6 +23,12 @@ new #[Title('Project context')] class extends Component {
             ->whereIn('id', Auth::user()->accessibleProjectIds())
             ->with('team.workspace')
             ->find($this->project_id);
+    }
+
+    #[Computed]
+    public function canManage(): bool
+    {
+        return $this->project && Auth::user()->canManageProject($this->project);
     }
 
 };
@@ -59,6 +64,7 @@ new #[Title('Project context')] class extends Component {
                 updateErrorMessage: {{ \Illuminate\Support\Js::from(__('Context item could not be updated.')) }},
                 deleteErrorMessage: {{ \Illuminate\Support\Js::from(__('Context item could not be deleted.')) }},
                 defaultType: {{ \Illuminate\Support\Js::from(__('Context')) }},
+                canManage: {{ \Illuminate\Support\Js::from($this->canManage) }},
                 contextItems: Array(),
                 error: null,
                 loading: true,
@@ -102,6 +108,7 @@ new #[Title('Project context')] class extends Component {
 
                         const payload = await response.json();
                         this.contextItems = Array.isArray(payload.data) ? payload.data : Array();
+                        this.canManage = Boolean(payload.meta?.can_manage_project);
                     } catch (error) {
                         this.contextItems = Array();
                         this.error = error.message || this.errorMessage;
@@ -330,16 +337,19 @@ new #[Title('Project context')] class extends Component {
             }"
             x-init="load()"
         >
-            <div class="flex justify-end">
-                <flux:modal.trigger name="add-context-item-modal">
-                    <flux:button variant="primary" icon="plus">
-                        {{ __('Add context item') }}
-                    </flux:button>
-                </flux:modal.trigger>
-            </div>
+            @if ($this->canManage)
+                <div class="flex justify-end">
+                    <flux:modal.trigger name="add-context-item-modal">
+                        <flux:button variant="primary" icon="plus">
+                            {{ __('Add context item') }}
+                        </flux:button>
+                    </flux:modal.trigger>
+                </div>
+            @endif
 
-            <flux:modal name="add-context-item-modal" class="md:w-[34rem]">
-                <form class="flex flex-col gap-5" x-on:submit.prevent="create()">
+            @if ($this->canManage)
+                <flux:modal name="add-context-item-modal" class="md:w-[34rem]">
+                    <form class="flex flex-col gap-5" x-on:submit.prevent="create()">
                     <div class="flex flex-col gap-1">
                         <flux:heading>{{ __('Add context item') }}</flux:heading>
                         <flux:text class="text-sm text-zinc-500">
@@ -408,11 +418,13 @@ new #[Title('Project context')] class extends Component {
                             <span x-show="saving">{{ __('Adding...') }}</span>
                         </flux:button>
                     </div>
-                </form>
-            </flux:modal>
+                    </form>
+                </flux:modal>
+            @endif
 
-            <flux:modal name="edit-context-item-modal" class="md:w-[34rem]">
-                <form class="flex flex-col gap-5" x-on:submit.prevent="update()">
+            @if ($this->canManage)
+                <flux:modal name="edit-context-item-modal" class="md:w-[34rem]">
+                    <form class="flex flex-col gap-5" x-on:submit.prevent="update()">
                     <div class="flex flex-col gap-1">
                         <flux:heading>{{ __('Edit context item') }}</flux:heading>
                         <flux:text class="text-sm text-zinc-500">
@@ -451,11 +463,13 @@ new #[Title('Project context')] class extends Component {
                             <span x-show="updating">{{ __('Saving...') }}</span>
                         </flux:button>
                     </div>
-                </form>
-            </flux:modal>
+                    </form>
+                </flux:modal>
+            @endif
 
-            <flux:modal name="delete-context-item-modal" class="min-w-[22rem]">
-                <form class="flex flex-col gap-5" x-on:submit.prevent="destroy()">
+            @if ($this->canManage)
+                <flux:modal name="delete-context-item-modal" class="min-w-[22rem]">
+                    <form class="flex flex-col gap-5" x-on:submit.prevent="destroy()">
                     <div class="flex flex-col gap-1">
                         <flux:heading>{{ __('Delete context item?') }}</flux:heading>
                         <flux:text class="text-sm text-zinc-500">
@@ -486,8 +500,9 @@ new #[Title('Project context')] class extends Component {
                             <span x-show="deleting">{{ __('Deleting...') }}</span>
                         </flux:button>
                     </div>
-                </form>
-            </flux:modal>
+                    </form>
+                </flux:modal>
+            @endif
 
             <template x-if="loading">
                 <div class="flex flex-col gap-3" aria-live="polite">
@@ -529,22 +544,24 @@ new #[Title('Project context')] class extends Component {
                             <div class="flex flex-col gap-4">
                                 <div class="flex flex-wrap items-center gap-2">
                                     <flux:badge variant="solid" x-text="formatType(contextItem.type)"></flux:badge>
-                                    <flux:button
-                                        size="sm"
-                                        variant="ghost"
-                                        icon="pencil-square"
-                                        x-on:click="openEdit(contextItem)"
-                                    >
-                                        {{ __('Edit') }}
-                                    </flux:button>
-                                    <flux:button
-                                        size="sm"
-                                        variant="danger"
-                                        icon="trash"
-                                        x-on:click="openDelete(contextItem)"
-                                    >
-                                        {{ __('Delete') }}
-                                    </flux:button>
+                                    @if ($this->canManage)
+                                        <flux:button
+                                            size="sm"
+                                            variant="ghost"
+                                            icon="pencil-square"
+                                            x-on:click="openEdit(contextItem)"
+                                        >
+                                            {{ __('Edit') }}
+                                        </flux:button>
+                                        <flux:button
+                                            size="sm"
+                                            variant="danger"
+                                            icon="trash"
+                                            x-on:click="openDelete(contextItem)"
+                                        >
+                                            {{ __('Delete') }}
+                                        </flux:button>
+                                    @endif
                                     <flux:text class="ml-auto text-xs text-zinc-500" x-text="`#${contextItem.id}`"></flux:text>
                                 </div>
 
