@@ -1,7 +1,7 @@
 # 0010. Cancel and retry semantics for AgentRuns
 
 Date: 2026-05-02
-Status: Proposed
+Status: Accepted
 
 ## Context
 
