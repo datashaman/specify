@@ -33,13 +33,13 @@
                             <flux:sidebar.item icon="rectangle-stack" :href="route('projects.show', $currentProjectId)" :current="request()->routeIs('features.show')" wire:navigate>
                                 {{ __('Features') }}
                             </flux:sidebar.item>
-                            <flux:sidebar.item icon="bookmark" :href="route('stories.index')" :current="request()->routeIs('stories.*')" wire:navigate>
+                            <flux:sidebar.item icon="bookmark" :href="route('stories.index', ['project' => $currentProjectId])" :current="request()->routeIs('stories.*')" wire:navigate>
                                 {{ __('Stories') }}
                             </flux:sidebar.item>
-                            <flux:sidebar.item icon="clipboard-document-list" :href="route('runs.index')" :current="request()->routeIs('runs.*')" wire:navigate>
+                            <flux:sidebar.item icon="clipboard-document-list" :href="route('runs.index', ['project' => $currentProjectId])" :current="request()->routeIs('runs.*')" wire:navigate>
                                 {{ __('Runs') }}
                             </flux:sidebar.item>
-                            <flux:sidebar.item icon="folder-open" :href="route('repos.index')" :current="request()->routeIs('repos.*')" wire:navigate>
+                            <flux:sidebar.item icon="folder-open" :href="route('repos.index', ['project' => $currentProjectId])" :current="request()->routeIs('repos.*')" wire:navigate>
                                 {{ __('Repos') }}
                             </flux:sidebar.item>
                         </flux:sidebar.group>

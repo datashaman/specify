@@ -23,7 +23,7 @@ function storyIndexScene(): array
 }
 
 test('lists stories scoped to user teams', function () {
-    ['user' => $user, 'feature' => $feature] = storyIndexScene();
+    ['user' => $user, 'project' => $project, 'feature' => $feature] = storyIndexScene();
     Story::factory()->for($feature)->create(['name' => 'mine', 'status' => StoryStatus::Approved]);
 
     $other = Workspace::factory()->create();
@@ -34,19 +34,19 @@ test('lists stories scoped to user teams', function () {
 
     $this->actingAs($user);
 
-    Livewire::test('pages::stories.index')
+    Livewire::test('pages::stories.index', ['project' => $project->id])
         ->assertSee('mine')
         ->assertDontSee('theirs');
 });
 
 test('status filter narrows the list', function () {
-    ['user' => $user, 'feature' => $feature] = storyIndexScene();
+    ['user' => $user, 'project' => $project, 'feature' => $feature] = storyIndexScene();
     Story::factory()->for($feature)->create(['name' => 'draft-story', 'status' => StoryStatus::Draft]);
     Story::factory()->for($feature)->create(['name' => 'approved-story', 'status' => StoryStatus::Approved]);
 
     $this->actingAs($user);
 
-    Livewire::test('pages::stories.index')
+    Livewire::test('pages::stories.index', ['project' => $project->id])
         ->assertSee('draft-story')
         ->assertSee('approved-story')
         ->set('status', 'approved')
@@ -55,5 +55,5 @@ test('status filter narrows the list', function () {
 });
 
 test('redirects guests', function () {
-    $this->get(route('stories.index'))->assertRedirect(route('login'));
+    $this->get('/stories')->assertRedirect(route('login'));
 });

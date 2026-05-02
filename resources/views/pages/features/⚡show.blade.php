@@ -123,7 +123,7 @@ new #[Title('Feature')] class extends Component {
                         @if ($this->canEditFeature())
                             <flux:button wire:click="startEdit" size="sm" variant="ghost">{{ __('Edit') }}</flux:button>
                         @endif
-                        <a href="{{ route('stories.create', ['feature_id' => $this->feature->id]) }}" wire:navigate>
+                        <a href="{{ route('stories.create', ['project' => $this->feature->project_id, 'feature_id' => $this->feature->id]) }}" wire:navigate>
                             <flux:button variant="primary">{{ __('+ New story for this feature') }}</flux:button>
                         </a>
                     </div>

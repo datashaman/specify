@@ -12,8 +12,20 @@ use Livewire\WithPagination;
 new #[Title('Stories')] class extends Component {
     use WithPagination;
 
+    public int $project_id;
+
     #[Url(as: 'status')]
     public ?string $status = null;
+
+    public function mount(int $project): void
+    {
+        $user = Auth::user();
+        abort_unless(in_array((int) $project, $user->accessibleProjectIds(), true), 404);
+        $this->project_id = (int) $project;
+        if ((int) $user->current_project_id !== $this->project_id) {
+            $user->forceFill(['current_project_id' => $this->project_id])->save();
+        }
+    }
 
     #[Computed]
     public function stories()
@@ -32,7 +44,7 @@ new #[Title('Stories')] class extends Component {
 <div class="flex flex-col gap-6 p-6">
     <div class="flex items-center justify-between">
         <flux:heading size="xl">{{ __('Stories') }}</flux:heading>
-        <a href="{{ route('stories.create') }}" wire:navigate>
+        <a href="{{ route('stories.create', ['project' => $this->project_id]) }}" wire:navigate>
             <flux:button variant="primary">{{ __('+ New story') }}</flux:button>
         </a>
     </div>

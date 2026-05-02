@@ -12,16 +12,27 @@ use Livewire\Attributes\Title;
 use Livewire\Component;
 
 new #[Title('Repositories')] class extends Component {
+    public int $project_id;
+
     public string $githubRepoSearch = '';
+
+    public function mount(int $project): void
+    {
+        $user = Auth::user();
+        abort_unless(in_array((int) $project, $user->accessibleProjectIds(), true), 404);
+        $this->project_id = (int) $project;
+        if ((int) $user->current_project_id !== $this->project_id) {
+            $user->forceFill(['current_project_id' => $this->project_id])->save();
+        }
+    }
 
     #[Computed]
     public function project(): ?Project
     {
-        $id = Auth::user()->current_project_id;
-
-        return $id
-            ? Project::query()->whereIn('id', Auth::user()->accessibleProjectIds())->with('team')->find($id)
-            : null;
+        return Project::query()
+            ->whereIn('id', Auth::user()->accessibleProjectIds())
+            ->with('team')
+            ->find($this->project_id);
     }
 
     #[Computed]
