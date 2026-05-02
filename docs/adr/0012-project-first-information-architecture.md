@@ -1,7 +1,7 @@
 # 0012. Project-first information architecture
 
 Date: 2026-05-02
-Status: Proposed
+Status: Accepted
 
 ## Context
 
