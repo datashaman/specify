@@ -49,7 +49,7 @@ function pendingStoryFor(Feature $feature, string $name = 'Visible story'): Stor
 }
 
 test('inbox redirects unauthenticated users', function () {
-    $this->get(route('inbox'))->assertRedirect(route('login'));
+    $this->get(route('triage'))->assertRedirect(route('login'));
 });
 
 test('inbox lists pending stories in scope', function () {
@@ -59,7 +59,7 @@ test('inbox lists pending stories in scope', function () {
 
     $this->actingAs($user);
 
-    Livewire::test('pages::inbox')
+    Livewire::test('pages::triage')
         ->assertSee('Visible story');
 });
 
@@ -74,7 +74,7 @@ test('inbox excludes items from teams the user does not belong to', function () 
 
     $this->actingAs($user);
 
-    Livewire::test('pages::inbox')
+    Livewire::test('pages::triage')
         ->assertDontSee('Hidden story');
 });
 
@@ -84,7 +84,7 @@ test('approving a story flips its status', function () {
 
     $this->actingAs($user);
 
-    Livewire::test('pages::inbox')
+    Livewire::test('pages::triage')
         ->call('decide', $story->id, 'approve');
 
     expect($story->fresh()->status)->toBe(StoryStatus::Approved);
@@ -96,7 +96,7 @@ test('Member sees only the no-permission notice (no buttons)', function () {
 
     $this->actingAs($user);
 
-    Livewire::test('pages::inbox')
+    Livewire::test('pages::triage')
         ->assertSee('Visible to member')
         ->assertSee('Your role does not permit')
         ->assertDontSee('Approve');
@@ -120,7 +120,7 @@ test('inbox shows approval count and approver names', function () {
     ]);
 
     $this->actingAs($user);
-    Livewire::test('pages::inbox')
+    Livewire::test('pages::triage')
         ->assertSee('1/2 approvals')
         ->assertSee('Alice');
 });
@@ -136,7 +136,7 @@ test('Revoke replaces Approve button after the user has approved', function () {
 
     $this->actingAs($user);
 
-    Livewire::test('pages::inbox')
+    Livewire::test('pages::triage')
         ->call('decide', $story->id, 'approve')
         ->assertSee('Revoke approval');
 });
@@ -147,9 +147,9 @@ test('Members can view the inbox but cannot approve', function () {
 
     $this->actingAs($user);
 
-    Livewire::test('pages::inbox')->assertSee('Visible to member');
+    Livewire::test('pages::triage')->assertSee('Visible to member');
 
-    Livewire::test('pages::inbox')
+    Livewire::test('pages::triage')
         ->call('decide', $story->id, 'approve')
         ->assertStatus(403);
 
@@ -166,7 +166,7 @@ test('pinning a project narrows the inbox to that project only', function () {
     $user->switchProject($projectA);
     $this->actingAs($user->fresh());
 
-    Livewire::test('pages::inbox')
+    Livewire::test('pages::triage')
         ->assertSee('in-A')
         ->assertDontSee('in-B');
 });
@@ -182,6 +182,6 @@ test('deciding on an out-of-scope item 404s', function () {
 
     $this->actingAs($user);
 
-    expect(fn () => Livewire::test('pages::inbox')->call('decide', $otherStory->id, 'approve'))
+    expect(fn () => Livewire::test('pages::triage')->call('decide', $otherStory->id, 'approve'))
         ->toThrow(ModelNotFoundException::class);
 });

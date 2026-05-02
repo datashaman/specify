@@ -17,7 +17,8 @@ Route::get('auth/{provider}/callback', [SocialiteController::class, 'callback'])
 
 Route::middleware(['auth', 'verified'])->group(function () {
     Route::livewire('dashboard', 'pages::dashboard')->name('dashboard');
-    Route::livewire('inbox', 'pages::inbox')->name('inbox');
+    Route::livewire('triage', 'pages::triage')->name('triage');
+    Route::livewire('activity', 'pages::activity.index')->name('activity.index');
     Route::livewire('projects', 'pages::projects.index')->name('projects.index');
     Route::livewire('projects/{project}', 'pages::projects.show')->name('projects.show');
     Route::livewire('projects/{project}/features/{feature}', 'pages::features.show')->name('features.show');
@@ -25,8 +26,12 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::livewire('stories/create', 'pages::stories.create')->name('stories.create');
     Route::livewire('stories/{story}', 'pages::stories.show')->name('stories.show');
     Route::livewire('runs', 'pages::runs.index')->name('runs.index');
-    Route::livewire('events', 'pages::events.index')->name('events.index');
     Route::livewire('repos', 'pages::repos.index')->name('repos.index');
+
+    // Legacy URL redirects (ADR-0012). PR descriptions, Slack links, and
+    // notification emails written against the old paths must continue to resolve.
+    Route::permanentRedirect('inbox', 'triage');
+    Route::permanentRedirect('events', 'activity');
 });
 
 require __DIR__.'/settings.php';

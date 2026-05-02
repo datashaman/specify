@@ -8,7 +8,7 @@ use Livewire\Attributes\Title;
 use Livewire\Component;
 use Livewire\WithPagination;
 
-new #[Title('Events')] class extends Component {
+new #[Title('Activity')] class extends Component {
     use WithPagination;
 
     public ?string $event = null;
@@ -41,7 +41,7 @@ new #[Title('Events')] class extends Component {
 }; ?>
 
 <div class="flex flex-col gap-6 p-6">
-    <flux:heading size="xl">{{ __('Events') }}</flux:heading>
+    <flux:heading size="xl">{{ __('Activity') }}</flux:heading>
 
     <div class="flex flex-wrap gap-2">
         <flux:select wire:model.live="repo_id" :placeholder="__('All repos')">
