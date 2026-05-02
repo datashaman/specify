@@ -6,6 +6,7 @@ use App\Models\AgentRun;
 use App\Models\AgentRunEvent;
 use App\Models\Story;
 use App\Models\Subtask;
+use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -49,7 +50,7 @@ class RunEventsController extends Controller
         ]);
     }
 
-    private function canSee($user, AgentRun $run): bool
+    private function canSee(User $user, AgentRun $run): bool
     {
         $accessible = $user->accessibleProjectIds();
 

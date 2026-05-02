@@ -97,27 +97,30 @@ class CliExecutor implements Executor
         $buffers = ['stdout' => '', 'stderr' => ''];
         $sentinelSeen = false;
 
-        $process->run(function (string $type, string $chunk) use ($emitter, &$buffers, &$sentinelSeen) {
+        $emit = function (string $stream, string $line) use ($emitter, &$sentinelSeen): void {
+            $emitter->emit($stream, ['line' => $line]);
+
+            if (! $sentinelSeen && $stream === 'stdout' && str_contains($line, '<<<SPECIFY:already_complete>>>')) {
+                $sentinelSeen = true;
+                $emitter->emit('sentinel', ['name' => 'already_complete']);
+            }
+        };
+
+        $process->run(function (string $type, string $chunk) use ($emit, &$buffers): void {
             $stream = $type === Process::OUT ? 'stdout' : 'stderr';
             $buffers[$stream] .= $chunk;
 
             while (($nl = strpos($buffers[$stream], "\n")) !== false) {
-                $line = substr($buffers[$stream], 0, $nl);
+                $line = rtrim(substr($buffers[$stream], 0, $nl), "\r");
                 $buffers[$stream] = substr($buffers[$stream], $nl + 1);
-                $line = rtrim($line, "\r");
 
-                $emitter->emit($stream, ['line' => $line]);
-
-                if (! $sentinelSeen && $stream === 'stdout' && str_contains($line, '<<<SPECIFY:already_complete>>>')) {
-                    $sentinelSeen = true;
-                    $emitter->emit('sentinel', ['name' => 'already_complete']);
-                }
+                $emit($stream, $line);
             }
         });
 
         foreach ($buffers as $stream => $rest) {
             if ($rest !== '') {
-                $emitter->emit($stream, ['line' => rtrim($rest, "\r")]);
+                $emit($stream, rtrim($rest, "\r"));
             }
         }
     }

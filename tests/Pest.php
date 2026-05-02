@@ -24,7 +24,7 @@ pest()->extend(TestCase::class)
 // the cwd to the project root before every test so the suite is order-
 // independent regardless of what a prior test did.
 beforeEach(function () {
-    @chdir(base_path());
+    chdir(base_path());
 });
 
 /*
