@@ -18,6 +18,15 @@ pest()->extend(TestCase::class)
     ->use(RefreshDatabase::class)
     ->in('Feature');
 
+// WorkspaceRunner / CliExecutor tests cd into temp directories and tear
+// them down. If a later test inherits a deleted cwd, every git/process
+// invocation fails with `getcwd: cannot access parent directories`. Reset
+// the cwd to the project root before every test so the suite is order-
+// independent regardless of what a prior test did.
+beforeEach(function () {
+    chdir(base_path());
+});
+
 /*
 |--------------------------------------------------------------------------
 | Expectations

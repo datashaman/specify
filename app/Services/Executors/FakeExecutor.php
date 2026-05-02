@@ -5,6 +5,7 @@ namespace App\Services\Executors;
 use App\Ai\Agents\SubtaskExecutor;
 use App\Models\Repo;
 use App\Models\Subtask;
+use App\Services\Progress\ProgressEmitter;
 
 /**
  * Test/no-op executor: invokes the agent (so SubtaskExecutor::fake() interception works)
@@ -18,7 +19,12 @@ class FakeExecutor implements Executor
         return false;
     }
 
-    public function execute(Subtask $subtask, ?string $workingDir, ?Repo $repo, ?string $workingBranch, ?string $contextBrief = null): ExecutionResult
+    public function supportsProgressEvents(): bool
+    {
+        return false;
+    }
+
+    public function execute(Subtask $subtask, ?string $workingDir, ?Repo $repo, ?string $workingBranch, ?string $contextBrief = null, ?ProgressEmitter $emitter = null): ExecutionResult
     {
         // Pass a real (but throwaway) directory so SubtaskExecutor::tools() can construct
         // a Sandbox during fake/test invocations. The tools are never actually called

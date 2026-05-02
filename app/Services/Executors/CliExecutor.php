@@ -4,6 +4,7 @@ namespace App\Services\Executors;
 
 use App\Models\Repo;
 use App\Models\Subtask;
+use App\Services\Progress\ProgressEmitter;
 use RuntimeException;
 use Symfony\Component\Process\Process;
 
@@ -27,12 +28,17 @@ class CliExecutor implements Executor
         return true;
     }
 
+    public function supportsProgressEvents(): bool
+    {
+        return true;
+    }
+
     /**
      * Pipe a prompt to the CLI, run it in `$workingDir`, and report changed files.
      *
      * @throws RuntimeException When `$workingDir` is null or the CLI exits non-zero.
      */
-    public function execute(Subtask $subtask, ?string $workingDir, ?Repo $repo, ?string $workingBranch, ?string $contextBrief = null): ExecutionResult
+    public function execute(Subtask $subtask, ?string $workingDir, ?Repo $repo, ?string $workingBranch, ?string $contextBrief = null, ?ProgressEmitter $emitter = null): ExecutionResult
     {
         if ($workingDir === null) {
             throw new RuntimeException('CliExecutor requires a working directory.');
@@ -46,7 +52,12 @@ class CliExecutor implements Executor
         $process = new Process($this->command, $workingDir);
         $process->setTimeout($this->timeout);
         $process->setInput($prompt);
-        $process->run();
+
+        if ($emitter !== null) {
+            $this->runStreaming($process, $emitter);
+        } else {
+            $process->run();
+        }
 
         if (! $process->isSuccessful()) {
             throw new RuntimeException(sprintf(
@@ -71,6 +82,47 @@ class CliExecutor implements Executor
             alreadyComplete: $alreadyComplete,
             alreadyCompleteEvidence: $alreadyCompleteEvidence,
         );
+    }
+
+    /**
+     * Stream the process, emitting one stdout/stderr event per line and a
+     * `sentinel` event when the ADR-0007 already-complete block flushes.
+     *
+     * Symfony's Process callback can be invoked mid-line on partial reads, so
+     * we buffer per-stream until a newline arrives. Anything left in the
+     * buffer at exit is flushed as a final event.
+     */
+    private function runStreaming(Process $process, ProgressEmitter $emitter): void
+    {
+        $buffers = ['stdout' => '', 'stderr' => ''];
+        $sentinelSeen = false;
+
+        $emit = function (string $stream, string $line) use ($emitter, &$sentinelSeen): void {
+            $emitter->emit($stream, ['line' => $line]);
+
+            if (! $sentinelSeen && $stream === 'stdout' && str_contains($line, '<<<SPECIFY:already_complete>>>')) {
+                $sentinelSeen = true;
+                $emitter->emit('sentinel', ['name' => 'already_complete']);
+            }
+        };
+
+        $process->run(function (string $type, string $chunk) use ($emit, &$buffers): void {
+            $stream = $type === Process::OUT ? 'stdout' : 'stderr';
+            $buffers[$stream] .= $chunk;
+
+            while (($nl = strpos($buffers[$stream], "\n")) !== false) {
+                $line = rtrim(substr($buffers[$stream], 0, $nl), "\r");
+                $buffers[$stream] = substr($buffers[$stream], $nl + 1);
+
+                $emit($stream, $line);
+            }
+        });
+
+        foreach ($buffers as $stream => $rest) {
+            if ($rest !== '') {
+                $emit($stream, rtrim($rest, "\r"));
+            }
+        }
     }
 
     /**
