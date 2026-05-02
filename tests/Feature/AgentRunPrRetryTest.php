@@ -42,8 +42,13 @@ test('retryPullRequestOpen refuses runs that already have a PR url', function ()
 
 test('retryPullRequestOpen dispatches the OpenPullRequestJob end-to-end', function () {
     Http::fake([
-        'api.github.com/repos/*/pulls?head*' => Http::response([
-            ['html_url' => 'https://github.com/o/r/pull/77', 'number' => 77, 'id' => 7],
+        'api.github.com/*pulls*' => Http::response([
+            [
+                'html_url' => 'https://github.com/o/r/pull/77',
+                'number' => 77,
+                'id' => 7,
+                'head' => ['ref' => 'specify/feature/story'],
+            ],
         ], 200),
     ]);
 
@@ -144,14 +149,18 @@ test('OpenPullRequestJob records find() exceptions as pull_request_error instead
 });
 
 test('OpenPullRequestJob opens a fresh PR and stamps the run output', function () {
-    Http::fake([
-        'api.github.com/repos/*/pulls?head*' => Http::response([], 200),
-        'api.github.com/repos/*/pulls' => Http::response([
+    Http::fake(function ($request) {
+        // GET (find) → empty list; POST (create) → 201 with the new PR.
+        if ($request->method() === 'GET') {
+            return Http::response([], 200);
+        }
+
+        return Http::response([
             'html_url' => 'https://github.com/o/r/pull/42',
             'number' => 42,
             'id' => 999,
-        ], 201),
-    ]);
+        ], 201);
+    });
 
     $story = approvedStoryInProjectWithRepo();
     $repo = $story->feature->project->primaryRepo();
@@ -184,8 +193,13 @@ test('OpenPullRequestJob opens a fresh PR and stamps the run output', function (
 
 test('OpenPullRequestJob adopts an existing open PR rather than opening a duplicate', function () {
     Http::fake([
-        'api.github.com/repos/*/pulls?head*' => Http::response([
-            ['html_url' => 'https://github.com/o/r/pull/7', 'number' => 7, 'id' => 70],
+        'api.github.com/*pulls*' => Http::response([
+            [
+                'html_url' => 'https://github.com/o/r/pull/7',
+                'number' => 7,
+                'id' => 70,
+                'head' => ['ref' => 'specify/feature/story'],
+            ],
         ], 200),
     ]);
 

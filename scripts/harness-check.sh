@@ -10,6 +10,16 @@
 # and there's no faster proxy on this codebase.
 set -uo pipefail
 
+# When the parent shell's cwd has been deleted (e.g. by a prior
+# WorkspaceRunner test that tore down a tempdir we happened to be inside)
+# every subprocess inherits the broken cwd and PHP can't even resolve
+# `composer`. Detect that and reposition to the project root before
+# running anything. The script is invoked from .claude/hooks via
+# $CLAUDE_PROJECT_DIR, so we always know where to land.
+if ! pwd -P >/dev/null 2>&1; then
+  cd "${CLAUDE_PROJECT_DIR:-$(dirname "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")")}" || exit 1
+fi
+
 step() {
   local label="$1"; shift
   echo "→ $label"

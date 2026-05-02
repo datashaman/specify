@@ -59,14 +59,22 @@ class GithubPullRequestProvider implements PullRequestProvider
         [$owner, $name] = $this->parseOwnerRepo($repo->url);
         $apiBase = rtrim((string) config('specify.github.api_base', 'https://api.github.com'), '/');
 
+        // GitHub's `head=user:branch` query-param filter is brittle:
+        // it's documented for fork PRs and silently returns empty for
+        // same-repo PRs whose head ref contains slashes (which all our
+        // `specify/<feature>/<story>` branches do). Smoke testing on a
+        // real repo confirmed the filtered request returned [] while the
+        // PR was open. The robust fix is to list open PRs (page 1, 100
+        // entries — a fresh retry adopts a recently-opened PR, which
+        // will always be on page 1 in any realistic queue) and match the
+        // head.ref client-side ourselves.
         $response = Http::withHeaders([
             'Accept' => 'application/vnd.github+json',
             'Authorization' => 'Bearer '.$repo->access_token,
             'X-GitHub-Api-Version' => '2022-11-28',
         ])->get("{$apiBase}/repos/{$owner}/{$name}/pulls", [
-            'head' => $owner.':'.$head,
             'state' => 'open',
-            'per_page' => 1,
+            'per_page' => 100,
         ]);
 
         if (! $response->successful()) {
@@ -78,13 +86,20 @@ class GithubPullRequestProvider implements PullRequestProvider
             return null;
         }
 
-        $pr = $data[0];
+        foreach ($data as $pr) {
+            if (! is_array($pr)) {
+                continue;
+            }
+            if (($pr['head']['ref'] ?? null) === $head) {
+                return [
+                    'url' => (string) ($pr['html_url'] ?? ''),
+                    'number' => $pr['number'] ?? 0,
+                    'id' => $pr['id'] ?? 0,
+                ];
+            }
+        }
 
-        return [
-            'url' => (string) ($pr['html_url'] ?? ''),
-            'number' => $pr['number'] ?? 0,
-            'id' => $pr['id'] ?? 0,
-        ];
+        return null;
     }
 
     /**
