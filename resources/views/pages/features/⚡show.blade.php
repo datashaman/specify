@@ -144,7 +144,7 @@ new #[Title('Feature')] class extends Component {
             <flux:heading size="lg">{{ __('Stories') }}</flux:heading>
             @forelse ($this->stories as $story)
                 <flux:card>
-                    <a href="{{ route('stories.show', $story) }}" wire:navigate>
+                    <a href="{{ route('stories.show', ['project' => $this->feature->project_id, 'story' => $story->id]) }}" wire:navigate>
                         <div class="flex flex-wrap items-center gap-2">
                             <flux:badge>{{ $story->status->value }}</flux:badge>
                             <flux:badge>rev {{ $story->revision }}</flux:badge>
