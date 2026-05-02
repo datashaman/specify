@@ -16,6 +16,13 @@
         'revoke' => 'text-zinc-500 dark:text-zinc-400',
         default => 'text-zinc-500',
     };
+    $decisionLabel = match ($decision->value) {
+        'approve' => __('Approved'),
+        'changes_requested' => __('Changes requested'),
+        'reject' => __('Rejected'),
+        'revoke' => __('Revoked'),
+        default => \Illuminate\Support\Str::headline($decision->value),
+    };
 @endphp
 
 <div data-decision="{{ $decision->value }}" class="flex items-start gap-2 text-sm">
@@ -23,7 +30,7 @@
     <div class="min-w-0 flex-1">
         <div class="flex flex-wrap items-baseline gap-x-2">
             <span class="font-medium">{{ $approval->approver?->name ?? __('unknown') }}</span>
-            <span class="text-xs text-zinc-500">{{ $decision->value }}</span>
+            <span class="text-xs text-zinc-500">{{ $decisionLabel }}</span>
             @if ($approval->story_revision)
                 <span class="text-xs text-zinc-500">rev {{ $approval->story_revision }}</span>
             @endif

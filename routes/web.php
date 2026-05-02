@@ -80,19 +80,32 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::permanentRedirect('inbox', 'triage');
     Route::permanentRedirect('events', 'activity');
 
-    // Project-scoped legacy redirects: resolve via the user's current project.
-    // If no current project is set, fall back to the project picker.
+    // Project-scoped legacy redirects: resolve via the user's current project,
+    // but only if it's still accessible. If pinned project was deleted or
+    // membership revoked, fall back to the project picker rather than a
+    // broken project URL.
+    $resolveActiveProjectId = function () {
+        $user = auth()->user();
+        $pinned = $user->current_project_id;
+        if (! $pinned) {
+            return null;
+        }
+
+        return in_array((int) $pinned, $user->accessibleProjectIds(), true)
+            ? (int) $pinned
+            : null;
+    };
     foreach (['stories' => 'stories.index', 'runs' => 'runs.index', 'repos' => 'repos.index'] as $legacy => $named) {
-        Route::get($legacy, function () use ($named) {
-            $projectId = auth()->user()->current_project_id;
+        Route::get($legacy, function () use ($named, $resolveActiveProjectId) {
+            $projectId = $resolveActiveProjectId();
 
             return $projectId
                 ? redirect()->route($named, ['project' => $projectId], 301)
                 : redirect()->route('projects.index', [], 301);
         });
     }
-    Route::get('stories/create', function () {
-        $projectId = auth()->user()->current_project_id;
+    Route::get('stories/create', function () use ($resolveActiveProjectId) {
+        $projectId = $resolveActiveProjectId();
 
         return $projectId
             ? redirect()->route('stories.create', ['project' => $projectId], 301)

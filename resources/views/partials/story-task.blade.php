@@ -37,7 +37,17 @@
                         >{{ $sub->name }}</a>
                         <flux:badge size="sm">{{ $sub->status->value }}</flux:badge>
                         @if ($appended)
-                            <span title="{{ __('Appended by Run') }} #{{ $sub->proposed_by_run_id }}" data-provenance class="text-xs text-amber-600 dark:text-amber-400">+</span>
+                            @php $provenanceLabel = __('Appended by Run').' #'.$sub->proposed_by_run_id; @endphp
+                            <span
+                                title="{{ $provenanceLabel }}"
+                                aria-label="{{ $provenanceLabel }}"
+                                role="img"
+                                data-provenance
+                                class="text-xs text-amber-600 dark:text-amber-400"
+                            >
+                                <span aria-hidden="true">+</span>
+                                <span class="sr-only">{{ $provenanceLabel }}</span>
+                            </span>
                         @endif
                     </div>
                     @if ($sub->description)

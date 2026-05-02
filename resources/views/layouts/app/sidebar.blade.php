@@ -27,10 +27,7 @@
 
                     @if ($currentProjectId)
                         <flux:sidebar.group :heading="__('Project')" class="grid">
-                            <flux:sidebar.item icon="home" :href="route('projects.show', $currentProjectId)" :current="request()->routeIs('projects.show') && (string) request()->route('project') === (string) $currentProjectId" wire:navigate>
-                                {{ __('Overview') }}
-                            </flux:sidebar.item>
-                            <flux:sidebar.item icon="rectangle-stack" :href="route('projects.show', $currentProjectId)" :current="request()->routeIs('features.show')" wire:navigate>
+                            <flux:sidebar.item icon="rectangle-stack" :href="route('projects.show', $currentProjectId)" :current="request()->routeIs('projects.show') || request()->routeIs('features.show')" wire:navigate>
                                 {{ __('Features') }}
                             </flux:sidebar.item>
                             <flux:sidebar.item icon="bookmark" :href="route('stories.index', ['project' => $currentProjectId])" :current="request()->routeIs('stories.*')" wire:navigate>

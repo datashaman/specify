@@ -55,19 +55,19 @@ The workspace switcher and the project switcher are **separate dropdowns**. They
 
 ### Active-project state
 
-A single new column carries the persistence:
+The active project is persisted in the existing `users.current_project_id`
+column. The session-first read path described in earlier drafts of this ADR
+was not adopted — the column is read directly per request (the existing
+`User` model already exposes it). What shipped:
 
-```php
-Schema::table('users', function (Blueprint $t) {
-    $t->foreignId('active_project_id')->nullable()->constrained('projects')->nullOnDelete();
-});
-```
+- **Read path**: `auth()->user()->current_project_id` — direct column read.
+- **Write path**: every project-scoped page's `mount(int $project)` validates the URL param against `accessibleProjectIds()` and pins the column to match (see `pages/stories/⚡show.blade.php`, `pages/stories/⚡index.blade.php`, `pages/runs/⚡index.blade.php`, `pages/repos/⚡index.blade.php`, `pages/subtasks/⚡show.blade.php`, `pages/runs/⚡show.blade.php`). The URL is the source of truth; the column mirrors the URL so the sidebar and other workspace-scoped pages stay in sync.
+- **Switcher**: `livewire/app-switcher` writes the column via `User::switchProject()` and navigates back to the referer.
+- **Stale-pin fallback (legacy redirects)**: when `/stories`, `/runs`, `/repos`, or `/stories/create` are hit, the redirect helper checks `current_project_id` against `accessibleProjectIds()` before composing the project-scoped URL; if the pin is stale (project deleted or membership revoked), it falls back to `/projects` rather than emitting a broken link. See `routes/web.php`.
+- **First login**: no special handling — the column is null until the user picks a project. The sidebar's Project section collapses to a single "Pick a project" link in that state.
+- **Authorisation**: every project-scoped page mount aborts 404 when the URL param isn't in `accessibleProjectIds()`. Active-project state is a UI affordance, not a permission grant.
 
-- **Read path**: `session('active_project_id')`. Cheap, request-local; no DB hit per request.
-- **Write path**: switching project writes both `session()` and `users.active_project_id`. The DB column is the cross-device fallback hydrated on login.
-- **First login**: pick the first project the user can access. If they have zero, render a project picker (no project menu shown).
-- **Stale session**: if the session id no longer matches a project the user can access, fall back to the column; if that's also stale, fall back to "first accessible".
-- **Authorisation**: every project-scoped route must `abort_unless($user->canAccessProject($project), 404)`. Active-project state is a UI affordance, not a permission grant.
+**Why no session-first?** The original draft proposed `session('active_project_id')` as the read path with the column as a cross-device fallback. In practice the column is cheap (already loaded with the User row each request), the URL is canonical for project-scoped pages anyway, and adding a session layer would have introduced a stale-state class without a corresponding cost saving. If a future need arises (multi-tab, cross-device sync), the session layer can be re-introduced as a non-breaking addition.
 
 ### Routes
 

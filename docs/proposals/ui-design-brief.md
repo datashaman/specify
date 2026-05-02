@@ -22,19 +22,27 @@ This brief is opinionated. Decisions taken during the grill are recorded in `CON
 
 ## 2. Information architecture
 
+This brief was drafted before the IA was finalised; the routes that
+shipped match ADR-0012 — see that ADR for the load-bearing reference.
+Summary of the canonical routes:
+
 ```
-/                                       Workspace landing for the active workspace
-/projects                               Projects index
-/projects/:project                      Project landing
-/features/:feature                      Feature document
-/stories/:story                         Story document — the centerpiece
-/stories/:story/subtasks/:subtask       Subtask drawer (slide-over off the Story plan)
-/stories/:story/subtasks/:subtask/runs/:agent_run_id   Run console
-/triage                                 Stories awaiting approval (renamed from /inbox)
-/runs                                   Runs across all projects
-/repos                                  Workspace-scoped repo registry
-/events                                 Event log
+/triage                                            Cross-project approval queue (renamed from /inbox)
+/activity                                          Cross-project event stream (renamed from /events)
+/projects                                          Projects index
+/projects/:project                                 Project landing (currently the features list; real Overview deferred)
+/projects/:project/features/:feature               Feature document
+/projects/:project/stories                         Stories index for the project
+/projects/:project/stories/:story                  Story document — the centerpiece
+/projects/:project/stories/:story/subtasks/:subtask                 Subtask drawer / page
+/projects/:project/stories/:story/subtasks/:subtask/runs/:run       Run console
+/projects/:project/runs                            Runs for the project
+/projects/:project/repos                           Repos for the project
 ```
+
+Legacy URLs (`/inbox`, `/events`, `/stories/:id`, `/runs/:id`, flat
+`/stories`, `/runs`, `/repos`, `/features`) all 301-redirect to the
+canonical project-scoped equivalents — see `routes/web.php`.
 
 **Workspace is ambient chrome, not a breadcrumb segment.** A switcher sits in the top-left of the global nav (Linear-style); cross-workspace navigation is a hard route change. Inside a workspace, the breadcrumb starts at Project: `Project › Feature › Story › Subtask › Run`.
 

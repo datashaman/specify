@@ -87,6 +87,25 @@ test('legacy /stories falls back to projects index when no current project', fun
         ->assertRedirect('/projects');
 });
 
+test('legacy /stories falls back to projects index when current_project_id is stale (no longer accessible)', function () {
+    $ws = Workspace::factory()->create();
+    $team = Team::factory()->for($ws)->create();
+    $user = User::factory()->create();
+    $team->addMember($user);
+    $accessible = Project::factory()->for($team)->create();
+
+    // A project the user cannot access — but the user has it pinned (stale).
+    $otherWs = Workspace::factory()->create();
+    $otherTeam = Team::factory()->for($otherWs)->create();
+    $stale = Project::factory()->for($otherTeam)->create();
+    $user->forceFill(['current_project_id' => $stale->id])->save();
+
+    $this->actingAs($user)
+        ->get('/stories')
+        ->assertStatus(301)
+        ->assertRedirect('/projects');
+});
+
 test('/stories/{id} 301-redirects to project-scoped url', function () {
     $ws = Workspace::factory()->create();
     $team = Team::factory()->for($ws)->create();
