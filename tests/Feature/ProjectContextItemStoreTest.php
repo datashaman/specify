@@ -59,6 +59,22 @@ test('admin can create a link context item', function () {
         ->and($contextItem->metadata)->toBe(['url' => 'https://example.com/design']);
 });
 
+test('owner can create a link context item', function () {
+    ['user' => $user, 'project' => $project] = projectContextItemStoreScene(TeamRole::Owner);
+
+    contextItemStoreRequest($this)->actingAs($user)
+        ->postJson(route('projects.context-items.store', $project), [
+            'type' => 'link',
+            'title' => 'Owner reference',
+            'url' => 'https://example.com/owner-reference',
+        ])
+        ->assertCreated()
+        ->assertJsonPath('data.title', 'Owner reference')
+        ->assertJsonPath('data.metadata.url', 'https://example.com/owner-reference');
+
+    expect(ContextItem::query()->sole()->project->is($project))->toBeTrue();
+});
+
 test('admin can create a text context item', function () {
     ['user' => $user, 'project' => $project] = projectContextItemStoreScene();
 

@@ -59,6 +59,19 @@ test('admin can update a project context item title and description', function (
         ->description->toBe('Updated description');
 });
 
+test('owner can update a project context item', function () {
+    ['user' => $user, 'project' => $project, 'contextItem' => $contextItem] = projectContextItemMutationScene(TeamRole::Owner);
+
+    contextItemMutationRequest($this)->actingAs($user)
+        ->patchJson(route('projects.context-items.update', [$project, $contextItem]), [
+            'title' => 'Owner updated title',
+        ])
+        ->assertSuccessful()
+        ->assertJsonPath('data.title', 'Owner updated title');
+
+    expect($contextItem->refresh()->title)->toBe('Owner updated title');
+});
+
 test('admin can clear a project context item description', function () {
     ['user' => $user, 'project' => $project, 'contextItem' => $contextItem] = projectContextItemMutationScene();
 
@@ -117,6 +130,16 @@ test('guest cannot delete a project context item', function () {
 
 test('admin can delete a project context item', function () {
     ['user' => $user, 'project' => $project, 'contextItem' => $contextItem] = projectContextItemMutationScene();
+
+    contextItemMutationRequest($this)->actingAs($user)
+        ->deleteJson(route('projects.context-items.destroy', [$project, $contextItem]))
+        ->assertNoContent();
+
+    $this->assertModelMissing($contextItem);
+});
+
+test('owner can delete a project context item', function () {
+    ['user' => $user, 'project' => $project, 'contextItem' => $contextItem] = projectContextItemMutationScene(TeamRole::Owner);
 
     contextItemMutationRequest($this)->actingAs($user)
         ->deleteJson(route('projects.context-items.destroy', [$project, $contextItem]))

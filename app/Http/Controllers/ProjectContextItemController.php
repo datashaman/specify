@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Enums\TeamRole;
+use App\Http\Requests\DestroyProjectContextItemRequest;
 use App\Http\Requests\StoreProjectContextItemRequest;
 use App\Http\Requests\UpdateProjectContextItemRequest;
 use App\Http\Resources\ContextItemResource;
@@ -60,10 +61,8 @@ class ProjectContextItemController extends Controller
             ->response();
     }
 
-    public function destroy(Request $request, Project $project, ContextItem $contextItem): Response
+    public function destroy(DestroyProjectContextItemRequest $request, Project $project, ContextItem $contextItem): Response
     {
-        abort_unless($request->user()->canManageProject($project), 403);
-
         $this->abortUnlessContextItemBelongsToProject($contextItem, $project);
 
         $contextItem->delete();
