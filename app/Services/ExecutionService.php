@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Enums\AgentRunKind;
 use App\Enums\AgentRunStatus;
+use App\Enums\ApprovalDecision;
 use App\Enums\StoryStatus;
 use App\Enums\TaskStatus;
 use App\Jobs\ExecuteSubtaskJob;
@@ -142,7 +143,7 @@ class ExecutionService
         });
     }
 
-    private function createAndDispatchRun(Subtask $subtask, ?StoryApproval $approval, ?Repo $repo, string $driver, ?string $branchSuffix): AgentRun
+    private function createAndDispatchRun(Subtask $subtask, ?StoryApproval $approval, ?Repo $repo, string $driver, ?string $branchSuffix, ?int $retryOfId = null): AgentRun
     {
         $run = AgentRun::create([
             'runnable_type' => $subtask->getMorphClass(),
@@ -153,6 +154,7 @@ class ExecutionService
             'authorizing_approval_type' => $approval?->getMorphClass(),
             'authorizing_approval_id' => $approval?->getKey(),
             'status' => AgentRunStatus::Queued,
+            'retry_of_id' => $retryOfId,
         ]);
 
         ExecuteSubtaskJob::dispatch($run->getKey());
@@ -333,6 +335,58 @@ class ExecutionService
         $run->forceFill(['cancel_requested' => true])->save();
 
         return true;
+    }
+
+    /**
+     * Retry a Subtask Execute run by dispatching a fresh sibling AgentRun
+     * that points at the prior run via `retry_of_id` (ADR-0010).
+     *
+     * Authorization re-resolves through the current StoryApproval — if the
+     * Story has been edited since (revision bumped → approval reset), the
+     * retry binds to the current approving approval. Throws when the Story
+     * is not Approved (revoked / changes-requested / superseded).
+     *
+     * Race mode: this retries one driver. The driver defaults to the prior
+     * run's `executor_driver` so a single-sibling retry is just "do that
+     * one again". Pass `$driver` to override.
+     */
+    public function retrySubtaskExecution(Subtask $subtask, AgentRun $fromRun, ?string $driver = null): AgentRun
+    {
+        if ($fromRun->runnable_type !== Subtask::class || (int) $fromRun->runnable_id !== (int) $subtask->getKey()) {
+            throw new RuntimeException('Run does not belong to this subtask.');
+        }
+        if ($fromRun->kind === AgentRunKind::RespondToReview) {
+            throw new RuntimeException('Review-response runs are not retryable; new review events re-fire automatically.');
+        }
+        if (! $fromRun->isTerminal()) {
+            throw new RuntimeException('Cannot retry a run that is still in flight.');
+        }
+
+        $story = $subtask->task?->story;
+        if (! $story || $story->status !== StoryStatus::Approved) {
+            throw new RuntimeException('Story is not Approved; retry is gated on a current approval.');
+        }
+
+        $approval = StoryApproval::query()
+            ->where('story_id', $story->getKey())
+            ->where('story_revision', $story->revision ?? 1)
+            ->where('decision', ApprovalDecision::Approve->value)
+            ->latest('created_at')
+            ->first();
+
+        $repo = $fromRun->repo ?? $story->feature?->project?->primaryRepo();
+        $resolvedDriver = $driver ?? $fromRun->executor_driver ?? $this->executors->defaultDriver();
+        $race = $this->executors->raceDrivers();
+        $branchSuffix = in_array($resolvedDriver, $race, true) ? $resolvedDriver : null;
+
+        return $this->createAndDispatchRun(
+            $subtask,
+            $approval,
+            $repo,
+            $resolvedDriver,
+            $branchSuffix,
+            $fromRun->getKey(),
+        );
     }
 
     /**

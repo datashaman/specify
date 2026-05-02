@@ -48,6 +48,30 @@ new #[Title('Run')] class extends Component {
         unset($this->run);
     }
 
+    public function retry(ExecutionService $execution): void
+    {
+        $run = $this->run;
+        abort_unless($run, 404);
+
+        if (! $run->isTerminal() || ! $run->status->isFailure()) {
+            return;
+        }
+
+        $subtask = $run->runnable;
+        if (! $subtask instanceof Subtask) {
+            return;
+        }
+
+        $newRun = $execution->retrySubtaskExecution($subtask, $run);
+
+        $this->redirect(route('runs.show', [
+            'project' => $this->project_id,
+            'story' => $this->story_id,
+            'subtask' => $this->subtask_id,
+            'run' => $newRun->id,
+        ]), navigate: true);
+    }
+
     #[Computed]
     public function run(): ?AgentRun
     {
@@ -93,6 +117,7 @@ new #[Title('Run')] class extends Component {
             };
             $canCancel = ! $run->isTerminal();
             $cancelPending = $canCancel && (bool) $run->cancel_requested;
+            $canRetry = $run->isTerminal() && $run->status->isFailure();
             $duration = $run->started_at && $run->finished_at
                 ? $run->started_at->diffInSeconds($run->finished_at)
                 : null;
@@ -123,6 +148,13 @@ new #[Title('Run')] class extends Component {
                     @if ($run->kind && $run->kind->value !== 'execute')
                         <flux:badge color="purple">{{ $run->kind->value }}</flux:badge>
                     @endif
+                    @if ($run->retry_of_id)
+                        <a
+                            href="{{ route('runs.show', ['project' => $project, 'story' => $story, 'subtask' => $subtask, 'run' => $run->retry_of_id]) }}"
+                            wire:navigate
+                            class="text-xs text-zinc-500 underline hover:text-zinc-700 dark:hover:text-zinc-300"
+                        >{{ __('retry of') }} #{{ $run->retry_of_id }}</a>
+                    @endif
                     @if ($cancelPending)
                         <flux:badge size="sm" color="amber" icon="clock">{{ __('cancel pending') }}</flux:badge>
                     @endif
@@ -137,6 +169,17 @@ new #[Title('Run')] class extends Component {
                             class="ml-auto"
                             data-action="cancel-run"
                         >{{ $cancelPending ? __('Cancelling…') : __('Cancel run') }}</flux:button>
+                    @endif
+                    @if ($canRetry)
+                        <flux:button
+                            size="sm"
+                            variant="primary"
+                            icon="arrow-path"
+                            wire:click="retry"
+                            wire:confirm="{{ __('Dispatch a fresh AgentRun for this subtask? The new run is authorised against the current StoryApproval.') }}"
+                            class="ml-auto"
+                            data-action="retry-run"
+                        >{{ __('Retry') }}</flux:button>
                     @endif
                 </div>
                 <div class="mt-2 flex flex-wrap items-center gap-2 text-xs">
