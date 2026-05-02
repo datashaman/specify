@@ -20,6 +20,19 @@ if ! pwd -P >/dev/null 2>&1; then
   cd "${CLAUDE_PROJECT_DIR:-$(dirname "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")")}" || exit 1
 fi
 
+# Disable Laravel Pao's pest output capture. Pao detects the agent
+# environment and swaps verbose pest output for a single JSON summary
+# line, which is great for protocol callers but useless here:
+#   - Multi-failure runs produce a JSON line longer than the Bash tool's
+#     output buffer and arrive truncated.
+#   - Fatals during pest's *test collection phase* (e.g. an anonymous
+#     class not satisfying a changed interface) abort before any result
+#     exists, so Pao's shutdown handler emits nothing at all — exit=2
+#     with zero output.
+# Both modes drop us into a silent retry loop. Verbose pest output is
+# what we actually want when the gate fails.
+export PAO_DISABLE=1
+
 step() {
   local label="$1"; shift
   echo "→ $label"
