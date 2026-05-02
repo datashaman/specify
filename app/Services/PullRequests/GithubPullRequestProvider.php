@@ -58,33 +58,83 @@ class GithubPullRequestProvider implements PullRequestProvider
 
         [$owner, $name] = $this->parseOwnerRepo($repo->url);
         $apiBase = rtrim((string) config('specify.github.api_base', 'https://api.github.com'), '/');
+        $headRepo = $owner.'/'.$name;
 
-        $response = Http::withHeaders([
-            'Accept' => 'application/vnd.github+json',
-            'Authorization' => 'Bearer '.$repo->access_token,
-            'X-GitHub-Api-Version' => '2022-11-28',
-        ])->get("{$apiBase}/repos/{$owner}/{$name}/pulls", [
-            'head' => $owner.':'.$head,
-            'state' => 'open',
-            'per_page' => 1,
-        ]);
+        // GitHub's `head=user:branch` query-param filter is brittle:
+        // it's documented for fork PRs and silently returns empty for
+        // same-repo PRs whose head ref contains slashes (which all our
+        // `specify/<feature>/<story>` branches do). Smoke testing on a
+        // real repo confirmed the filtered request returned [] while the
+        // PR was open. The robust fix is to list open PRs and match the
+        // head.ref client-side, paginating via the `Link: rel="next"`
+        // header. Cap at MAX_PAGES * 100 PRs so a runaway queue can't
+        // burn the API budget.
+        $url = "{$apiBase}/repos/{$owner}/{$name}/pulls?state=open&per_page=100";
+        $maxPages = (int) config('specify.github.find_pr_max_pages', 10);
 
-        if (! $response->successful()) {
-            return null;
+        for ($page = 0; $page < $maxPages; $page++) {
+            $response = Http::withHeaders([
+                'Accept' => 'application/vnd.github+json',
+                'Authorization' => 'Bearer '.$repo->access_token,
+                'X-GitHub-Api-Version' => '2022-11-28',
+            ])->get($url);
+
+            if (! $response->successful()) {
+                return null;
+            }
+
+            $data = $response->json();
+            if (! is_array($data) || $data === []) {
+                return null;
+            }
+
+            foreach ($data as $pr) {
+                if (! is_array($pr)) {
+                    continue;
+                }
+                if (($pr['head']['ref'] ?? null) !== $head) {
+                    continue;
+                }
+                // Cross-repo guard: the open-PR list includes fork PRs
+                // whose head.ref can collide with a same-repo branch.
+                // Only adopt PRs whose head is on the destination repo
+                // — `createPullRequest` always sends `head` as a bare
+                // branch name, so the PR we want is always same-repo.
+                if (($pr['head']['repo']['full_name'] ?? null) !== $headRepo) {
+                    continue;
+                }
+
+                return [
+                    'url' => (string) ($pr['html_url'] ?? ''),
+                    'number' => $pr['number'] ?? 0,
+                    'id' => $pr['id'] ?? 0,
+                ];
+            }
+
+            $next = $this->nextPageUrl($response->header('Link'));
+            if ($next === null) {
+                return null;
+            }
+            $url = $next;
         }
 
-        $data = $response->json();
-        if (! is_array($data) || $data === []) {
+        return null;
+    }
+
+    /**
+     * Parse the next-page URL out of a GitHub `Link` header
+     * (`<https://...?page=2>; rel="next", <...>; rel="last"`).
+     */
+    private function nextPageUrl(?string $linkHeader): ?string
+    {
+        if ($linkHeader === null || $linkHeader === '') {
             return null;
         }
+        if (preg_match('/<([^>]+)>;\s*rel="next"/', $linkHeader, $m)) {
+            return $m[1];
+        }
 
-        $pr = $data[0];
-
-        return [
-            'url' => (string) ($pr['html_url'] ?? ''),
-            'number' => $pr['number'] ?? 0,
-            'id' => $pr['id'] ?? 0,
-        ];
+        return null;
     }
 
     /**
