@@ -50,6 +50,43 @@ class GithubPullRequestProvider implements PullRequestProvider
         ];
     }
 
+    public function findOpenPullRequest(Repo $repo, string $head): ?array
+    {
+        if ($repo->access_token === null || $repo->access_token === '') {
+            return null;
+        }
+
+        [$owner, $name] = $this->parseOwnerRepo($repo->url);
+        $apiBase = rtrim((string) config('specify.github.api_base', 'https://api.github.com'), '/');
+
+        $response = Http::withHeaders([
+            'Accept' => 'application/vnd.github+json',
+            'Authorization' => 'Bearer '.$repo->access_token,
+            'X-GitHub-Api-Version' => '2022-11-28',
+        ])->get("{$apiBase}/repos/{$owner}/{$name}/pulls", [
+            'head' => $owner.':'.$head,
+            'state' => 'open',
+            'per_page' => 1,
+        ]);
+
+        if (! $response->successful()) {
+            return null;
+        }
+
+        $data = $response->json();
+        if (! is_array($data) || $data === []) {
+            return null;
+        }
+
+        $pr = $data[0];
+
+        return [
+            'url' => (string) ($pr['html_url'] ?? ''),
+            'number' => $pr['number'] ?? 0,
+            'id' => $pr['id'] ?? 0,
+        ];
+    }
+
     /**
      * @return array{0: string, 1: string}
      */

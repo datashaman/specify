@@ -49,6 +49,11 @@ class GitlabPullRequestProvider implements PullRequestProvider
         ];
     }
 
+    public function findOpenPullRequest(Repo $repo, string $head): ?array
+    {
+        return null;
+    }
+
     private function parseProjectPath(string $url): string
     {
         $url = preg_replace('/\.git$/', '', $url);

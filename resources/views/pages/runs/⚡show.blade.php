@@ -1,8 +1,10 @@
 <?php
 
+use App\Enums\AgentRunKind;
 use App\Enums\AgentRunStatus;
 use App\Models\AgentRun;
 use App\Models\Subtask;
+use App\Services\ExecutionService;
 use Illuminate\Support\Facades\Auth;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Title;
@@ -32,6 +34,71 @@ new #[Title('Run')] class extends Component {
         if ((int) $user->current_project_id !== $this->project_id) {
             $user->forceFill(['current_project_id' => $this->project_id])->save();
         }
+    }
+
+    public function cancel(ExecutionService $execution): void
+    {
+        $run = $this->run;
+        abort_unless($run, 404);
+
+        if ($run->isTerminal()) {
+            return;
+        }
+
+        $execution->cancelRun($run, 'Cancelled from run console.');
+        unset($this->run);
+    }
+
+    public function retryPr(ExecutionService $execution): void
+    {
+        $run = $this->run;
+        abort_unless($run, 404);
+
+        try {
+            $execution->retryPullRequestOpen($run);
+        } catch (\RuntimeException $e) {
+            // Surface but don't crash the page — invariant violations
+            // (already-open PR, non-Succeeded run) are expected user errors.
+            session()->flash('pr_retry_error', $e->getMessage());
+
+            return;
+        }
+
+        session()->flash('pr_retry_dispatched', __('PR retry dispatched.'));
+        unset($this->run);
+    }
+
+    public function retry(ExecutionService $execution): void
+    {
+        $run = $this->run;
+        abort_unless($run, 404);
+
+        if (! $run->isTerminal() || ! $run->status->isFailure()) {
+            return;
+        }
+        if ($run->kind === AgentRunKind::RespondToReview) {
+            return;
+        }
+
+        $subtask = $run->runnable;
+        if (! $subtask instanceof Subtask) {
+            return;
+        }
+
+        try {
+            $newRun = $execution->retrySubtaskExecution($subtask, $run);
+        } catch (\RuntimeException $e) {
+            session()->flash('retry_error', $e->getMessage());
+
+            return;
+        }
+
+        $this->redirect(route('runs.show', [
+            'project' => $this->project_id,
+            'story' => $this->story_id,
+            'subtask' => $this->subtask_id,
+            'run' => $newRun->id,
+        ]), navigate: true);
     }
 
     #[Computed]
@@ -74,9 +141,17 @@ new #[Title('Run')] class extends Component {
             $rail = match ($run->status) {
                 AgentRunStatus::Succeeded => 'run_complete',
                 AgentRunStatus::Running, AgentRunStatus::Queued => 'running',
-                AgentRunStatus::Failed, AgentRunStatus::Aborted => 'run_failed',
+                AgentRunStatus::Failed, AgentRunStatus::Aborted, AgentRunStatus::Cancelled => 'run_failed',
                 default => 'draft',
             };
+            $canCancel = ! $run->isTerminal();
+            $cancelPending = $canCancel && (bool) $run->cancel_requested;
+            // Review-response runs (ADR-0008) re-fire automatically on the
+            // next review event and are explicitly not retryable through
+            // the manual chain (ADR-0010).
+            $canRetry = $run->isTerminal()
+                && $run->status->isFailure()
+                && $run->kind !== AgentRunKind::RespondToReview;
             $duration = $run->started_at && $run->finished_at
                 ? $run->started_at->diffInSeconds($run->finished_at)
                 : null;
@@ -107,6 +182,39 @@ new #[Title('Run')] class extends Component {
                     @if ($run->kind && $run->kind->value !== 'execute')
                         <flux:badge color="purple">{{ $run->kind->value }}</flux:badge>
                     @endif
+                    @if ($run->retry_of_id)
+                        <a
+                            href="{{ route('runs.show', ['project' => $project, 'story' => $story, 'subtask' => $subtask, 'run' => $run->retry_of_id]) }}"
+                            wire:navigate
+                            class="text-xs text-zinc-500 underline hover:text-zinc-700 dark:hover:text-zinc-300"
+                        >{{ __('retry of') }} #{{ $run->retry_of_id }}</a>
+                    @endif
+                    @if ($cancelPending)
+                        <flux:badge size="sm" color="amber" icon="clock">{{ __('cancel pending') }}</flux:badge>
+                    @endif
+                    @if ($canCancel)
+                        <flux:button
+                            size="sm"
+                            variant="subtle"
+                            icon="x-mark"
+                            wire:click="cancel"
+                            wire:confirm="{{ __('Cancel this run? In-flight tool calls finish; the pipeline stops at the next phase boundary.') }}"
+                            :disabled="$cancelPending"
+                            class="ml-auto"
+                            data-action="cancel-run"
+                        >{{ $cancelPending ? __('Cancelling…') : __('Cancel run') }}</flux:button>
+                    @endif
+                    @if ($canRetry)
+                        <flux:button
+                            size="sm"
+                            variant="primary"
+                            icon="arrow-path"
+                            wire:click="retry"
+                            wire:confirm="{{ __('Dispatch a fresh AgentRun for this subtask? The new run is authorised against the current StoryApproval.') }}"
+                            class="ml-auto"
+                            data-action="retry-run"
+                        >{{ __('Retry') }}</flux:button>
+                    @endif
                 </div>
                 <div class="mt-2 flex flex-wrap items-center gap-2 text-xs">
                     @if ($run->executor_driver)
@@ -134,6 +242,13 @@ new #[Title('Run')] class extends Component {
                     </div>
                 @endif
             </div>
+
+            @if (session('retry_error'))
+                <flux:callout icon="exclamation-triangle" color="rose">
+                    <flux:callout.heading>{{ __('Retry failed') }}</flux:callout.heading>
+                    <flux:callout.text>{{ session('retry_error') }}</flux:callout.text>
+                </flux:callout>
+            @endif
 
             @if ($run->error_message)
                 <details class="rounded-md border border-rose-200 bg-rose-50 dark:border-rose-900/40 dark:bg-rose-950/30" open>
@@ -193,6 +308,16 @@ new #[Title('Run')] class extends Component {
                         <flux:text class="text-zinc-500">{{ __('No diff captured for this run.') }}</flux:text>
                     @endif
                 @elseif ($tab === 'pr')
+                    @if (session('pr_retry_dispatched'))
+                        <flux:callout icon="check-circle" color="emerald">
+                            <flux:callout.text>{{ session('pr_retry_dispatched') }}</flux:callout.text>
+                        </flux:callout>
+                    @endif
+                    @if (session('pr_retry_error'))
+                        <flux:callout icon="exclamation-triangle" color="rose">
+                            <flux:callout.text>{{ session('pr_retry_error') }}</flux:callout.text>
+                        </flux:callout>
+                    @endif
                     @if ($prUrl)
                         <flux:card>
                             <div class="flex flex-wrap items-center gap-2">
@@ -208,6 +333,17 @@ new #[Title('Run')] class extends Component {
                                 @endif
                             </div>
                         </flux:card>
+                    @elseif ($prError && $run->status === AgentRunStatus::Succeeded)
+                        <div class="flex flex-wrap items-center gap-2">
+                            <flux:button
+                                size="sm"
+                                variant="primary"
+                                icon="arrow-path"
+                                wire:click="retryPr"
+                                data-action="retry-pr"
+                            >{{ __('Retry PR open') }}</flux:button>
+                            <flux:text class="text-xs text-zinc-500">{{ __('Re-attempt PR creation; idempotent — adopts an existing PR if one is already open for this branch.') }}</flux:text>
+                        </div>
                     @else
                         <flux:text class="text-zinc-500">{{ __('No pull request opened for this run.') }}</flux:text>
                     @endif

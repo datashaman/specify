@@ -33,6 +33,7 @@ use RuntimeException;
     'input', 'output', 'diff', 'error_message',
     'tokens_input', 'tokens_output',
     'started_at', 'finished_at',
+    'cancel_requested', 'retry_of_id',
 ])]
 class AgentRun extends Model
 {
@@ -55,6 +56,7 @@ class AgentRun extends Model
             'tokens_output' => 'integer',
             'started_at' => 'datetime',
             'finished_at' => 'datetime',
+            'cancel_requested' => 'boolean',
         ];
     }
 
@@ -75,10 +77,11 @@ class AgentRun extends Model
 
     public function isTerminal(): bool
     {
-        return in_array($this->status, [
-            AgentRunStatus::Succeeded,
-            AgentRunStatus::Failed,
-            AgentRunStatus::Aborted,
-        ], true);
+        return $this->status->isTerminal();
+    }
+
+    public function retryOf(): BelongsTo
+    {
+        return $this->belongsTo(self::class, 'retry_of_id');
     }
 }

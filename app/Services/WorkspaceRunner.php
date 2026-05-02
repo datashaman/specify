@@ -198,6 +198,39 @@ class WorkspaceRunner
     }
 
     /**
+     * Discard any local-only commits on $branch by hard-resetting it to
+     * `origin/$baseBranch` and clearing the working tree (ADR-0010).
+     *
+     * Called when the pipeline observes a cooperative cancel mid-flight:
+     * a partial commit on the local working branch must not survive into
+     * the shared per-story workspace, otherwise a future retry would start
+     * from the cancelled commit. If the branch was already pushed
+     * (origin/<branch> exists), the local copy is reset to the remote
+     * tip rather than the base — the published work is the source of
+     * truth and only local-ahead commits get discarded.
+     */
+    public function discardLocalChanges(string $workingDir, string $branch, string $baseBranch): void
+    {
+        $this->run(['git', 'reset', '--hard', 'HEAD'], $workingDir, allowFailure: true);
+        $this->run(['git', 'clean', '-fdx'], $workingDir, allowFailure: true);
+
+        $remote = $this->run(
+            ['git', 'rev-parse', '--verify', '--quiet', 'refs/remotes/origin/'.$branch],
+            $workingDir,
+            allowFailure: true,
+        );
+
+        if ($remote['exitCode'] === 0) {
+            $this->run(['git', 'reset', '--hard', 'origin/'.$branch], $workingDir, allowFailure: true);
+
+            return;
+        }
+
+        $this->run(['git', 'fetch', 'origin', $baseBranch], $workingDir, allowFailure: true);
+        $this->run(['git', 'reset', '--hard', 'origin/'.$baseBranch], $workingDir, allowFailure: true);
+    }
+
+    /**
      * Push the named branch to origin so reviewers can inspect the diff out-of-band.
      */
     public function push(string $workingDir, string $branch): void

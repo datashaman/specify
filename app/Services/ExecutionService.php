@@ -4,10 +4,12 @@ namespace App\Services;
 
 use App\Enums\AgentRunKind;
 use App\Enums\AgentRunStatus;
+use App\Enums\ApprovalDecision;
 use App\Enums\StoryStatus;
 use App\Enums\TaskStatus;
 use App\Jobs\ExecuteSubtaskJob;
 use App\Jobs\GenerateTasksJob;
+use App\Jobs\OpenPullRequestJob;
 use App\Jobs\RespondToPrReviewJob;
 use App\Models\AgentRun;
 use App\Models\Repo;
@@ -142,7 +144,7 @@ class ExecutionService
         });
     }
 
-    private function createAndDispatchRun(Subtask $subtask, ?StoryApproval $approval, ?Repo $repo, string $driver, ?string $branchSuffix): AgentRun
+    private function createAndDispatchRun(Subtask $subtask, ?StoryApproval $approval, ?Repo $repo, string $driver, ?string $branchSuffix, ?int $retryOfId = null): AgentRun
     {
         $run = AgentRun::create([
             'runnable_type' => $subtask->getMorphClass(),
@@ -153,6 +155,7 @@ class ExecutionService
             'authorizing_approval_type' => $approval?->getMorphClass(),
             'authorizing_approval_id' => $approval?->getKey(),
             'status' => AgentRunStatus::Queued,
+            'retry_of_id' => $retryOfId,
         ]);
 
         ExecuteSubtaskJob::dispatch($run->getKey());
@@ -231,13 +234,34 @@ class ExecutionService
             ->values();
     }
 
-    /** Transition an AgentRun to Running and stamp `started_at`. */
-    public function markRunning(AgentRun $run): void
+    /**
+     * Transition an AgentRun to Running and stamp `started_at`.
+     *
+     * Conditional on the persisted status still being Queued — closes the
+     * queued-cancel race (ADR-0010): if `cancelRun()` flipped the row to
+     * Cancelled between the worker's `findOrFail` and this call, the
+     * UPDATE matches zero rows and we return false so the caller bails.
+     */
+    public function markRunning(AgentRun $run): bool
     {
+        $affected = AgentRun::query()
+            ->whereKey($run->getKey())
+            ->where('status', AgentRunStatus::Queued->value)
+            ->update([
+                'status' => AgentRunStatus::Running->value,
+                'started_at' => now(),
+            ]);
+
+        if ($affected === 0) {
+            return false;
+        }
+
         $run->forceFill([
             'status' => AgentRunStatus::Running->value,
             'started_at' => now(),
-        ])->save();
+        ])->syncOriginal();
+
+        return true;
     }
 
     /**
@@ -288,6 +312,157 @@ class ExecutionService
         if ($run->runnable_type === Subtask::class) {
             $this->finalizeSubtaskFromRun($run);
         }
+    }
+
+    /**
+     * Mark an AgentRun Cancelled — cooperative cancel observed at a pipeline
+     * phase boundary (ADR-0010). Failure-class for cascade purposes; siblings
+     * count as losers.
+     */
+    public function markCancelled(AgentRun $run, ?string $reason = null): void
+    {
+        $run->forceFill([
+            'status' => AgentRunStatus::Cancelled->value,
+            'error_message' => $reason ?? 'Cancelled by user.',
+            'finished_at' => now(),
+        ])->save();
+
+        if ($run->runnable_type === Subtask::class) {
+            $this->finalizeSubtaskFromRun($run);
+        }
+    }
+
+    /**
+     * Request cooperative cancellation of an AgentRun (ADR-0010).
+     *
+     * Queued runs short-circuit straight to Cancelled (the job hasn't
+     * started, so there's nothing to cooperate with). Running runs have the
+     * `cancel_requested` flag set; the pipeline's poll points observe it
+     * between phases and transition to Cancelled. Terminal runs are no-ops.
+     *
+     * Returns true if anything changed.
+     */
+    public function cancelRun(AgentRun $run, ?string $reason = null): bool
+    {
+        if ($run->isTerminal()) {
+            return false;
+        }
+
+        // Set the audit flag in both branches: a Queued run that flips
+        // straight to Cancelled still records *that the cancel was
+        // requested*, matching ADR-0010's "cancel_requested is part of the
+        // audit trail" claim. Without this, a Queued cancel would leave a
+        // Cancelled run with cancel_requested=false and reviewers couldn't
+        // tell whether the run terminated cooperatively or because the
+        // worker never picked it up.
+        $run->forceFill(['cancel_requested' => true])->save();
+
+        if ($run->status === AgentRunStatus::Queued) {
+            $this->markCancelled($run, $reason);
+        }
+
+        return true;
+    }
+
+    /**
+     * Retry a Subtask Execute run by dispatching a fresh sibling AgentRun
+     * that points at the prior run via `retry_of_id` (ADR-0010).
+     *
+     * Authorization re-resolves through the current StoryApproval — if the
+     * Story has been edited since (revision bumped → approval reset), the
+     * retry binds to the current approving approval. Throws when the Story
+     * is not Approved (revoked / changes-requested / superseded).
+     *
+     * Race mode: this retries one driver. The driver defaults to the prior
+     * run's `executor_driver` so a single-sibling retry is just "do that
+     * one again". Pass `$driver` to override.
+     */
+    public function retrySubtaskExecution(Subtask $subtask, AgentRun $fromRun, ?string $driver = null): AgentRun
+    {
+        if ($fromRun->runnable_type !== Subtask::class || (int) $fromRun->runnable_id !== (int) $subtask->getKey()) {
+            throw new RuntimeException('Run does not belong to this subtask.');
+        }
+        if ($fromRun->kind === AgentRunKind::RespondToReview) {
+            throw new RuntimeException('Review-response runs are not retryable; new review events re-fire automatically.');
+        }
+        if (! $fromRun->isTerminal()) {
+            throw new RuntimeException('Cannot retry a run that is still in flight.');
+        }
+        // Service-level invariant: only failure-class runs can be retried.
+        // The UI hides Retry on Succeeded runs already, but a non-UI
+        // caller (MCP tool, internal automation) without this guard could
+        // re-dispatch an already-successful Subtask and double-open PRs.
+        if (! $fromRun->status->isFailure()) {
+            throw new RuntimeException('Only failed / cancelled / aborted runs can be retried.');
+        }
+
+        $story = $subtask->task?->story;
+        if (! $story || $story->status !== StoryStatus::Approved) {
+            throw new RuntimeException('Story is not Approved; retry is gated on a current approval.');
+        }
+
+        $approval = StoryApproval::query()
+            ->where('story_id', $story->getKey())
+            ->where('story_revision', $story->revision ?? 1)
+            ->where('decision', ApprovalDecision::Approve->value)
+            ->latest('created_at')
+            ->first();
+
+        $repo = $fromRun->repo ?? $story->feature?->project?->primaryRepo();
+        $resolvedDriver = $driver ?? $fromRun->executor_driver ?? $this->executors->defaultDriver();
+        $race = $this->executors->raceDrivers();
+        $branchSuffix = in_array($resolvedDriver, $race, true) ? $resolvedDriver : null;
+
+        return $this->createAndDispatchRun(
+            $subtask,
+            $approval,
+            $repo,
+            $resolvedDriver,
+            $branchSuffix,
+            $fromRun->getKey(),
+        );
+    }
+
+    /**
+     * Retry the PR-open step for a Succeeded run whose previous open()
+     * attempt failed (ADR-0004 — non-fatal — so the run is Succeeded but
+     * `pull_request_error` is set and `pull_request_url` is empty).
+     *
+     * The AgentRun's terminal status is preserved; only its output is
+     * updated. See OpenPullRequestJob for idempotency + locking semantics
+     * (ADR-0010).
+     */
+    public function retryPullRequestOpen(AgentRun $run): void
+    {
+        if ($run->status !== AgentRunStatus::Succeeded) {
+            throw new RuntimeException('PR retry only applies to Succeeded runs.');
+        }
+        $output = (array) $run->output;
+        if (! empty($output['pull_request_url'])) {
+            throw new RuntimeException('Run already has a pull_request_url; nothing to retry.');
+        }
+
+        OpenPullRequestJob::dispatch($run->getKey());
+    }
+
+    /**
+     * Convenience: cancel every still-open AgentRun for a Subtask. Useful for
+     * race mode where one button cancels all sibling drivers (ADR-0010).
+     *
+     * @return int Number of runs whose state changed.
+     */
+    public function cancelSubtask(Subtask $subtask, ?string $reason = null): int
+    {
+        $changed = 0;
+        foreach ($subtask->agentRuns()
+            ->whereIn('status', [AgentRunStatus::Queued->value, AgentRunStatus::Running->value])
+            ->get() as $run) {
+            if ($this->cancelRun($run, $reason)) {
+                $changed++;
+            }
+        }
+
+        return $changed;
     }
 
     /**

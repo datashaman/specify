@@ -16,7 +16,7 @@ except to mark them Superseded.
 | [0007](0007-already-complete-subtasks.md) | Already-complete subtasks | Accepted |
 | [0008](0008-pr-review-feedback-via-webhooks.md) | PR review feedback closes the loop via webhooks | Accepted |
 | [0009](0009-story-snapshots-for-run-authorisation.md) | Story snapshots for run authorisation | Proposed |
-| [0010](0010-cancel-and-retry-for-agent-runs.md) | Cancel and retry semantics for AgentRuns | Proposed |
+| [0010](0010-cancel-and-retry-for-agent-runs.md) | Cancel and retry semantics for AgentRuns | Accepted |
 | [0011](0011-streaming-progress-events-from-executors.md) | Streaming progress events from executors | Proposed |
 | [0012](0012-project-first-information-architecture.md) | Project-first information architecture | Accepted |
 
