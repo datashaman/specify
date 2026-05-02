@@ -23,3 +23,5 @@ yarn-error.log
 /.zed
 .gstack/
 *.swp
+.playwright-mcp/
+*.png

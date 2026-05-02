@@ -30,14 +30,6 @@ afterEach(function () {
     Cache::flush();
 });
 
-test('shows the prompt to select a project when none is pinned', function () {
-    ['user' => $user] = repoScene(pin: false);
-    $this->actingAs($user);
-
-    Livewire::test('pages::repos.index')
-        ->assertSee('Select a project to manage its repositories.');
-});
-
 test('lists project repos with a no-webhook badge by default', function () {
     ['user' => $user, 'project' => $project, 'workspace' => $ws] = repoScene();
     $repo = Repo::factory()->for($ws)->create([
@@ -47,7 +39,7 @@ test('lists project repos with a no-webhook badge by default', function () {
     $project->attachRepo($repo);
     $this->actingAs($user);
 
-    Livewire::test('pages::repos.index')
+    Livewire::test('pages::repos.index', ['project' => $project->id])
         ->assertSee('backend')
         ->assertSee('no webhook');
 });
@@ -60,7 +52,7 @@ test('admin can mark a repo primary; setPrimary flips the pivot flag', function 
     $project->attachRepo($b);
     $this->actingAs($user);
 
-    Livewire::test('pages::repos.index')
+    Livewire::test('pages::repos.index', ['project' => $project->id])
         ->call('setPrimary', $b->id)
         ->assertHasNoErrors();
 
@@ -74,7 +66,7 @@ test('member cannot setPrimary', function () {
     $project->attachRepo($repo);
     $this->actingAs($user);
 
-    Livewire::test('pages::repos.index')
+    Livewire::test('pages::repos.index', ['project' => $project->id])
         ->call('setPrimary', $repo->id)
         ->assertStatus(403);
 });
@@ -88,7 +80,7 @@ test('remove detaches the project pivot AND deletes the workspace repo', functio
     $project->attachRepo($repo);
     $this->actingAs($user);
 
-    Livewire::test('pages::repos.index')
+    Livewire::test('pages::repos.index', ['project' => $project->id])
         ->call('remove', $repo->id)
         ->assertHasNoErrors();
 
@@ -102,7 +94,7 @@ test('member cannot remove a repo', function () {
     $project->attachRepo($repo);
     $this->actingAs($user);
 
-    Livewire::test('pages::repos.index')
+    Livewire::test('pages::repos.index', ['project' => $project->id])
         ->call('remove', $repo->id)
         ->assertStatus(403);
 
@@ -126,7 +118,7 @@ test('addGithubRepo creates a workspace repo and attaches it to the project', fu
         'api.github.com/repos/datashaman/specify/hooks*' => Http::response(['id' => 1], 201),
     ]);
 
-    Livewire::test('pages::repos.index')
+    Livewire::test('pages::repos.index', ['project' => $project->id])
         ->call('addGithubRepo', 'datashaman/specify')
         ->assertHasNoErrors();
 
@@ -137,10 +129,10 @@ test('addGithubRepo creates a workspace repo and attaches it to the project', fu
 });
 
 test('member cannot addGithubRepo', function () {
-    ['user' => $user] = repoScene(TeamRole::Member);
+    ['user' => $user, 'project' => $project] = repoScene(TeamRole::Member);
     $this->actingAs($user);
 
-    Livewire::test('pages::repos.index')
+    Livewire::test('pages::repos.index', ['project' => $project->id])
         ->call('addGithubRepo', 'datashaman/specify')
         ->assertStatus(403);
 

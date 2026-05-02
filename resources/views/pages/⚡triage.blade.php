@@ -9,7 +9,7 @@ use Livewire\Attributes\Computed;
 use Livewire\Attributes\Title;
 use Livewire\Component;
 
-new #[Title('Inbox')] class extends Component {
+new #[Title('Triage')] class extends Component {
     public array $notes = [];
 
     #[Computed]
@@ -58,7 +58,7 @@ new #[Title('Inbox')] class extends Component {
 }; ?>
 
 <div class="flex flex-col gap-8 p-6">
-    <flux:heading size="xl">{{ __('Inbox') }}</flux:heading>
+    <flux:heading size="xl">{{ __('Triage') }}</flux:heading>
 
     @php
         $user = auth()->user();

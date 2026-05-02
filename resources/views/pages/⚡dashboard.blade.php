@@ -90,18 +90,24 @@ new #[Title('Dashboard')] class extends Component {
 }; ?>
 
 <div class="flex flex-col gap-6 p-6">
+    @php
+        $currentProjectId = auth()->user()->current_project_id;
+        $runsHref = $currentProjectId ? route('runs.index', ['project' => $currentProjectId]) : route('projects.index');
+        $failedRunsHref = $currentProjectId ? route('runs.index', ['project' => $currentProjectId, 'status' => 'failed']) : route('projects.index');
+    @endphp
+
     <flux:heading size="xl">{{ __('Dashboard') }}</flux:heading>
 
     <div class="grid grid-cols-1 gap-3 md:grid-cols-3">
-        <a href="{{ route('inbox') }}" wire:navigate class="rounded-xl border border-zinc-200 p-4 hover:bg-zinc-50 dark:border-zinc-700 dark:hover:bg-zinc-900">
+        <a href="{{ route('triage') }}" wire:navigate class="rounded-xl border border-zinc-200 p-4 hover:bg-zinc-50 dark:border-zinc-700 dark:hover:bg-zinc-900">
             <div class="text-xs uppercase tracking-wide text-zinc-500">{{ __('Pending stories') }}</div>
             <div class="mt-1 text-3xl font-semibold">{{ $this->pendingStoryCount }}</div>
         </a>
-        <a href="{{ route('runs.index') }}" wire:navigate class="rounded-xl border border-zinc-200 p-4 hover:bg-zinc-50 dark:border-zinc-700 dark:hover:bg-zinc-900">
+        <a href="{{ $runsHref }}" wire:navigate class="rounded-xl border border-zinc-200 p-4 hover:bg-zinc-50 dark:border-zinc-700 dark:hover:bg-zinc-900">
             <div class="text-xs uppercase tracking-wide text-zinc-500">{{ __('Executing stories') }}</div>
             <div class="mt-1 text-3xl font-semibold">{{ $this->executingStoryCount }}</div>
         </a>
-        <a href="{{ route('runs.index', ['status' => 'failed']) }}" wire:navigate class="rounded-xl border border-zinc-200 p-4 hover:bg-zinc-50 dark:border-zinc-700 dark:hover:bg-zinc-900">
+        <a href="{{ $failedRunsHref }}" wire:navigate class="rounded-xl border border-zinc-200 p-4 hover:bg-zinc-50 dark:border-zinc-700 dark:hover:bg-zinc-900">
             <div class="text-xs uppercase tracking-wide text-zinc-500">{{ __('Failed runs') }}</div>
             <div class="mt-1 text-3xl font-semibold {{ $this->failedRunCount > 0 ? 'text-red-600' : '' }}">{{ $this->failedRunCount }}</div>
         </a>
@@ -138,7 +144,7 @@ new #[Title('Dashboard')] class extends Component {
             @empty
                 <flux:text class="text-zinc-500">{{ __('No runs yet.') }}</flux:text>
             @endforelse
-            <a href="{{ route('runs.index') }}" wire:navigate class="text-sm underline">{{ __('See all runs') }} &rarr;</a>
+            <a href="{{ $runsHref }}" wire:navigate class="text-sm underline">{{ __('See all runs') }} &rarr;</a>
         </section>
 
         <section class="flex flex-col gap-3">

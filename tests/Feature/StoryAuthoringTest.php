@@ -29,11 +29,11 @@ function authorScene(): array
 }
 
 test('save draft creates a Story in Draft with acceptance criteria', function () {
-    ['user' => $user, 'feature' => $feature] = authorScene();
+    ['user' => $user, 'project' => $project, 'feature' => $feature] = authorScene();
 
     $this->actingAs($user);
 
-    Livewire::test('pages::stories.create')
+    Livewire::test('pages::stories.create', ['project' => $project->id])
         ->set('feature_id', $feature->id)
         ->set('name', 'Authored from UI')
         ->set('description', 'Reviewers can author new stories.')
@@ -57,7 +57,7 @@ test('save & submit transitions the story for approval', function () {
 
     $this->actingAs($user);
 
-    Livewire::test('pages::stories.create')
+    Livewire::test('pages::stories.create', ['project' => $project->id])
         ->set('feature_id', $feature->id)
         ->set('name', 'Submit me')
         ->set('description', 'desc')
@@ -69,7 +69,7 @@ test('save & submit transitions the story for approval', function () {
 });
 
 test('cannot save against a feature outside the user\'s teams', function () {
-    ['user' => $user] = authorScene();
+    ['user' => $user, 'project' => $project] = authorScene();
     $other = Workspace::factory()->create();
     $otherTeam = Team::factory()->for($other)->create();
     $otherProject = Project::factory()->for($otherTeam)->create();
@@ -77,7 +77,7 @@ test('cannot save against a feature outside the user\'s teams', function () {
 
     $this->actingAs($user);
 
-    expect(fn () => Livewire::test('pages::stories.create')
+    expect(fn () => Livewire::test('pages::stories.create', ['project' => $project->id])
         ->set('feature_id', $otherFeature->id)
         ->set('name', 'Sneak')
         ->set('description', 'no')
@@ -86,5 +86,5 @@ test('cannot save against a feature outside the user\'s teams', function () {
 });
 
 test('unauthenticated visitors are redirected', function () {
-    $this->get(route('stories.create'))->assertRedirect(route('login'));
+    $this->get('/stories/create')->assertRedirect(route('login'));
 });

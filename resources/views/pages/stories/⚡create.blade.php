@@ -25,12 +25,17 @@ new #[Title('New story')] class extends Component {
     /** @var array<int,string> */
     public array $criteria = [''];
 
-    public function mount(): void
+    public function mount(int $project): void
     {
         $user = Auth::user();
+        abort_unless(in_array((int) $project, $user->accessibleProjectIds(), true), 404);
+        if ((int) $user->current_project_id !== (int) $project) {
+            $user->forceFill(['current_project_id' => (int) $project])->save();
+        }
+
         if ($this->feature_id) {
             $feature = Feature::query()
-                ->whereHas('project', fn ($q) => $q->whereIn('id', $user->accessibleProjectIds()))
+                ->where('project_id', (int) $project)
                 ->find($this->feature_id);
             if ($feature) {
                 return;
@@ -38,13 +43,10 @@ new #[Title('New story')] class extends Component {
             $this->feature_id = null;
         }
 
-        $projectId = $user->current_project_id;
-        if ($projectId) {
-            $this->feature_id = Feature::query()
-                ->where('project_id', $projectId)
-                ->orderBy('id')
-                ->first()?->id;
-        }
+        $this->feature_id = Feature::query()
+            ->where('project_id', (int) $project)
+            ->orderBy('id')
+            ->first()?->id;
     }
 
     #[Computed]

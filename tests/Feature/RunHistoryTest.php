@@ -32,11 +32,11 @@ function runScene(): array
 }
 
 test('runs page redirects unauthenticated users', function () {
-    $this->get(route('runs.index'))->assertRedirect(route('login'));
+    $this->get('/runs')->assertRedirect(route('login'));
 });
 
 test('lists runs scoped to the user\'s teams', function () {
-    ['user' => $user, 'task' => $task] = runScene();
+    ['user' => $user, 'task' => $task, 'project' => $project] = runScene();
     $subtask = Subtask::factory()->for($task)->create(['name' => 'visible-sub']);
     AgentRun::factory()->create([
         'runnable_type' => Subtask::class,
@@ -47,13 +47,13 @@ test('lists runs scoped to the user\'s teams', function () {
 
     $this->actingAs($user);
 
-    Livewire::test('pages::runs.index')
+    Livewire::test('pages::runs.index', ['project' => $project->id])
         ->assertSee('visible-sub')
         ->assertSee('https://github.com/o/r/pull/1');
 });
 
 test('does not show runs from outside the user\'s teams', function () {
-    ['user' => $user] = runScene();
+    ['user' => $user, 'project' => $project] = runScene();
 
     $other = Workspace::factory()->create();
     $otherTeam = Team::factory()->for($other)->create();
@@ -70,11 +70,11 @@ test('does not show runs from outside the user\'s teams', function () {
 
     $this->actingAs($user);
 
-    Livewire::test('pages::runs.index')->assertDontSee('hidden-sub');
+    Livewire::test('pages::runs.index', ['project' => $project->id])->assertDontSee('hidden-sub');
 });
 
 test('shows PR merged badge when webhook recorded a merge', function () {
-    ['user' => $user, 'task' => $task] = runScene();
+    ['user' => $user, 'task' => $task, 'project' => $project] = runScene();
     $sub = Subtask::factory()->for($task)->create(['name' => 'merged-sub']);
     AgentRun::factory()->create([
         'runnable_type' => Subtask::class,
@@ -89,7 +89,7 @@ test('shows PR merged badge when webhook recorded a merge', function () {
 
     $this->actingAs($user);
 
-    Livewire::test('pages::runs.index')
+    Livewire::test('pages::runs.index', ['project' => $project->id])
         ->assertSee('merged-sub')
         ->assertSee('PR merged');
 });
@@ -112,13 +112,13 @@ test('shows repo name and tokens on the run card', function () {
 
     $this->actingAs($user);
 
-    Livewire::test('pages::runs.index')
+    Livewire::test('pages::runs.index', ['project' => $project->id])
         ->assertSee('backend')
         ->assertSee('1234/567 tok');
 });
 
 test('status filter narrows the list', function () {
-    ['user' => $user, 'task' => $task] = runScene();
+    ['user' => $user, 'task' => $task, 'project' => $project] = runScene();
     $a = Subtask::factory()->for($task)->create(['name' => 'sub-running']);
     $b = Subtask::factory()->for($task)->create(['name' => 'sub-failed']);
     AgentRun::factory()->create([
@@ -134,7 +134,7 @@ test('status filter narrows the list', function () {
 
     $this->actingAs($user);
 
-    Livewire::test('pages::runs.index')
+    Livewire::test('pages::runs.index', ['project' => $project->id])
         ->assertSee('sub-running')
         ->assertSee('sub-failed')
         ->set('status', 'failed')

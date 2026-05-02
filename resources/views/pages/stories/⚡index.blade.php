@@ -12,8 +12,20 @@ use Livewire\WithPagination;
 new #[Title('Stories')] class extends Component {
     use WithPagination;
 
+    public int $project_id;
+
     #[Url(as: 'status')]
     public ?string $status = null;
+
+    public function mount(int $project): void
+    {
+        $user = Auth::user();
+        abort_unless(in_array((int) $project, $user->accessibleProjectIds(), true), 404);
+        $this->project_id = (int) $project;
+        if ((int) $user->current_project_id !== $this->project_id) {
+            $user->forceFill(['current_project_id' => $this->project_id])->save();
+        }
+    }
 
     #[Computed]
     public function stories()
@@ -32,7 +44,7 @@ new #[Title('Stories')] class extends Component {
 <div class="flex flex-col gap-6 p-6">
     <div class="flex items-center justify-between">
         <flux:heading size="xl">{{ __('Stories') }}</flux:heading>
-        <a href="{{ route('stories.create') }}" wire:navigate>
+        <a href="{{ route('stories.create', ['project' => $this->project_id]) }}" wire:navigate>
             <flux:button variant="primary">{{ __('+ New story') }}</flux:button>
         </a>
     </div>
@@ -48,7 +60,7 @@ new #[Title('Stories')] class extends Component {
 
     <div class="flex flex-col gap-3">
         @forelse ($this->stories as $story)
-            <a href="{{ route('stories.show', $story) }}" wire:navigate>
+            <a href="{{ route('stories.show', ['project' => $story->feature->project_id, 'story' => $story->id]) }}" wire:navigate>
                 <flux:card class="hover:bg-zinc-50 dark:hover:bg-zinc-800/50">
                     <div class="flex flex-wrap items-center gap-2">
                         <flux:badge variant="solid">{{ $story->feature->project->name }}</flux:badge>
