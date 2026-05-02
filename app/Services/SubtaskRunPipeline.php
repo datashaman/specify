@@ -77,6 +77,8 @@ class SubtaskRunPipeline
         }
 
         if ($this->cancelObserved($agentRun, 'before_execute', $logCtx)) {
+            $this->discardLocalChangesIfPossible($workingDir, $agentRun, $repo, $logCtx);
+
             return SubtaskRunOutcome::cancelled();
         }
 
@@ -97,6 +99,8 @@ class SubtaskRunPipeline
         $result = $executor->execute($subtask, $workingDir, $repo, $agentRun->working_branch, $contextBrief !== '' ? $contextBrief : null);
 
         if ($this->cancelObserved($agentRun, 'after_execute', $logCtx)) {
+            $this->discardLocalChangesIfPossible($workingDir, $agentRun, $repo, $logCtx);
+
             return SubtaskRunOutcome::cancelled();
         }
 
@@ -170,6 +174,8 @@ class SubtaskRunPipeline
 
         if (config('specify.workspace.push_after_commit', true)) {
             if ($this->cancelObserved($agentRun, 'before_push', $logCtx)) {
+                $this->discardLocalChangesIfPossible($workingDir, $agentRun, $repo, $logCtx);
+
                 return SubtaskRunOutcome::cancelled();
             }
 
@@ -235,6 +241,33 @@ class SubtaskRunPipeline
     private function branchFor(AgentRun $agentRun): string
     {
         return $agentRun->working_branch ?? 'specify/run-'.$agentRun->getKey();
+    }
+
+    /**
+     * Reset the working branch on cooperative cancel so a future retry
+     * doesn't start from a partial commit (ADR-0010). No-op when the
+     * executor never needed a working directory.
+     */
+    private function discardLocalChangesIfPossible(?string $workingDir, AgentRun $agentRun, ?Repo $repo, array $logCtx): void
+    {
+        if ($workingDir === null || $repo === null) {
+            return;
+        }
+
+        try {
+            $this->workspace->discardLocalChanges(
+                $workingDir,
+                $this->branchFor($agentRun),
+                $repo->default_branch,
+            );
+        } catch (Throwable $e) {
+            // Cleanup is best-effort; surface in logs but never let it
+            // turn a clean cancel into a queue exception.
+            Log::warning('specify.subtask.cancel_cleanup_failed', $logCtx + [
+                'exception' => $e::class,
+                'message' => $e->getMessage(),
+            ]);
+        }
     }
 
     /**

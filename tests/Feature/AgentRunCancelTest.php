@@ -18,7 +18,7 @@ beforeEach(function () {
     config(['queue.default' => 'sync']);
 });
 
-test('cancelRun on a Queued run transitions to Cancelled directly', function () {
+test('cancelRun on a Queued run transitions to Cancelled and records the audit flag', function () {
     $run = AgentRun::factory()->create([
         'runnable_type' => Subtask::class,
         'runnable_id' => Subtask::factory()->create()->id,
@@ -28,7 +28,11 @@ test('cancelRun on a Queued run transitions to Cancelled directly', function () 
     app(ExecutionService::class)->cancelRun($run);
 
     expect($run->fresh()->status)->toBe(AgentRunStatus::Cancelled);
-    expect($run->fresh()->cancel_requested)->toBeFalse();
+    // ADR-0010: the flag stays set after the terminal transition so a
+    // Cancelled run is distinguishable from one that terminated via some
+    // other path. (The Queued path used to leave the flag false; that was
+    // a divergence from the ADR text.)
+    expect($run->fresh()->cancel_requested)->toBeTrue();
 });
 
 test('cancelRun on a Running run sets cancel_requested but stays Running', function () {
@@ -112,6 +116,7 @@ test('cancelSubtask cancels every still-open AgentRun on the Subtask', function 
 
     expect($changed)->toBe(2);
     expect($queued->fresh()->status)->toBe(AgentRunStatus::Cancelled);
+    expect($queued->fresh()->cancel_requested)->toBeTrue();
     expect($running->fresh()->cancel_requested)->toBeTrue();
     expect($done->fresh()->status)->toBe(AgentRunStatus::Succeeded);
 });
@@ -187,6 +192,29 @@ test('Queued run cancelled before the worker picks up the job stays Cancelled', 
     expect($fresh->status)->toBe(AgentRunStatus::Cancelled);
     expect($fresh->started_at)->toBeNull();
     expect($fresh->output['pull_request_url'] ?? null)->toBeNull();
+});
+
+test('markRunning loses the queued-cancel race when the row is Cancelled mid-handle', function () {
+    // Simulates: ExecuteSubtaskJob::handle() loads the AgentRun (still
+    // Queued at that snapshot), then cancelRun runs in another transaction
+    // and flips the row to Cancelled before markRunning fires. The
+    // conditional UPDATE must match zero rows so we don't overwrite the
+    // terminal state — closes the queued-cancel race (ADR-0010).
+    $run = AgentRun::factory()->create([
+        'runnable_type' => Subtask::class,
+        'runnable_id' => Subtask::factory()->create()->id,
+        'status' => AgentRunStatus::Queued,
+    ]);
+
+    AgentRun::query()->whereKey($run->getKey())->update([
+        'status' => AgentRunStatus::Cancelled->value,
+        'cancel_requested' => true,
+    ]);
+
+    $went = app(ExecutionService::class)->markRunning($run);
+
+    expect($went)->toBeFalse();
+    expect($run->fresh()->status)->toBe(AgentRunStatus::Cancelled);
 });
 
 test('AgentRunStatus::Cancelled is a failure-class terminal state', function () {

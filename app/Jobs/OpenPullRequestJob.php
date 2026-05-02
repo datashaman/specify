@@ -65,7 +65,31 @@ class OpenPullRequestJob implements ShouldQueue
         }
 
         try {
-            $existing = $provider->findOpenPullRequest($repo, $branch);
+            // Re-check inside the lock: a concurrent retry job may have
+            // stamped the URL while we were queued / waiting for the lock.
+            // Without this, two retries can both fall through to create()
+            // on providers whose findOpenPullRequest() returns null
+            // (Bitbucket / GitLab) — opening duplicate MRs.
+            $run = $run->fresh() ?? $run;
+            if (! empty(((array) $run->output)['pull_request_url'] ?? null)) {
+                Log::info('specify.subtask.pr_retry.already_open', [
+                    'run_id' => $run->getKey(),
+                ]);
+
+                return;
+            }
+
+            try {
+                $existing = $provider->findOpenPullRequest($repo, $branch);
+            } catch (Throwable $e) {
+                // findOpenPullRequest is best-effort: a malformed repo URL
+                // or transient API error should be recorded as a normal
+                // pr_retry failure, not crash the queue worker.
+                $this->recordError($run, $e->getMessage());
+
+                return;
+            }
+
             if ($existing !== null && ($existing['url'] ?? '') !== '') {
                 $this->stampSuccess($run, $existing);
 

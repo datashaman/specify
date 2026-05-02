@@ -234,13 +234,34 @@ class ExecutionService
             ->values();
     }
 
-    /** Transition an AgentRun to Running and stamp `started_at`. */
-    public function markRunning(AgentRun $run): void
+    /**
+     * Transition an AgentRun to Running and stamp `started_at`.
+     *
+     * Conditional on the persisted status still being Queued — closes the
+     * queued-cancel race (ADR-0010): if `cancelRun()` flipped the row to
+     * Cancelled between the worker's `findOrFail` and this call, the
+     * UPDATE matches zero rows and we return false so the caller bails.
+     */
+    public function markRunning(AgentRun $run): bool
     {
+        $affected = AgentRun::query()
+            ->whereKey($run->getKey())
+            ->where('status', AgentRunStatus::Queued->value)
+            ->update([
+                'status' => AgentRunStatus::Running->value,
+                'started_at' => now(),
+            ]);
+
+        if ($affected === 0) {
+            return false;
+        }
+
         $run->forceFill([
             'status' => AgentRunStatus::Running->value,
             'started_at' => now(),
-        ])->save();
+        ])->syncOriginal();
+
+        return true;
     }
 
     /**
@@ -327,13 +348,18 @@ class ExecutionService
             return false;
         }
 
+        // Set the audit flag in both branches: a Queued run that flips
+        // straight to Cancelled still records *that the cancel was
+        // requested*, matching ADR-0010's "cancel_requested is part of the
+        // audit trail" claim. Without this, a Queued cancel would leave a
+        // Cancelled run with cancel_requested=false and reviewers couldn't
+        // tell whether the run terminated cooperatively or because the
+        // worker never picked it up.
+        $run->forceFill(['cancel_requested' => true])->save();
+
         if ($run->status === AgentRunStatus::Queued) {
             $this->markCancelled($run, $reason);
-
-            return true;
         }
-
-        $run->forceFill(['cancel_requested' => true])->save();
 
         return true;
     }
@@ -361,6 +387,13 @@ class ExecutionService
         }
         if (! $fromRun->isTerminal()) {
             throw new RuntimeException('Cannot retry a run that is still in flight.');
+        }
+        // Service-level invariant: only failure-class runs can be retried.
+        // The UI hides Retry on Succeeded runs already, but a non-UI
+        // caller (MCP tool, internal automation) without this guard could
+        // re-dispatch an already-successful Subtask and double-open PRs.
+        if (! $fromRun->status->isFailure()) {
+            throw new RuntimeException('Only failed / cancelled / aborted runs can be retried.');
         }
 
         $story = $subtask->task?->story;

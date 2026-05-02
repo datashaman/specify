@@ -49,7 +49,13 @@ class ExecuteSubtaskJob implements ShouldQueue
             return;
         }
 
-        $execution->markRunning($run);
+        // markRunning is conditional on persisted status === Queued; if the
+        // row was Cancelled between findOrFail and here, the UPDATE matches
+        // zero rows and we abort the job entirely (closes the queued-cancel
+        // race — ADR-0010).
+        if (! $execution->markRunning($run)) {
+            return;
+        }
 
         $driver = $run->executor_driver ?? $executors->defaultDriver();
 

@@ -73,6 +73,76 @@ test('retryPullRequestOpen dispatches the OpenPullRequestJob end-to-end', functi
     expect($fresh->output['pull_request_url'])->toBe('https://github.com/o/r/pull/77');
 });
 
+test('OpenPullRequestJob bails inside the lock when a concurrent retry already stamped the URL', function () {
+    // Two queued retries: first one stamps the URL while the second is
+    // still queued; the second wakes up, acquires the lock, must bail
+    // before calling create() — without this guard, providers that
+    // return null from findOpenPullRequest (Bitbucket / GitLab) would
+    // open duplicate MRs.
+    Http::fake([
+        'api.github.com/*' => Http::response(['html_url' => 'should-not-be-called', 'number' => 0, 'id' => 0], 201),
+    ]);
+
+    $story = approvedStoryInProjectWithRepo();
+    $repo = $story->feature->project->primaryRepo();
+    $repo->forceFill([
+        'provider' => RepoProvider::Github,
+        'access_token' => 'tok',
+        'url' => 'https://github.com/o/r',
+        'default_branch' => 'main',
+    ])->save();
+    $subtask = $story->tasks()->first()->subtasks()->first();
+
+    $run = AgentRun::factory()->create([
+        'runnable_type' => Subtask::class,
+        'runnable_id' => $subtask->id,
+        'repo_id' => $repo->id,
+        'working_branch' => 'specify/feature/story',
+        'executor_driver' => 'fake',
+        'status' => AgentRunStatus::Succeeded,
+        'output' => [
+            'pull_request_error' => 'first attempt failed',
+            'pull_request_url' => 'https://github.com/o/r/pull/100',
+        ],
+    ]);
+
+    (new OpenPullRequestJob($run->id))->handle();
+
+    Http::assertNothingSent();
+    expect($run->fresh()->output['pull_request_url'])->toBe('https://github.com/o/r/pull/100');
+});
+
+test('OpenPullRequestJob records find() exceptions as pull_request_error instead of crashing the worker', function () {
+    $story = approvedStoryInProjectWithRepo();
+    $repo = $story->feature->project->primaryRepo();
+    $repo->forceFill([
+        'provider' => RepoProvider::Github,
+        'access_token' => 'tok',
+        // Malformed URL: parseOwnerRepo throws a RuntimeException — the
+        // job must capture this as a normal pr_retry failure rather than
+        // letting the exception escape the queue worker.
+        'url' => 'not-a-valid-url',
+        'default_branch' => 'main',
+    ])->save();
+    $subtask = $story->tasks()->first()->subtasks()->first();
+
+    $run = AgentRun::factory()->create([
+        'runnable_type' => Subtask::class,
+        'runnable_id' => $subtask->id,
+        'repo_id' => $repo->id,
+        'working_branch' => 'specify/feature/story',
+        'executor_driver' => 'fake',
+        'status' => AgentRunStatus::Succeeded,
+        'output' => ['pull_request_error' => 'previous attempt blew up'],
+    ]);
+
+    (new OpenPullRequestJob($run->id))->handle();
+
+    $fresh = $run->fresh();
+    expect($fresh->status)->toBe(AgentRunStatus::Succeeded);
+    expect($fresh->output['pull_request_error'])->toContain('Unable to parse');
+});
+
 test('OpenPullRequestJob opens a fresh PR and stamps the run output', function () {
     Http::fake([
         'api.github.com/repos/*/pulls?head*' => Http::response([], 200),

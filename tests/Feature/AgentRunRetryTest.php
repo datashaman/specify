@@ -146,6 +146,24 @@ test('retry on a RespondToReview run is rejected by the service', function () {
         ->toThrow(RuntimeException::class, 'Review-response');
 });
 
+test('retrySubtaskExecution rejects Succeeded runs at the service layer', function () {
+    // The UI gates Retry behind isFailure(), but the service contract must
+    // hold that line on its own — non-UI callers (MCP tools, internal
+    // automation) must not be able to re-dispatch an already-successful
+    // Subtask and double-open PRs.
+    $story = approvedStoryInProjectWithRepo();
+    $story->forceFill(['status' => StoryStatus::Approved->value])->save();
+    $subtask = $story->fresh()->tasks()->first()->subtasks()->first();
+    $run = AgentRun::factory()->create([
+        'runnable_type' => Subtask::class,
+        'runnable_id' => $subtask->id,
+        'status' => AgentRunStatus::Succeeded,
+    ]);
+
+    expect(fn () => app(ExecutionService::class)->retrySubtaskExecution($subtask, $run))
+        ->toThrow(RuntimeException::class, 'failed / cancelled / aborted');
+});
+
 test('Run console links a retry back to its origin run', function () {
     $story = approvedStoryInProjectWithRepo();
     $subtask = $story->tasks()->first()->subtasks()->first();
