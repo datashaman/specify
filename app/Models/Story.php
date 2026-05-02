@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\AgentRunKind;
 use App\Enums\StoryStatus;
 use App\Models\Concerns\HasSlug;
 use App\Services\ApprovalService;
@@ -13,6 +14,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
+use Illuminate\Support\Collection;
 use InvalidArgumentException;
 
 /**
@@ -117,6 +119,117 @@ class Story extends Model
     public function agentRuns(): MorphMany
     {
         return $this->morphMany(AgentRun::class, 'runnable');
+    }
+
+    /**
+     * Pull requests associated with this Story — the PR is a Story-level
+     * artefact (every Subtask AgentRun on a single-driver story commits to
+     * the same `specify/<feature>/<story>` branch; the first run opens the
+     * PR, the rest add commits). Race mode (ADR-0006) opens N PRs, one per
+     * driver branch — each is a separate entry in the returned collection.
+     *
+     * Pulled from each Execute-kind Subtask AgentRun whose output carries
+     * a `pull_request_url`. RespondToReview runs (ADR-0008) are excluded
+     * because they push commits to an already-open PR; their
+     * `pull_request_number` is just a back-pointer, not a new PR.
+     *
+     * Each entry: `{ url, number, driver, branch, run_id, merged, action,
+     * run_finished_at }`. `run_finished_at` is the terminal timestamp of
+     * the AgentRun that recorded the PR, *not* the PR's upstream open
+     * time — we don't fetch that. Ordered by most recent run first; any
+     * merged PR is hoisted to the top.
+     *
+     * @return Collection<int, array<string, mixed>>
+     */
+    public function pullRequests(): Collection
+    {
+        $subtaskIds = $this->tasks()
+            ->with('subtasks:id,task_id')
+            ->get()
+            ->flatMap(fn ($t) => $t->subtasks->pluck('id'))
+            ->all();
+
+        if ($subtaskIds === []) {
+            return collect();
+        }
+
+        $entries = AgentRun::query()
+            ->where('runnable_type', Subtask::class)
+            ->whereIn('runnable_id', $subtaskIds)
+            ->where('kind', AgentRunKind::Execute->value)
+            ->whereJsonContainsKey('output->pull_request_url')
+            ->orderByDesc('id')
+            ->get(['id', 'executor_driver', 'working_branch', 'output', 'finished_at'])
+            ->map(function (AgentRun $run) {
+                $o = (array) $run->output;
+                $url = (string) ($o['pull_request_url'] ?? '');
+                if ($url === '') {
+                    return null;
+                }
+
+                return [
+                    'url' => $url,
+                    'number' => $o['pull_request_number'] ?? null,
+                    'driver' => $run->executor_driver,
+                    'branch' => $run->working_branch,
+                    'run_id' => $run->getKey(),
+                    'merged' => $o['pull_request_merged'] ?? null,
+                    'action' => $o['pull_request_action'] ?? null,
+                    // The run's terminal timestamp — *not* the PR's open
+                    // time. We don't fetch the upstream PR's created_at;
+                    // this is the closest proxy for "when did Specify
+                    // first know about this PR" without an extra API
+                    // call. Rename the key so callers don't think it's
+                    // an authoritative PR timestamp.
+                    'run_finished_at' => $run->finished_at,
+                ];
+            })
+            ->filter()
+            ->values();
+
+        // Deduplicate on URL: when a PR retry adopts an already-open PR
+        // every retried run records the same URL. Keep the freshest one
+        // (the most recent run wins because we ordered by id desc).
+        $entries = $entries
+            ->groupBy('url')
+            ->map(fn (Collection $g) => $g->first())
+            ->values();
+
+        // Hoist merged PRs to the top while preserving the id-desc order
+        // within each partition. A compound sort key (merged-bit, then
+        // -run_id) is order-stable across PHP / Laravel versions and
+        // doesn't depend on Collection::sortBy's stability semantics.
+        return $entries
+            ->sortBy(fn ($pr) => [
+                $pr['merged'] === true ? 0 : 1,
+                -1 * (int) $pr['run_id'],
+            ])
+            ->values();
+    }
+
+    /**
+     * The single canonical PR for this Story, if there is one. Returns
+     * the merged PR if any sibling has been merged; otherwise the sole
+     * entry in single-driver mode; otherwise null in pre-merge race mode
+     * where the candidates are still equally valid.
+     *
+     * Use `pullRequests()` when you want to render every candidate.
+     *
+     * @return array<string, mixed>|null
+     */
+    public function primaryPullRequest(): ?array
+    {
+        $prs = $this->pullRequests();
+        if ($prs->isEmpty()) {
+            return null;
+        }
+
+        $merged = $prs->first(fn ($pr) => $pr['merged'] === true);
+        if ($merged !== null) {
+            return $merged;
+        }
+
+        return $prs->count() === 1 ? $prs->first() : null;
     }
 
     public function effectivePolicy(): ApprovalPolicy

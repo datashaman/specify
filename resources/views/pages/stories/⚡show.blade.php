@@ -666,6 +666,49 @@ new #[Title('Story')] class extends Component {
                         <flux:badge>{{ __('by') }} {{ $story->creator->name }}</flux:badge>
                     @endif
                 </div>
+
+                @php $storyPrs = $story->pullRequests(); @endphp
+                @if ($storyPrs->isNotEmpty())
+                    <div class="mt-3 flex flex-col gap-1.5" data-section="story-prs">
+                        <div class="flex items-baseline gap-2">
+                            <flux:text class="text-xs uppercase tracking-wide text-zinc-500">
+                                {{ trans_choice('Pull request|Pull requests', $storyPrs->count()) }}
+                            </flux:text>
+                            @if ($storyPrs->count() > 1)
+                                <flux:text class="text-xs text-zinc-400">
+                                    {{ __('race candidates — reviewer picks the winner by merging it') }}
+                                </flux:text>
+                            @endif
+                        </div>
+                        <div class="flex flex-col gap-1">
+                            @foreach ($storyPrs as $pr)
+                                <div class="flex flex-wrap items-center gap-2 text-sm">
+                                    <flux:badge size="sm" :color="$pr['merged'] === true ? 'emerald' : 'zinc'">
+                                        @if ($pr['merged'] === true)
+                                            {{ __('merged') }}
+                                        @elseif ($pr['merged'] === false)
+                                            {{ __('open') }}
+                                        @else
+                                            {{ __('PR') }}
+                                        @endif
+                                        @if ($pr['number'])
+                                            #{{ $pr['number'] }}
+                                        @endif
+                                    </flux:badge>
+                                    <a
+                                        href="{{ $pr['url'] }}"
+                                        target="_blank"
+                                        rel="noopener"
+                                        class="truncate text-zinc-700 underline decoration-dotted hover:decoration-solid dark:text-zinc-300"
+                                    >{{ $pr['url'] }}</a>
+                                    @if ($pr['driver'])
+                                        <flux:badge size="sm" icon="cpu-chip">{{ $pr['driver'] }}</flux:badge>
+                                    @endif
+                                </div>
+                            @endforeach
+                        </div>
+                    </div>
+                @endif
             @endif
         </div>
 
