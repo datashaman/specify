@@ -1,5 +1,7 @@
 <?php
 
+use App\Enums\StoryStatus;
+use App\Enums\TaskStatus;
 use App\Models\Feature;
 use Illuminate\Support\Facades\Auth;
 use Livewire\Attributes\Computed;
@@ -93,80 +95,190 @@ new #[Title('Feature')] class extends Component {
             ? $this->feature->stories()->with('creator', 'tasks:id,story_id,status')->latest('updated_at')->get()
             : collect();
     }
+
+    /**
+     * Tally child stories by status. Drives both the rail-state roll-up
+     * and the chip strip in the header. Keys are StoryStatus->value.
+     *
+     * @return array<string, int>
+     */
+    #[Computed]
+    public function storyTally(): array
+    {
+        $tally = [];
+        foreach ($this->stories as $story) {
+            $key = $story->status->value;
+            $tally[$key] = ($tally[$key] ?? 0) + 1;
+        }
+
+        return $tally;
+    }
+
+    /**
+     * Roll-up rail state. "running" wins if any story has an active
+     * subtask run; otherwise we walk the priority ladder. Empty feature
+     * is "draft".
+     */
+    #[Computed]
+    public function railState(): string
+    {
+        if ($this->stories->isEmpty()) {
+            return 'draft';
+        }
+
+        $hasActiveRun = $this->stories->contains(function ($story) {
+            return $story->tasks->isNotEmpty()
+                && $story->status === StoryStatus::Approved
+                && $story->tasks->contains(fn ($t) => $t->status === TaskStatus::InProgress || $t->status === TaskStatus::Pending);
+        });
+        if ($hasActiveRun) {
+            return 'running';
+        }
+
+        $statuses = $this->stories->pluck('status')->map(fn ($s) => $s->value);
+
+        if ($statuses->every(fn ($s) => $s === StoryStatus::Done->value)) {
+            return 'run_complete';
+        }
+        if ($statuses->contains(StoryStatus::ChangesRequested->value)) {
+            return 'changes_requested';
+        }
+        if ($statuses->contains(StoryStatus::PendingApproval->value)) {
+            return 'pending';
+        }
+        if ($statuses->contains(StoryStatus::Approved->value)) {
+            return 'approved';
+        }
+
+        return 'draft';
+    }
 }; ?>
 
-<div class="flex flex-col gap-6 p-6">
+<div class="flex p-6">
     @if (! $this->feature)
         <flux:text class="text-zinc-500">{{ __('Feature not found.') }}</flux:text>
     @else
-        <div>
-            <a href="{{ route('projects.show', $this->feature->project) }}" wire:navigate class="text-sm text-zinc-500 underline">
-                &larr; {{ $this->feature->project->name }}
-            </a>
-            @if ($editing)
-                <div class="mt-3 flex flex-col gap-3">
-                    <flux:input wire:model="editName" :label="__('Name')" />
-                    <flux:textarea wire:model="editDescription" :label="__('Description (markdown supported)')" rows="6" />
-                    <flux:textarea wire:model="editNotes" :label="__('Notes (markdown supported)')" rows="4" />
-                    <div class="flex items-center gap-2">
-                        <flux:button wire:click="saveEdit" wire:target="saveEdit" wire:loading.attr="disabled" variant="primary">
-                            <span wire:loading.remove wire:target="saveEdit">{{ __('Save') }}</span>
-                            <span wire:loading wire:target="saveEdit">{{ __('Saving…') }}</span>
-                        </flux:button>
-                        <flux:button wire:click="cancelEdit" variant="ghost">{{ __('Cancel') }}</flux:button>
-                    </div>
-                </div>
-            @else
-                <div class="mt-2 flex items-center justify-between gap-3">
-                    <flux:heading size="xl">{{ $this->feature->name }}</flux:heading>
-                    <div class="flex items-center gap-2">
-                        @if ($this->canEditFeature())
-                            <flux:button wire:click="startEdit" size="sm" variant="ghost">{{ __('Edit') }}</flux:button>
-                        @endif
-                        <a href="{{ route('stories.create', ['project' => $this->feature->project_id, 'feature_id' => $this->feature->id]) }}" wire:navigate>
-                            <flux:button variant="primary">{{ __('+ New story for this feature') }}</flux:button>
-                        </a>
-                    </div>
-                </div>
-                @if ($this->feature->description)
-                    <x-markdown :content="$this->feature->description" class="mt-1" />
-                @endif
-                @if ($this->feature->notes)
-                    <details class="mt-2">
-                        <summary class="cursor-pointer text-xs text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300">{{ __('Notes') }}</summary>
-                        <x-markdown :content="$this->feature->notes" class="mt-2" />
-                    </details>
-                @endif
-            @endif
-        </div>
+        @php
+            $feature = $this->feature;
+            $tally = $this->storyTally;
+            $totalStories = array_sum($tally);
+        @endphp
 
-        <section class="flex flex-col gap-3">
-            <flux:heading size="lg">{{ __('Stories') }}</flux:heading>
-            @forelse ($this->stories as $story)
-                <flux:card>
-                    <a href="{{ route('stories.show', ['project' => $this->feature->project_id, 'story' => $story->id]) }}" wire:navigate>
-                        <div class="flex flex-wrap items-center gap-2">
-                            <flux:badge>{{ $story->status->value }}</flux:badge>
-                            <flux:badge>rev {{ $story->revision }}</flux:badge>
-                            @if ($story->creator)
-                                <flux:badge>{{ __('by') }} {{ $story->creator->name }}</flux:badge>
-                            @endif
-                            @php
-                                $tasksTotal = $story->tasks->count();
-                                $tasksDone = $story->tasks->filter(fn ($t) => $t->status === \App\Enums\TaskStatus::Done)->count();
-                            @endphp
-                            @if ($tasksTotal > 0)
-                                <flux:badge>{{ $tasksDone }}/{{ $tasksTotal }} {{ __('tasks') }}</flux:badge>
-                            @endif
-                            <flux:text class="ml-auto text-xs text-zinc-500">{{ $story->updated_at?->diffForHumans() }}</flux:text>
+        <x-rail :state="$this->railState" class="mr-4" />
+
+        <div class="flex min-w-0 max-w-4xl flex-1 flex-col gap-6">
+            <div>
+                <nav aria-label="Breadcrumb" class="flex flex-wrap items-center gap-1 text-sm text-zinc-500" data-section="breadcrumb">
+                    <a href="{{ route('projects.show', $feature->project) }}" wire:navigate class="hover:text-zinc-700 hover:underline dark:hover:text-zinc-300">{{ $feature->project->name }}</a>
+                    <span aria-hidden="true">›</span>
+                    <span class="text-zinc-700 dark:text-zinc-300" aria-current="page">{{ $feature->name }}</span>
+                </nav>
+
+                @if ($editing)
+                    <div class="mt-3 flex flex-col gap-3">
+                        <flux:input wire:model="editName" :label="__('Name')" />
+                        <flux:textarea wire:model="editDescription" :label="__('Description (markdown supported)')" rows="6" />
+                        <flux:textarea wire:model="editNotes" :label="__('Notes (markdown supported)')" rows="4" />
+                        <div class="flex items-center gap-2">
+                            <flux:button wire:click="saveEdit" wire:target="saveEdit" wire:loading.attr="disabled" variant="primary">
+                                <span wire:loading.remove wire:target="saveEdit">{{ __('Save') }}</span>
+                                <span wire:loading wire:target="saveEdit">{{ __('Saving…') }}</span>
+                            </flux:button>
+                            <flux:button wire:click="cancelEdit" variant="ghost">{{ __('Cancel') }}</flux:button>
                         </div>
-                        <flux:heading class="mt-2">{{ $story->name }}</flux:heading>
-                        <x-markdown :content="$story->description" class="mt-1" />
+                    </div>
+                @else
+                    <div class="mt-2 flex items-start justify-between gap-3">
+                        <flux:heading size="xl">{{ $feature->name }}</flux:heading>
+                        <div class="flex items-center gap-2">
+                            @if ($this->canEditFeature())
+                                <flux:button wire:click="startEdit" size="sm" icon="pencil-square">{{ __('Edit') }}</flux:button>
+                            @endif
+                            <a href="{{ route('stories.create', ['project' => $feature->project_id, 'feature_id' => $feature->id]) }}" wire:navigate>
+                                <flux:button variant="primary">{{ __('+ New story') }}</flux:button>
+                            </a>
+                        </div>
+                    </div>
+
+                    <div class="mt-2 flex flex-wrap items-center gap-2" data-section="story-tally">
+                        <x-state-pill
+                            :state="$this->railState"
+                            :tally="$totalStories > 0 ? (string) $totalStories : null"
+                            :label="__($totalStories === 1 ? ':n story' : ':n stories', ['n' => $totalStories])"
+                        />
+                        @foreach ($tally as $statusValue => $count)
+                            @php
+                                $pillState = match ($statusValue) {
+                                    StoryStatus::Draft->value, StoryStatus::ProposedByAI->value => 'draft',
+                                    StoryStatus::PendingApproval->value => 'pending',
+                                    StoryStatus::Approved->value => 'approved',
+                                    StoryStatus::ChangesRequested->value => 'changes_requested',
+                                    StoryStatus::Rejected->value, StoryStatus::Cancelled->value => 'rejected',
+                                    StoryStatus::Done->value => 'run_complete',
+                                    default => 'draft',
+                                };
+                            @endphp
+                            <x-state-pill
+                                :state="$pillState"
+                                :tally="(string) $count"
+                                :label="$statusValue"
+                                data-tally-status="{{ $statusValue }}"
+                            />
+                        @endforeach
+                    </div>
+
+                    @if ($feature->description)
+                        <x-markdown :content="$feature->description" class="mt-3" />
+                    @endif
+                    @if ($feature->notes)
+                        <details class="mt-2">
+                            <summary class="cursor-pointer text-xs text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300">{{ __('Notes') }}</summary>
+                            <x-markdown :content="$feature->notes" class="mt-2" />
+                        </details>
+                    @endif
+                @endif
+            </div>
+
+            <section class="flex flex-col gap-3" data-section="stories">
+                <flux:heading size="lg">{{ __('Stories') }}</flux:heading>
+                @forelse ($this->stories as $story)
+                    @php
+                        $rowState = match ($story->status->value) {
+                            StoryStatus::Draft->value, StoryStatus::ProposedByAI->value => 'draft',
+                            StoryStatus::PendingApproval->value => 'pending',
+                            StoryStatus::Approved->value => 'approved',
+                            StoryStatus::ChangesRequested->value => 'changes_requested',
+                            StoryStatus::Rejected->value, StoryStatus::Cancelled->value => 'rejected',
+                            StoryStatus::Done->value => 'run_complete',
+                            default => 'draft',
+                        };
+                        $tasksTotal = $story->tasks->count();
+                        $tasksDone = $story->tasks->filter(fn ($t) => $t->status === TaskStatus::Done)->count();
+                    @endphp
+                    <a href="{{ route('stories.show', ['project' => $feature->project_id, 'story' => $story->id]) }}" wire:navigate class="flex items-stretch gap-3 rounded-lg border border-zinc-200 p-4 hover:bg-zinc-50 dark:border-zinc-700 dark:hover:bg-zinc-800/50" data-story-row="{{ $story->id }}">
+                        <x-rail :state="$rowState" class="!w-0.5" />
+                        <div class="min-w-0 flex-1">
+                            <div class="flex flex-wrap items-center gap-2">
+                                <x-state-pill :state="$rowState" :label="$story->status->value" />
+                                <flux:badge size="sm">rev {{ $story->revision }}</flux:badge>
+                                @if ($story->creator)
+                                    <flux:badge size="sm">{{ __('by') }} {{ $story->creator->name }}</flux:badge>
+                                @endif
+                                @if ($tasksTotal > 0)
+                                    <flux:badge size="sm">{{ $tasksDone }}/{{ $tasksTotal }} {{ __('tasks') }}</flux:badge>
+                                @endif
+                                <flux:text class="ml-auto text-xs text-zinc-500">{{ $story->updated_at?->diffForHumans() }}</flux:text>
+                            </div>
+                            <flux:heading class="mt-2">{{ $story->name }}</flux:heading>
+                            @if ($story->description)
+                                <x-markdown :content="$story->description" class="mt-1 text-sm text-zinc-600 dark:text-zinc-400" />
+                            @endif
+                        </div>
                     </a>
-                </flux:card>
-            @empty
-                <flux:text class="text-zinc-500">{{ __('No stories yet for this feature.') }}</flux:text>
-            @endforelse
-        </section>
+                @empty
+                    <flux:text class="text-zinc-500">{{ __('No stories yet for this feature.') }}</flux:text>
+                @endforelse
+            </section>
+        </div>
     @endif
 </div>
