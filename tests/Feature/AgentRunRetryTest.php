@@ -1,6 +1,7 @@
 <?php
 
 use App\Ai\Agents\SubtaskExecutor;
+use App\Enums\AgentRunKind;
 use App\Enums\AgentRunStatus;
 use App\Enums\StoryStatus;
 use App\Models\AgentRun;
@@ -109,6 +110,40 @@ test('Run console hides Retry on Succeeded runs', function () {
         ->get("/projects/{$project->id}/stories/{$story->id}/subtasks/{$subtask->id}/runs/{$run->id}")
         ->assertOk()
         ->assertDontSee('Retry');
+});
+
+test('Run console hides Retry on RespondToReview runs (re-fires automatically)', function () {
+    $story = approvedStoryInProjectWithRepo();
+    $subtask = $story->tasks()->first()->subtasks()->first();
+    $run = AgentRun::factory()->create([
+        'runnable_type' => Subtask::class,
+        'runnable_id' => $subtask->id,
+        'status' => AgentRunStatus::Failed,
+        'kind' => AgentRunKind::RespondToReview,
+    ]);
+
+    $project = $story->feature->project;
+    $member = User::factory()->create();
+    $project->team->addMember($member);
+
+    $this->actingAs($member)
+        ->get("/projects/{$project->id}/stories/{$story->id}/subtasks/{$subtask->id}/runs/{$run->id}")
+        ->assertOk()
+        ->assertDontSee('Retry');
+});
+
+test('retry on a RespondToReview run is rejected by the service', function () {
+    $story = approvedStoryInProjectWithRepo();
+    $subtask = $story->tasks()->first()->subtasks()->first();
+    $run = AgentRun::factory()->create([
+        'runnable_type' => Subtask::class,
+        'runnable_id' => $subtask->id,
+        'status' => AgentRunStatus::Failed,
+        'kind' => AgentRunKind::RespondToReview,
+    ]);
+
+    expect(fn () => app(ExecutionService::class)->retrySubtaskExecution($subtask, $run))
+        ->toThrow(RuntimeException::class, 'Review-response');
 });
 
 test('Run console links a retry back to its origin run', function () {

@@ -47,6 +47,11 @@ class BitbucketPullRequestProvider implements PullRequestProvider
         ];
     }
 
+    public function findOpenPullRequest(Repo $repo, string $head): ?array
+    {
+        return null;
+    }
+
     /**
      * @return array{0: string, 1: string}
      */

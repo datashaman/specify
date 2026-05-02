@@ -390,6 +390,28 @@ class ExecutionService
     }
 
     /**
+     * Retry the PR-open step for a Succeeded run whose previous open()
+     * attempt failed (ADR-0004 — non-fatal — so the run is Succeeded but
+     * `pull_request_error` is set and `pull_request_url` is empty).
+     *
+     * The AgentRun's terminal status is preserved; only its output is
+     * updated. See OpenPullRequestJob for idempotency + locking semantics
+     * (ADR-0010).
+     */
+    public function retryPullRequestOpen(AgentRun $run): void
+    {
+        if ($run->status !== AgentRunStatus::Succeeded) {
+            throw new RuntimeException('PR retry only applies to Succeeded runs.');
+        }
+        $output = (array) $run->output;
+        if (! empty($output['pull_request_url'])) {
+            throw new RuntimeException('Run already has a pull_request_url; nothing to retry.');
+        }
+
+        OpenPullRequestJob::dispatch($run->getKey());
+    }
+
+    /**
      * Convenience: cancel every still-open AgentRun for a Subtask. Useful for
      * race mode where one button cancels all sibling drivers (ADR-0010).
      *
