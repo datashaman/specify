@@ -30,7 +30,11 @@
                 @endphp
                 <li data-subtask-id="{{ $sub->id }}">
                     <div class="flex flex-wrap items-center gap-2">
-                        <span class="font-medium">{{ $sub->name }}</span>
+                        <a
+                            href="{{ route('subtasks.show', ['project' => $task->story->feature->project_id, 'story' => $task->story_id, 'subtask' => $sub->id]) }}"
+                            wire:navigate
+                            class="font-medium hover:underline"
+                        >{{ $sub->name }}</a>
                         <flux:badge size="sm">{{ $sub->status->value }}</flux:badge>
                         @if ($appended)
                             <span title="{{ __('Appended by Run') }} #{{ $sub->proposed_by_run_id }}" data-provenance class="text-xs text-amber-600 dark:text-amber-400">+</span>
@@ -41,14 +45,22 @@
                     @endif
 
                     @if ($latestRun)
+                        @php
+                            $runUrl = route('runs.show', [
+                                'project' => $task->story->feature->project_id,
+                                'story' => $task->story_id,
+                                'subtask' => $sub->id,
+                                'run' => $latestRun->id,
+                            ]);
+                        @endphp
                         <div class="mt-2 overflow-hidden rounded-md border border-zinc-200 dark:border-zinc-700">
-                            <div class="flex flex-wrap items-center gap-2 bg-zinc-50 px-2 py-1 text-xs dark:bg-zinc-800/50">
+                            <a href="{{ $runUrl }}" wire:navigate class="flex flex-wrap items-center gap-2 bg-zinc-50 px-2 py-1 text-xs hover:bg-zinc-100 dark:bg-zinc-800/50 dark:hover:bg-zinc-800">
                                 <flux:badge size="sm">{{ __('run') }} #{{ $latestRun->id }}</flux:badge>
                                 <flux:badge size="sm">{{ $latestRun->status->value }}</flux:badge>
                                 @if ($latestRun->finished_at)
                                     <flux:text class="ml-auto text-xs text-zinc-500">{{ $latestRun->finished_at->diffForHumans() }}</flux:text>
                                 @endif
-                            </div>
+                            </a>
                             <div class="px-2 py-1.5">
                                 @if ($url = $latestRun->output['pull_request_url'] ?? null)
                                     <flux:text class="text-xs">
@@ -70,14 +82,22 @@
                                     <summary class="cursor-pointer px-2 py-1 text-xs text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300">{{ __('Run history') }} ({{ $priorRuns->count() }})</summary>
                                     <div class="flex flex-col">
                                         @foreach ($priorRuns as $run)
+                                            @php
+                                                $priorRunUrl = route('runs.show', [
+                                                    'project' => $task->story->feature->project_id,
+                                                    'story' => $task->story_id,
+                                                    'subtask' => $sub->id,
+                                                    'run' => $run->id,
+                                                ]);
+                                            @endphp
                                             <div class="border-t border-zinc-100 px-2 py-1 dark:border-zinc-800">
-                                                <div class="flex flex-wrap items-center gap-2 text-xs">
+                                                <a href="{{ $priorRunUrl }}" wire:navigate class="flex flex-wrap items-center gap-2 text-xs hover:underline">
                                                     <flux:badge size="sm">#{{ $run->id }}</flux:badge>
                                                     <flux:badge size="sm">{{ $run->status->value }}</flux:badge>
                                                     @if ($run->finished_at)
                                                         <flux:text class="ml-auto text-xs text-zinc-500">{{ $run->finished_at->diffForHumans() }}</flux:text>
                                                     @endif
-                                                </div>
+                                                </a>
                                                 @if ($url = $run->output['pull_request_url'] ?? null)
                                                     <flux:text class="mt-1 text-xs">
                                                         <a href="{{ $url }}" target="_blank" rel="noopener" class="underline">{{ $url }}</a>

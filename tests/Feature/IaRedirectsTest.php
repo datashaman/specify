@@ -102,7 +102,7 @@ test('/stories/{id} 301-redirects to project-scoped url', function () {
         ->assertRedirect("/projects/{$project->id}/stories/{$story->id}");
 });
 
-test('/runs/{id} 301-redirects to canonical story document', function () {
+test('/runs/{id} 301-redirects to nested run console for subtask runs', function () {
     $ws = Workspace::factory()->create();
     $team = Team::factory()->for($ws)->create();
     $user = User::factory()->create();
@@ -115,6 +115,25 @@ test('/runs/{id} 301-redirects to canonical story document', function () {
     $run = AgentRun::factory()->create([
         'runnable_type' => Subtask::class,
         'runnable_id' => $subtask->id,
+    ]);
+
+    $this->actingAs($user)
+        ->get('/runs/'.$run->id)
+        ->assertStatus(301)
+        ->assertRedirect("/projects/{$project->id}/stories/{$story->id}/subtasks/{$subtask->id}/runs/{$run->id}");
+});
+
+test('/runs/{id} 301-redirects to story doc for plan-generation (Story-runnable) runs', function () {
+    $ws = Workspace::factory()->create();
+    $team = Team::factory()->for($ws)->create();
+    $user = User::factory()->create();
+    $team->addMember($user);
+    $project = Project::factory()->for($team)->create();
+    $feature = Feature::factory()->for($project)->create();
+    $story = Story::factory()->for($feature)->create();
+    $run = AgentRun::factory()->create([
+        'runnable_type' => Story::class,
+        'runnable_id' => $story->id,
     ]);
 
     $this->actingAs($user)

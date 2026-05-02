@@ -203,8 +203,8 @@ new #[Title('Feature')] class extends Component {
                     <div class="mt-2 flex flex-wrap items-center gap-2" data-section="story-tally">
                         <x-state-pill
                             :state="$this->railState"
-                            :tally="$totalStories > 0 ? (string) $totalStories : null"
-                            :label="__($totalStories === 1 ? ':n story' : ':n stories', ['n' => $totalStories])"
+                            :tally="(string) $totalStories"
+                            :label="__('stories')"
                         />
                         @foreach ($tally as $statusValue => $count)
                             @php

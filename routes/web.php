@@ -30,6 +30,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::livewire('projects/{project}/runs', 'pages::runs.index')->name('runs.index');
     Route::livewire('projects/{project}/repos', 'pages::repos.index')->name('repos.index');
     Route::livewire('projects/{project}/stories/{story}', 'pages::stories.show')->name('stories.show');
+    Route::livewire('projects/{project}/stories/{story}/subtasks/{subtask}', 'pages::subtasks.show')->name('subtasks.show');
+    Route::livewire('projects/{project}/stories/{story}/subtasks/{subtask}/runs/{run}', 'pages::runs.show')->name('runs.show');
 
     // Legacy /stories/{story} → /projects/{p}/stories/{s} (resolve via story).
     Route::get('stories/{story}', function (int $story) {
@@ -41,21 +43,36 @@ Route::middleware(['auth', 'verified'])->group(function () {
         return redirect()->route('stories.show', ['project' => $s->feature->project_id, 'story' => $s->id], 301);
     });
 
-    // Legacy /runs/{run} → canonical run console URL (Slice 3 lands the
-    // nested route; for now redirect to the parent Story document).
+    // Legacy /runs/{run} → canonical nested run console. Plan-generation
+    // runs (Story-runnable) have no Subtask parent and redirect to the
+    // Story document instead.
     Route::get('runs/{run}', function (int $run) {
         $r = AgentRun::query()->find($run);
         abort_unless($r, 404);
 
-        $story = match ($r->runnable_type) {
-            Story::class => Story::find($r->runnable_id),
-            Subtask::class => Subtask::find($r->runnable_id)?->task?->story,
-            default => null,
-        };
-        abort_unless($story, 404);
-        abort_unless(in_array($story->feature->project_id, auth()->user()->accessibleProjectIds(), true), 404);
+        if ($r->runnable_type === Story::class) {
+            $story = Story::find($r->runnable_id);
+            abort_unless($story, 404);
+            abort_unless(in_array($story->feature->project_id, auth()->user()->accessibleProjectIds(), true), 404);
 
-        return redirect()->route('stories.show', ['project' => $story->feature->project_id, 'story' => $story->id], 301);
+            return redirect()->route('stories.show', ['project' => $story->feature->project_id, 'story' => $story->id], 301);
+        }
+
+        if ($r->runnable_type === Subtask::class) {
+            $subtask = Subtask::with('task.story.feature')->find($r->runnable_id);
+            abort_unless($subtask?->task?->story, 404);
+            $story = $subtask->task->story;
+            abort_unless(in_array($story->feature->project_id, auth()->user()->accessibleProjectIds(), true), 404);
+
+            return redirect()->route('runs.show', [
+                'project' => $story->feature->project_id,
+                'story' => $story->id,
+                'subtask' => $subtask->id,
+                'run' => $r->id,
+            ], 301);
+        }
+
+        abort(404);
     });
 
     // Legacy URL redirects (ADR-0012). PR descriptions, Slack links, and
