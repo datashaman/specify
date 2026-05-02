@@ -5,6 +5,7 @@ namespace App\Services\Executors;
 use App\Ai\Agents\SubtaskExecutor;
 use App\Models\Repo;
 use App\Models\Subtask;
+use App\Services\Progress\ProgressEmitter;
 use Illuminate\Http\Client\RequestException;
 use Illuminate\Support\Facades\Log;
 use RuntimeException;
@@ -25,6 +26,11 @@ class LaravelAiExecutor implements Executor
         return true;
     }
 
+    public function supportsProgressEvents(): bool
+    {
+        return false;
+    }
+
     /**
      * Run the agent loop and translate its final output into an `ExecutionResult`.
      *
@@ -32,7 +38,7 @@ class LaravelAiExecutor implements Executor
      *                          or when the agent terminates without producing
      *                          summary/files/commit-message fields.
      */
-    public function execute(Subtask $subtask, ?string $workingDir, ?Repo $repo, ?string $workingBranch, ?string $contextBrief = null): ExecutionResult
+    public function execute(Subtask $subtask, ?string $workingDir, ?Repo $repo, ?string $workingBranch, ?string $contextBrief = null, ?ProgressEmitter $emitter = null): ExecutionResult
     {
         $context = [
             'subtask_id' => $subtask->getKey(),

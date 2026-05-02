@@ -1,7 +1,7 @@
 # 0011. Streaming progress events from executors
 
 Date: 2026-05-02
-Status: Proposed
+Status: Accepted
 
 ## Context
 

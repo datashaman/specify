@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Auth\SocialiteController;
+use App\Http\Controllers\RunEventsController;
 use App\Http\Controllers\Webhooks\GithubWebhookController;
 use App\Models\AgentRun;
 use App\Models\Story;
@@ -19,6 +20,8 @@ Route::get('auth/{provider}/callback', [SocialiteController::class, 'callback'])
     ->name('socialite.callback');
 
 Route::middleware(['auth', 'verified'])->group(function () {
+    Route::get('runs/{run}/events', RunEventsController::class)->name('runs.events');
+
     Route::livewire('dashboard', 'pages::dashboard')->name('dashboard');
     Route::livewire('triage', 'pages::triage')->name('triage');
     Route::livewire('activity', 'pages::activity.index')->name('activity.index');
