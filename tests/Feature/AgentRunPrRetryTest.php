@@ -40,6 +40,39 @@ test('retryPullRequestOpen refuses runs that already have a PR url', function ()
         ->toThrow(RuntimeException::class, 'already');
 });
 
+test('retryPullRequestOpen dispatches the OpenPullRequestJob end-to-end', function () {
+    Http::fake([
+        'api.github.com/repos/*/pulls?head*' => Http::response([
+            ['html_url' => 'https://github.com/o/r/pull/77', 'number' => 77, 'id' => 7],
+        ], 200),
+    ]);
+
+    $story = approvedStoryInProjectWithRepo();
+    $repo = $story->feature->project->primaryRepo();
+    $repo->forceFill([
+        'provider' => RepoProvider::Github,
+        'access_token' => 'tok',
+        'url' => 'https://github.com/o/r',
+        'default_branch' => 'main',
+    ])->save();
+    $subtask = $story->tasks()->first()->subtasks()->first();
+
+    $run = AgentRun::factory()->create([
+        'runnable_type' => Subtask::class,
+        'runnable_id' => $subtask->id,
+        'repo_id' => $repo->id,
+        'working_branch' => 'specify/feature/story',
+        'executor_driver' => 'fake',
+        'status' => AgentRunStatus::Succeeded,
+        'output' => ['pull_request_error' => 'rate limited'],
+    ]);
+
+    app(ExecutionService::class)->retryPullRequestOpen($run);
+
+    $fresh = $run->fresh();
+    expect($fresh->output['pull_request_url'])->toBe('https://github.com/o/r/pull/77');
+});
+
 test('OpenPullRequestJob opens a fresh PR and stamps the run output', function () {
     Http::fake([
         'api.github.com/repos/*/pulls?head*' => Http::response([], 200),

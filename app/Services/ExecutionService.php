@@ -9,6 +9,7 @@ use App\Enums\StoryStatus;
 use App\Enums\TaskStatus;
 use App\Jobs\ExecuteSubtaskJob;
 use App\Jobs\GenerateTasksJob;
+use App\Jobs\OpenPullRequestJob;
 use App\Jobs\RespondToPrReviewJob;
 use App\Models\AgentRun;
 use App\Models\Repo;
