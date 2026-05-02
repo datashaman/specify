@@ -26,6 +26,8 @@ class SubtaskRunOutcome
 
     public const STATE_ALREADY_COMPLETE = 'already_complete';
 
+    public const STATE_CANCELLED = 'cancelled';
+
     /**
      * @param  array<string, mixed>  $output
      */
@@ -73,6 +75,15 @@ class SubtaskRunOutcome
     public static function alreadyComplete(array $output): self
     {
         return new self(self::STATE_ALREADY_COMPLETE, $output, null, null);
+    }
+
+    /**
+     * Cooperative cancel observed at a pipeline phase boundary (ADR-0010).
+     * Failure-class — the cascade treats it as Blocked.
+     */
+    public static function cancelled(string $reason = 'Cancelled by user.'): self
+    {
+        return new self(self::STATE_CANCELLED, [], null, $reason);
     }
 
     /**

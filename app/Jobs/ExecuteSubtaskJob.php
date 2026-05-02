@@ -36,6 +36,13 @@ class ExecuteSubtaskJob implements ShouldQueue
     {
         $run = AgentRun::findOrFail($this->agentRunId);
 
+        // ADR-0010: a Queued run can be cancelled before the worker picks
+        // it up; respect the terminal state instead of overwriting it via
+        // markRunning. Append-only invariant means terminal stays terminal.
+        if ($run->isTerminal()) {
+            return;
+        }
+
         if (! $run->runnable instanceof Subtask) {
             $execution->markFailed($run, 'Subtask for AgentRun not found.');
 
@@ -67,6 +74,7 @@ class ExecuteSubtaskJob implements ShouldQueue
             SubtaskRunOutcome::STATE_PULL_REQUEST_FAILED,
             SubtaskRunOutcome::STATE_ALREADY_COMPLETE => $execution->markSucceeded($run, $outcome->output, $outcome->diff),
             SubtaskRunOutcome::STATE_NO_DIFF => $execution->markFailed($run, $outcome->error ?? 'Subtask run failed.'),
+            SubtaskRunOutcome::STATE_CANCELLED => $execution->markCancelled($run, $outcome->error),
         };
 
         if ($outcome->isSucceeded()) {

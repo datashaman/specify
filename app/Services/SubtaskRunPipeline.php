@@ -58,6 +58,10 @@ class SubtaskRunPipeline
             'executor_driver' => $agentRun->executor_driver,
         ]);
 
+        if ($this->cancelObserved($agentRun, 'before_prepare', $logCtx)) {
+            return SubtaskRunOutcome::cancelled();
+        }
+
         $repo = $agentRun->repo;
         $workingDir = null;
 
@@ -70,6 +74,10 @@ class SubtaskRunPipeline
             $workingDir = $this->workspace->prepare($repo, $agentRun);
             $this->workspace->checkoutBranch($workingDir, $branch, baseBranch: $repo->default_branch);
             Log::info('specify.subtask.workspace.ready', $logCtx + ['working_dir' => $workingDir]);
+        }
+
+        if ($this->cancelObserved($agentRun, 'before_execute', $logCtx)) {
+            return SubtaskRunOutcome::cancelled();
         }
 
         $contextBrief = $this->contextBuilder->build($subtask, $workingDir, $repo);
@@ -87,6 +95,11 @@ class SubtaskRunPipeline
         }
 
         $result = $executor->execute($subtask, $workingDir, $repo, $agentRun->working_branch, $contextBrief !== '' ? $contextBrief : null);
+
+        if ($this->cancelObserved($agentRun, 'after_execute', $logCtx)) {
+            return SubtaskRunOutcome::cancelled();
+        }
+
         $output = $result->toArray();
         if ($contextBrief !== '') {
             $output['context_brief'] = $contextBrief;
@@ -156,6 +169,10 @@ class SubtaskRunPipeline
         $output = $this->applyProposedSubtasks($subtask, $result->proposedSubtasks, $agentRun, $output, $logCtx);
 
         if (config('specify.workspace.push_after_commit', true)) {
+            if ($this->cancelObserved($agentRun, 'before_push', $logCtx)) {
+                return SubtaskRunOutcome::cancelled();
+            }
+
             $branch = $this->branchFor($agentRun);
             $this->workspace->push($workingDir, $branch);
             $output['pushed'] = true;
@@ -218,6 +235,24 @@ class SubtaskRunPipeline
     private function branchFor(AgentRun $agentRun): string
     {
         return $agentRun->working_branch ?? 'specify/run-'.$agentRun->getKey();
+    }
+
+    /**
+     * Re-fetch `cancel_requested` from the DB and log when observed (ADR-0010).
+     * Re-read because the in-memory model is stale relative to a sibling
+     * cancel-request transaction issued while this pipeline was mid-flight.
+     */
+    private function cancelObserved(AgentRun $agentRun, string $phase, array $logCtx): bool
+    {
+        $requested = (bool) AgentRun::query()
+            ->whereKey($agentRun->getKey())
+            ->value('cancel_requested');
+
+        if ($requested) {
+            Log::info('specify.subtask.cancel_observed', $logCtx + ['phase' => $phase]);
+        }
+
+        return $requested;
     }
 
     /**

@@ -29,7 +29,7 @@ Concrete shape:
 
 ### Cancel
 
-- New column `agent_runs.cancel_requested` (boolean, default false). Set by `ExecutionService::cancelRun(AgentRun)`; cleared on terminal state.
+- New column `agent_runs.cancel_requested` (boolean, default false). Set by `ExecutionService::cancelRun(AgentRun)`. The flag is write-once (set true on cancel request) and survives the terminal transition as part of the audit trail — `agent_runs` is append-only, so a reviewer querying "was this Cancelled run cancel-requested?" gets a yes that matches the row's terminal status.
 - `SubtaskRunPipeline` polls the flag between phases (prepare / checkout / execute / commit / diff / push / open PR). When set, it transitions to a new terminal state `Cancelled` (Failure-class — the cascade treats it as Blocked).
 - `Executor` interface gains an optional `supportsCooperativeCancel(): bool` capability (default false). Drivers that opt in receive a `CancelToken` argument on `execute()` and may check it between tool calls. `LaravelAiExecutor` opts in (the agent loop is ours); `CliExecutor` does not (CLI process is opaque). Cancel for non-cooperating drivers waits for the next pipeline-phase boundary or the configured timeout.
 - New state `AgentRunStatus::Cancelled`. `SubtaskRunOutcome::cancelled()` factory; `isFailure()` true.

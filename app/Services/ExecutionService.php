@@ -291,6 +291,71 @@ class ExecutionService
     }
 
     /**
+     * Mark an AgentRun Cancelled — cooperative cancel observed at a pipeline
+     * phase boundary (ADR-0010). Failure-class for cascade purposes; siblings
+     * count as losers.
+     */
+    public function markCancelled(AgentRun $run, ?string $reason = null): void
+    {
+        $run->forceFill([
+            'status' => AgentRunStatus::Cancelled->value,
+            'error_message' => $reason ?? 'Cancelled by user.',
+            'finished_at' => now(),
+        ])->save();
+
+        if ($run->runnable_type === Subtask::class) {
+            $this->finalizeSubtaskFromRun($run);
+        }
+    }
+
+    /**
+     * Request cooperative cancellation of an AgentRun (ADR-0010).
+     *
+     * Queued runs short-circuit straight to Cancelled (the job hasn't
+     * started, so there's nothing to cooperate with). Running runs have the
+     * `cancel_requested` flag set; the pipeline's poll points observe it
+     * between phases and transition to Cancelled. Terminal runs are no-ops.
+     *
+     * Returns true if anything changed.
+     */
+    public function cancelRun(AgentRun $run, ?string $reason = null): bool
+    {
+        if ($run->isTerminal()) {
+            return false;
+        }
+
+        if ($run->status === AgentRunStatus::Queued) {
+            $this->markCancelled($run, $reason);
+
+            return true;
+        }
+
+        $run->forceFill(['cancel_requested' => true])->save();
+
+        return true;
+    }
+
+    /**
+     * Convenience: cancel every still-open AgentRun for a Subtask. Useful for
+     * race mode where one button cancels all sibling drivers (ADR-0010).
+     *
+     * @return int Number of runs whose state changed.
+     */
+    public function cancelSubtask(Subtask $subtask, ?string $reason = null): int
+    {
+        $changed = 0;
+        foreach ($subtask->agentRuns()
+            ->whereIn('status', [AgentRunStatus::Queued->value, AgentRunStatus::Running->value])
+            ->get() as $run) {
+            if ($this->cancelRun($run, $reason)) {
+                $changed++;
+            }
+        }
+
+        return $changed;
+    }
+
+    /**
      * Cascade gate. Called whenever a Subtask AgentRun reaches a terminal
      * state. Defers if any sibling on the same Subtask is still Queued or
      * Running. Once all siblings have terminated:

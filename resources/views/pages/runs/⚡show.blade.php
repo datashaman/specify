@@ -3,6 +3,7 @@
 use App\Enums\AgentRunStatus;
 use App\Models\AgentRun;
 use App\Models\Subtask;
+use App\Services\ExecutionService;
 use Illuminate\Support\Facades\Auth;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Title;
@@ -32,6 +33,19 @@ new #[Title('Run')] class extends Component {
         if ((int) $user->current_project_id !== $this->project_id) {
             $user->forceFill(['current_project_id' => $this->project_id])->save();
         }
+    }
+
+    public function cancel(ExecutionService $execution): void
+    {
+        $run = $this->run;
+        abort_unless($run, 404);
+
+        if ($run->isTerminal()) {
+            return;
+        }
+
+        $execution->cancelRun($run, 'Cancelled from run console.');
+        unset($this->run);
     }
 
     #[Computed]
@@ -74,9 +88,11 @@ new #[Title('Run')] class extends Component {
             $rail = match ($run->status) {
                 AgentRunStatus::Succeeded => 'run_complete',
                 AgentRunStatus::Running, AgentRunStatus::Queued => 'running',
-                AgentRunStatus::Failed, AgentRunStatus::Aborted => 'run_failed',
+                AgentRunStatus::Failed, AgentRunStatus::Aborted, AgentRunStatus::Cancelled => 'run_failed',
                 default => 'draft',
             };
+            $canCancel = ! $run->isTerminal();
+            $cancelPending = $canCancel && (bool) $run->cancel_requested;
             $duration = $run->started_at && $run->finished_at
                 ? $run->started_at->diffInSeconds($run->finished_at)
                 : null;
@@ -106,6 +122,21 @@ new #[Title('Run')] class extends Component {
                     <x-state-pill :state="$rail" :label="$run->status->value" />
                     @if ($run->kind && $run->kind->value !== 'execute')
                         <flux:badge color="purple">{{ $run->kind->value }}</flux:badge>
+                    @endif
+                    @if ($cancelPending)
+                        <flux:badge size="sm" color="amber" icon="clock">{{ __('cancel pending') }}</flux:badge>
+                    @endif
+                    @if ($canCancel)
+                        <flux:button
+                            size="sm"
+                            variant="subtle"
+                            icon="x-mark"
+                            wire:click="cancel"
+                            wire:confirm="{{ __('Cancel this run? In-flight tool calls finish; the pipeline stops at the next phase boundary.') }}"
+                            :disabled="$cancelPending"
+                            class="ml-auto"
+                            data-action="cancel-run"
+                        >{{ $cancelPending ? __('Cancelling…') : __('Cancel run') }}</flux:button>
                     @endif
                 </div>
                 <div class="mt-2 flex flex-wrap items-center gap-2 text-xs">
