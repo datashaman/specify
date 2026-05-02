@@ -143,6 +143,61 @@ test('primaryPullRequest hoists the merged sibling and pullRequests sorts it fir
     expect($primary['url'])->toBe('https://github.com/o/r/pull/101');
 });
 
+test('pullRequests preserves run-id-desc order within the unmerged partition when hoisting a merged PR', function () {
+    // Compound sort key: (merged, -run_id). Without it the order of
+    // non-merged candidates can drift across PHP/Laravel versions —
+    // reviewers reading the candidate list would see entries shuffle.
+    $story = Story::factory()->create();
+    $task = Task::factory()->for($story)->create();
+    $subtask = Subtask::factory()->for($task)->create();
+
+    foreach ([
+        ['driver' => 'a', 'number' => 1, 'merged' => null],
+        ['driver' => 'b', 'number' => 2, 'merged' => true],
+        ['driver' => 'c', 'number' => 3, 'merged' => null],
+        ['driver' => 'd', 'number' => 4, 'merged' => null],
+    ] as $row) {
+        AgentRun::factory()->create([
+            'runnable_type' => Subtask::class,
+            'runnable_id' => $subtask->id,
+            'status' => AgentRunStatus::Succeeded,
+            'kind' => AgentRunKind::Execute,
+            'executor_driver' => $row['driver'],
+            'output' => [
+                'pull_request_url' => 'https://github.com/o/r/pull/'.$row['number'],
+                'pull_request_number' => $row['number'],
+                'pull_request_merged' => $row['merged'],
+            ],
+        ]);
+    }
+
+    $prs = $story->pullRequests();
+
+    // Merged hoisted; remaining are run-id desc (insertion order: a,b,c,d
+    // → ids 1,2,3,4 → desc among non-merged is d,c,a, with merged b on top).
+    expect($prs->pluck('driver')->all())->toMatchArray(['b', 'd', 'c', 'a']);
+});
+
+test('pullRequests entries expose run_finished_at, not opened_at', function () {
+    // Renamed in review feedback: opened_at implied an authoritative PR
+    // open timestamp; we only have the AgentRun's terminal time.
+    $story = Story::factory()->create();
+    $task = Task::factory()->for($story)->create();
+    $subtask = Subtask::factory()->for($task)->create();
+    AgentRun::factory()->create([
+        'runnable_type' => Subtask::class,
+        'runnable_id' => $subtask->id,
+        'status' => AgentRunStatus::Succeeded,
+        'kind' => AgentRunKind::Execute,
+        'finished_at' => now(),
+        'output' => ['pull_request_url' => 'https://github.com/o/r/pull/1'],
+    ]);
+
+    $entry = $story->pullRequests()->first();
+    expect($entry)->toHaveKey('run_finished_at');
+    expect($entry)->not->toHaveKey('opened_at');
+});
+
 test('pullRequests excludes RespondToReview-kind runs (those just push commits, not PRs)', function () {
     $story = Story::factory()->create();
     $task = Task::factory()->for($story)->create();

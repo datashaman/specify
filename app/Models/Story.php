@@ -134,8 +134,10 @@ class Story extends Model
      * `pull_request_number` is just a back-pointer, not a new PR.
      *
      * Each entry: `{ url, number, driver, branch, run_id, merged, action,
-     * opened_at }`. Ordered by most recent first; the merged one (if any)
-     * is hoisted to the top.
+     * run_finished_at }`. `run_finished_at` is the terminal timestamp of
+     * the AgentRun that recorded the PR, *not* the PR's upstream open
+     * time — we don't fetch that. Ordered by most recent run first; any
+     * merged PR is hoisted to the top.
      *
      * @return Collection<int, array<string, mixed>>
      */
@@ -173,7 +175,13 @@ class Story extends Model
                     'run_id' => $run->getKey(),
                     'merged' => $o['pull_request_merged'] ?? null,
                     'action' => $o['pull_request_action'] ?? null,
-                    'opened_at' => $run->finished_at,
+                    // The run's terminal timestamp — *not* the PR's open
+                    // time. We don't fetch the upstream PR's created_at;
+                    // this is the closest proxy for "when did Specify
+                    // first know about this PR" without an extra API
+                    // call. Rename the key so callers don't think it's
+                    // an authoritative PR timestamp.
+                    'run_finished_at' => $run->finished_at,
                 ];
             })
             ->filter()
@@ -187,9 +195,15 @@ class Story extends Model
             ->map(fn (Collection $g) => $g->first())
             ->values();
 
-        // Hoist merged PRs to the top.
+        // Hoist merged PRs to the top while preserving the id-desc order
+        // within each partition. A compound sort key (merged-bit, then
+        // -run_id) is order-stable across PHP / Laravel versions and
+        // doesn't depend on Collection::sortBy's stability semantics.
         return $entries
-            ->sortBy(fn ($pr) => $pr['merged'] === true ? 0 : 1)
+            ->sortBy(fn ($pr) => [
+                $pr['merged'] === true ? 0 : 1,
+                -1 * (int) $pr['run_id'],
+            ])
             ->values();
     }
 
