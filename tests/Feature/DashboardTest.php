@@ -3,6 +3,7 @@
 use App\Enums\AgentRunStatus;
 use App\Enums\StoryStatus;
 use App\Enums\TaskStatus;
+use App\Enums\TeamRole;
 use App\Models\AgentRun;
 use App\Models\Feature;
 use App\Models\Project;
@@ -90,4 +91,76 @@ test('dashboard surfaces repos missing an access_token', function () {
     $this->actingAs($user);
 
     Livewire::test('pages::dashboard')->assertSet('reposNeedingToken', 1);
+});
+
+test('awaiting your approval lists pending stories the user can approve', function () {
+    $ws = Workspace::factory()->create();
+    $team = Team::factory()->for($ws)->create();
+    $user = User::factory()->create();
+    $team->addMember($user, TeamRole::Admin);
+    $user->forceFill(['current_team_id' => $team->id])->save();
+
+    $project = Project::factory()->for($team)->create(['name' => 'Specify']);
+    $feature = Feature::factory()->for($project)->create();
+    $story = Story::factory()->for($feature)->create([
+        'name' => 'Approve me',
+        'status' => StoryStatus::PendingApproval,
+    ]);
+
+    $this->actingAs($user);
+
+    Livewire::test('pages::dashboard')
+        ->assertSee('Awaiting your approval')
+        ->assertSee('Approve me')
+        ->assertSeeHtml(route('stories.show', ['project' => $project->id, 'story' => $story->id]));
+});
+
+test('awaiting your approval is hidden for non-approvers', function () {
+    $ws = Workspace::factory()->create();
+    $team = Team::factory()->for($ws)->create();
+    $user = User::factory()->create();
+    $team->addMember($user, TeamRole::Member);
+    $user->forceFill(['current_team_id' => $team->id])->save();
+
+    $project = Project::factory()->for($team)->create();
+    $feature = Feature::factory()->for($project)->create();
+    Story::factory()->for($feature)->create([
+        'status' => StoryStatus::PendingApproval,
+        'name' => 'Hidden from me',
+    ]);
+
+    $this->actingAs($user);
+
+    Livewire::test('pages::dashboard')
+        ->assertDontSee('Awaiting your approval')
+        ->assertDontSee('Hidden from me');
+});
+
+test('recent runs are clickable and link to the run console', function () {
+    $ws = Workspace::factory()->create();
+    $team = Team::factory()->for($ws)->create();
+    $user = User::factory()->create();
+    $team->addMember($user);
+    $user->forceFill(['current_team_id' => $team->id])->save();
+
+    $project = Project::factory()->for($team)->create();
+    $feature = Feature::factory()->for($project)->create();
+    $story = Story::factory()->for($feature)->create();
+    $task = Task::factory()->for($story)->create();
+    $subtask = Subtask::factory()->for($task)->create();
+    $run = AgentRun::factory()->create([
+        'runnable_type' => Subtask::class,
+        'runnable_id' => $subtask->id,
+        'status' => AgentRunStatus::Succeeded,
+    ]);
+
+    $this->actingAs($user);
+
+    Livewire::test('pages::dashboard')
+        ->assertSeeHtml(route('runs.show', [
+            'project' => $project->id,
+            'story' => $story->id,
+            'subtask' => $subtask->id,
+            'run' => $run->id,
+        ]));
 });
