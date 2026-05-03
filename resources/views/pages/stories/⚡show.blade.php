@@ -823,9 +823,6 @@ new #[Title('Story')] class extends Component {
                                 <span class="text-zinc-400 transition-transform group-open:rotate-90" aria-hidden="true">▸</span>
                                 <flux:badge>{{ __('AC') }} #{{ $loop->iteration }}</flux:badge>
                                 <span class="font-medium">{{ $ac->criterion }}</span>
-                                @if ($ac->met)
-                                    <flux:badge class="ml-1">{{ __('met') }}</flux:badge>
-                                @endif
                             </summary>
 
                             @if ($acTasks->isEmpty())
