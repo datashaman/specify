@@ -191,6 +191,21 @@ new #[Title('Project')] class extends Component {
             @endif
         </section>
 
+        <section class="grid gap-3 md:grid-cols-3" data-section="project-workspaces">
+            <a href="{{ route('stories.index', ['project' => $this->project->id]) }}" wire:navigate class="rounded-xl border border-zinc-200 p-4 hover:bg-zinc-50 dark:border-zinc-700 dark:hover:bg-zinc-900">
+                <div class="text-xs uppercase tracking-wide text-zinc-500">{{ __('Stories') }}</div>
+                <div class="mt-2 text-sm text-zinc-600 dark:text-zinc-400">{{ __('Browse product contracts and their current plans.') }}</div>
+            </a>
+            <a href="{{ route('plans.index', ['project' => $this->project->id]) }}" wire:navigate class="rounded-xl border border-zinc-200 p-4 hover:bg-zinc-50 dark:border-zinc-700 dark:hover:bg-zinc-900">
+                <div class="text-xs uppercase tracking-wide text-zinc-500">{{ __('Plans') }}</div>
+                <div class="mt-2 text-sm text-zinc-600 dark:text-zinc-400">{{ __('Work directly with the implementation layer across the project.') }}</div>
+            </a>
+            <a href="{{ route('approvals.index', ['project' => $this->project->id]) }}" wire:navigate class="rounded-xl border border-zinc-200 p-4 hover:bg-zinc-50 dark:border-zinc-700 dark:hover:bg-zinc-900">
+                <div class="text-xs uppercase tracking-wide text-zinc-500">{{ __('Approvals') }}</div>
+                <div class="mt-2 text-sm text-zinc-600 dark:text-zinc-400">{{ __('Review story contracts and current plans in separate queues.') }}</div>
+            </a>
+        </section>
+
         <section class="flex flex-col gap-3">
             <div class="flex items-center justify-between gap-2">
                 <flux:heading size="lg">{{ __('Features') }}</flux:heading>

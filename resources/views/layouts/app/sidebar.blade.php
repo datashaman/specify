@@ -33,6 +33,12 @@
                             <flux:sidebar.item icon="bookmark" :href="route('stories.index', ['project' => $currentProjectId])" :current="request()->routeIs('stories.*')" wire:navigate>
                                 {{ __('Stories') }}
                             </flux:sidebar.item>
+                            <flux:sidebar.item icon="document-duplicate" :href="route('plans.index', ['project' => $currentProjectId])" :current="request()->routeIs('plans.*')" wire:navigate>
+                                {{ __('Plans') }}
+                            </flux:sidebar.item>
+                            <flux:sidebar.item icon="check-badge" :href="route('approvals.index', ['project' => $currentProjectId])" :current="request()->routeIs('approvals.*') || request()->routeIs('triage')" wire:navigate>
+                                {{ __('Approvals') }}
+                            </flux:sidebar.item>
                             <flux:sidebar.item icon="clipboard-document-list" :href="route('runs.index', ['project' => $currentProjectId])" :current="request()->routeIs('runs.*')" wire:navigate>
                                 {{ __('Runs') }}
                             </flux:sidebar.item>
