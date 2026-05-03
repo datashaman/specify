@@ -342,6 +342,19 @@ test('plan toggle is hidden when story has no ACs and no unmapped tasks', functi
         ->assertDontSeeHtml('data-toggle="plan-mode"');
 });
 
+test('story page shows an empty state when no context items are attached', function () {
+    $s = showPageScene(['status' => StoryStatus::Draft]);
+    attachPolicy($s['ws'], required: 1);
+
+    $this->actingAs($s['user']);
+
+    Livewire::test('pages::stories.show', ['story' => $s['story']->id])
+        ->assertSeeHtml('data-section="story-context-items"')
+        ->assertSee('Attached context items')
+        ->assertSee('0 items attached')
+        ->assertSee('No context items attached yet.');
+});
+
 test('story page lists attached context items and excludes them from the attach picker', function () {
     $s = showPageScene(['status' => StoryStatus::Draft]);
     attachPolicy($s['ws'], required: 1);

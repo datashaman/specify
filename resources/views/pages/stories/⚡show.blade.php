@@ -876,7 +876,7 @@ new #[Title('Story')] class extends Component
             <section class="flex flex-col gap-3" data-section="story-context-items">
                 <div class="flex flex-wrap items-center justify-between gap-3">
                     <div class="flex flex-wrap items-center gap-x-3 gap-y-1">
-                        <flux:heading size="lg">{{ __('Context') }}</flux:heading>
+                        <flux:heading size="lg">{{ __('Attached context items') }}</flux:heading>
                         <flux:text class="text-xs text-zinc-500">
                             {{ trans_choice(':count item attached|:count items attached', $attachedContextItems->count(), ['count' => $attachedContextItems->count()]) }}
                         </flux:text>
