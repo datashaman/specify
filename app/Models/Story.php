@@ -114,6 +114,11 @@ class Story extends Model
         return $this->hasMany(Task::class)->orderBy('position');
     }
 
+    public function contextItems(): BelongsToMany
+    {
+        return $this->belongsToMany(ContextItem::class)->withTimestamps();
+    }
+
     public function creator(): BelongsTo
     {
         return $this->belongsTo(User::class, 'created_by_id');
