@@ -64,7 +64,7 @@ test('author can attach project context items to a story idempotently', function
         ->toBe([$first->id, $second->id]);
 });
 
-test('attached context items must belong to the story project', function () {
+test('attached context items must all belong to the story project', function () {
     $user = User::factory()->create();
     $workspace = Workspace::factory()->create();
     $team = Team::factory()->for($workspace)->create();
@@ -72,18 +72,24 @@ test('attached context items must belong to the story project', function () {
     $project = Project::factory()->for($team)->create();
     $feature = Feature::factory()->for($project)->create();
     $story = Story::factory()->for($feature)->create(['created_by_id' => $user->id]);
+    $existingContextItem = ContextItem::factory()->for($project)->create();
+    $sameProjectContextItem = ContextItem::factory()->for($project)->create();
     $otherContextItem = ContextItem::factory()->create();
+
+    $story->contextItems()->attach($existingContextItem);
 
     $this->actingAs($user)
         ->withSession(['_token' => 'test-token'])
         ->postJson(route('stories.context-items.store', [$project, $story]), [
             '_token' => 'test-token',
-            'context_item_ids' => [$otherContextItem->id],
+            'context_item_ids' => [$sameProjectContextItem->id, $otherContextItem->id],
         ])
         ->assertUnprocessable()
-        ->assertJsonValidationErrors('context_item_ids.0');
+        ->assertJsonValidationErrors('context_item_ids')
+        ->assertJsonPath('errors.context_item_ids.0', 'Only context items from this story\'s project can be attached.');
 
-    expect($story->fresh()->contextItems)->toHaveCount(0);
+    expect($story->fresh()->contextItems()->pluck('context_items.id')->all())
+        ->toBe([$existingContextItem->id]);
 });
 
 test('author can detach a context item from a story', function () {

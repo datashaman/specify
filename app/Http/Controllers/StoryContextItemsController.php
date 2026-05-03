@@ -8,7 +8,7 @@ use App\Models\Story;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 
 class StoryContextItemsController extends Controller
 {
@@ -24,12 +24,7 @@ class StoryContextItemsController extends Controller
 
         $validated = $request->validate([
             'context_item_ids' => ['required', 'array', 'min:1'],
-            'context_item_ids.*' => [
-                'required',
-                'integer',
-                Rule::exists('context_items', 'id')
-                    ->where('project_id', $project->getKey()),
-            ],
+            'context_item_ids.*' => ['required', 'integer'],
         ]);
 
         $ids = collect($validated['context_item_ids'])
@@ -37,6 +32,17 @@ class StoryContextItemsController extends Controller
             ->unique()
             ->values()
             ->all();
+
+        $matchingContextItemCount = ContextItem::query()
+            ->whereKey($ids)
+            ->where('project_id', $story->feature->project_id)
+            ->count();
+
+        if ($matchingContextItemCount !== count($ids)) {
+            throw ValidationException::withMessages([
+                'context_item_ids' => 'Only context items from this story\'s project can be attached.',
+            ]);
+        }
 
         $story->contextItems()->syncWithoutDetaching($ids);
 
