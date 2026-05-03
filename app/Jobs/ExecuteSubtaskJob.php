@@ -89,6 +89,32 @@ class ExecuteSubtaskJob implements ShouldQueue
     }
 
     /**
+     * Queue failure callback — fires when the worker dies, the job exceeds
+     * `tries`/`timeout`, or the framework otherwise decides this attempt is
+     * dead. The catch block in `handle()` covers exceptions thrown inside
+     * the pipeline; this covers the rest (worker SIGKILL, OOM, retry
+     * exhaustion). `markFailed` is idempotent so a double-mark is harmless.
+     */
+    public function failed(?Throwable $e): void
+    {
+        $run = AgentRun::find($this->agentRunId);
+        if ($run === null || $run->isTerminal()) {
+            return;
+        }
+
+        Log::error('specify.subtask.run.job_failed', [
+            'run_id' => $run->getKey(),
+            'subtask_id' => $run->runnable_id,
+            'exception' => $e?->getMessage(),
+        ]);
+
+        app(ExecutionService::class)->markFailed(
+            $run,
+            $e?->getMessage() ?: 'Job failed without surfacing an exception (worker died or retries exhausted).',
+        );
+    }
+
+    /**
      * Fire the ADR-conformance review job after the AgentRun has been
      * persisted by markSucceeded. Dispatched here (not from the pipeline)
      * so the queued job sees `output.pull_request_number` and `diff`
