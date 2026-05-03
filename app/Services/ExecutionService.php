@@ -199,9 +199,7 @@ class ExecutionService
 
         DB::transaction(function () use ($story, $approval) {
             foreach ($this->nextActionableSubtasks($story) as $subtask) {
-                $hasOpenRun = $subtask->agentRuns()
-                    ->whereIn('status', [AgentRunStatus::Queued->value, AgentRunStatus::Running->value])
-                    ->exists();
+                $hasOpenRun = $subtask->agentRuns()->active()->exists();
                 if ($hasOpenRun) {
                     continue;
                 }
@@ -454,9 +452,7 @@ class ExecutionService
     public function cancelSubtask(Subtask $subtask, ?string $reason = null): int
     {
         $changed = 0;
-        foreach ($subtask->agentRuns()
-            ->whereIn('status', [AgentRunStatus::Queued->value, AgentRunStatus::Running->value])
-            ->get() as $run) {
+        foreach ($subtask->agentRuns()->active()->get() as $run) {
             if ($this->cancelRun($run, $reason)) {
                 $changed++;
             }
@@ -505,12 +501,7 @@ class ExecutionService
                 ->where('kind', AgentRunKind::Execute->value)
                 ->get();
 
-            $stillOpen = $siblings->contains(fn (AgentRun $r) => in_array(
-                $r->status,
-                [AgentRunStatus::Queued, AgentRunStatus::Running],
-                true,
-            ));
-            if ($stillOpen) {
+            if ($siblings->contains(fn (AgentRun $r) => $r->isActive())) {
                 return;
             }
 
@@ -558,10 +549,7 @@ class ExecutionService
         $approval = $authorizingApproval instanceof StoryApproval ? $authorizingApproval : null;
 
         foreach ($this->nextActionableSubtasks($story->fresh()) as $next) {
-            $hasOpenRun = $next->agentRuns()
-                ->whereIn('status', [AgentRunStatus::Queued->value, AgentRunStatus::Running->value])
-                ->exists();
-            if ($hasOpenRun) {
+            if ($next->agentRuns()->active()->exists()) {
                 continue;
             }
             $this->dispatchSubtaskExecution($next, $approval);

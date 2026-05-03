@@ -25,11 +25,27 @@ enum AgentRunStatus: string
         };
     }
 
+    public function isActive(): bool
+    {
+        return ! $this->isTerminal();
+    }
+
     public function isFailure(): bool
     {
         return match ($this) {
             self::Failed, self::Aborted, self::Cancelled => true,
             default => false,
         };
+    }
+
+    /**
+     * @return list<string>
+     */
+    public static function activeValues(): array
+    {
+        return array_values(array_map(
+            fn (self $s) => $s->value,
+            array_filter(self::cases(), fn (self $s) => $s->isActive()),
+        ));
     }
 }

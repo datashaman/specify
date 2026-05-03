@@ -6,6 +6,7 @@ use App\Enums\AgentRunKind;
 use App\Enums\AgentRunStatus;
 use Database\Factories\AgentRunFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -78,6 +79,16 @@ class AgentRun extends Model
     public function isTerminal(): bool
     {
         return $this->status->isTerminal();
+    }
+
+    public function isActive(): bool
+    {
+        return $this->status->isActive();
+    }
+
+    public function scopeActive(Builder $query): Builder
+    {
+        return $query->whereIn('status', AgentRunStatus::activeValues());
     }
 
     public function retryOf(): BelongsTo
