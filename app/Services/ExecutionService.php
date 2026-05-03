@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Enums\AgentRunKind;
 use App\Enums\AgentRunStatus;
 use App\Enums\ApprovalDecision;
+use App\Enums\PlanStatus;
 use App\Enums\StoryStatus;
 use App\Enums\TaskStatus;
 use App\Jobs\ExecuteSubtaskJob;
@@ -651,7 +652,7 @@ class ExecutionService
         $remainingTasks = $story->tasks()->where('tasks.status', '!=', TaskStatus::Done->value)->count();
         if ($remainingTasks === 0) {
             if ($story->currentPlan) {
-                $story->currentPlan->forceFill(['status' => \App\Enums\PlanStatus::Done->value])->save();
+                $story->currentPlan->forceFill(['status' => PlanStatus::Done->value])->save();
             }
             $story->forceFill(['status' => StoryStatus::Done->value])->save();
 

@@ -3,11 +3,11 @@
 namespace App\Mcp\Tools;
 
 use App\Mcp\Concerns\ResolvesProjectAccess;
+use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Laravel\Mcp\Request;
 use Laravel\Mcp\Response;
 use Laravel\Mcp\Server\Attributes\Description;
 use Laravel\Mcp\Server\Tool;
-use Illuminate\Contracts\JsonSchema\JsonSchema;
 
 #[Description('Get a plan in detail, including approval revision, task and subtask counts, and whether it is the story\'s current plan.')]
 class GetPlanTool extends Tool

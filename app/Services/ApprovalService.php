@@ -3,12 +3,14 @@
 namespace App\Services;
 
 use App\Enums\ApprovalDecision;
+use App\Enums\PlanStatus;
 use App\Enums\StoryStatus;
 use App\Models\Plan;
 use App\Models\PlanApproval;
 use App\Models\Story;
 use App\Models\StoryApproval;
 use App\Models\User;
+use Illuminate\Support\Collection;
 use InvalidArgumentException;
 use RuntimeException;
 
@@ -67,10 +69,10 @@ class ApprovalService
         ApprovalDecision $decision,
         ?string $notes = null,
     ): PlanApproval {
-        if ($target->status === \App\Enums\PlanStatus::Rejected) {
+        if ($target->status === PlanStatus::Rejected) {
             throw new RuntimeException('Plan is rejected; no further decisions accepted.');
         }
-        if ($target->status === \App\Enums\PlanStatus::Superseded) {
+        if ($target->status === PlanStatus::Superseded) {
             throw new RuntimeException('Plan is superseded; no further decisions accepted.');
         }
 
@@ -139,30 +141,30 @@ class ApprovalService
         );
 
         if ($state['rejected']) {
-            $plan->forceFill(['status' => \App\Enums\PlanStatus::Rejected->value])->save();
+            $plan->forceFill(['status' => PlanStatus::Rejected->value])->save();
 
             return;
         }
 
         if ($state['changes_requested']) {
-            $plan->forceFill(['status' => \App\Enums\PlanStatus::PendingApproval->value])->save();
+            $plan->forceFill(['status' => PlanStatus::PendingApproval->value])->save();
 
             return;
         }
 
         if ($policy->auto_approve || $state['count'] >= $policy->required_approvals) {
-            if ($plan->status !== \App\Enums\PlanStatus::Draft) {
-                $plan->forceFill(['status' => \App\Enums\PlanStatus::Approved->value])->save();
+            if ($plan->status !== PlanStatus::Draft) {
+                $plan->forceFill(['status' => PlanStatus::Approved->value])->save();
             }
 
             return;
         }
 
-        if ($plan->status === \App\Enums\PlanStatus::Draft) {
+        if ($plan->status === PlanStatus::Draft) {
             return;
         }
 
-        $plan->forceFill(['status' => \App\Enums\PlanStatus::PendingApproval->value])->save();
+        $plan->forceFill(['status' => PlanStatus::PendingApproval->value])->save();
     }
 
     private function guardSelfApproval(bool $allowSelfApproval, ?int $creatorId, User $approver, ApprovalDecision $decision): void
@@ -178,10 +180,10 @@ class ApprovalService
     }
 
     /**
-     * @param  \Illuminate\Support\Collection<int, StoryApproval|PlanApproval>  $approvals
+     * @param  Collection<int, StoryApproval|PlanApproval>  $approvals
      * @return array{rejected: bool, changes_requested: bool, count: int}
      */
-    private function approvalState(\Illuminate\Support\Collection $approvals): array
+    private function approvalState(Collection $approvals): array
     {
         if ($approvals->contains(fn ($a) => $a->decision === ApprovalDecision::Reject)) {
             return ['rejected' => true, 'changes_requested' => false, 'count' => 0];

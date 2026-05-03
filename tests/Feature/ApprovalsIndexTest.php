@@ -3,6 +3,7 @@
 use App\Enums\PlanStatus;
 use App\Enums\StoryStatus;
 use App\Enums\TeamRole;
+use App\Models\ApprovalPolicy;
 use App\Models\Feature;
 use App\Models\Project;
 use App\Models\Story;
@@ -24,8 +25,8 @@ test('approvals board shows separate story and plan queues', function () {
     $project = Project::factory()->for($team)->create();
     $feature = Feature::factory()->for($project)->create();
 
-    \App\Models\ApprovalPolicy::create([
-        'scope_type' => \App\Models\ApprovalPolicy::SCOPE_PROJECT,
+    ApprovalPolicy::create([
+        'scope_type' => ApprovalPolicy::SCOPE_PROJECT,
         'scope_id' => $project->id,
         'required_approvals' => 1,
     ]);

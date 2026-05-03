@@ -21,7 +21,7 @@ use InvalidArgumentException;
  * Each replacement creates a fresh Plan version, writes Tasks/Subtasks under
  * that plan, marks the prior current plan superseded, and points the Story at
  * the new current plan.
-  */
+ */
 class PlanWriter
 {
     public function __construct(public ApprovalService $approvals) {}

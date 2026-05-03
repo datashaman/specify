@@ -7,7 +7,6 @@ use App\Enums\TeamRole;
 use App\Models\AcceptanceCriterion;
 use App\Models\ApprovalPolicy;
 use App\Models\Feature;
-use App\Models\PlanApproval;
 use App\Models\Project;
 use App\Models\Story;
 use App\Models\StoryApproval;

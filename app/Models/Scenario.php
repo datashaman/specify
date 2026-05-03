@@ -2,6 +2,8 @@
 
 namespace App\Models;
 
+use App\Enums\StoryStatus;
+use App\Services\ApprovalService;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -22,9 +24,9 @@ class Scenario extends Model
             }
 
             $story->silentlyForceFill([
-                'status' => $story->status === \App\Enums\StoryStatus::Draft
-                    ? \App\Enums\StoryStatus::Draft->value
-                    : \App\Enums\StoryStatus::PendingApproval->value,
+                'status' => $story->status === StoryStatus::Draft
+                    ? StoryStatus::Draft->value
+                    : StoryStatus::PendingApproval->value,
                 'revision' => ($story->revision ?? 1) + 1,
             ]);
 
@@ -32,7 +34,7 @@ class Scenario extends Model
                 $story->currentPlan->reopenForApproval();
             }
 
-            app(\App\Services\ApprovalService::class)->recompute($story->fresh());
+            app(ApprovalService::class)->recompute($story->fresh());
         };
 
         static::created($reopen);

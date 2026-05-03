@@ -45,22 +45,17 @@ class UpdatePlanTool extends Tool
 
         $changes = [];
         $structuralChange = false;
+
         foreach (['name', 'summary', 'design_notes', 'implementation_notes', 'risks', 'assumptions', 'source_label'] as $field) {
-             if (array_key_exists($field, $validated)) {
-                 $changes[$field] = $validated[$field];
-+                $structuralChange = true;
-             }
-         }
-         if (isset($validated['source'])) {
-             $changes['source'] = PlanSource::from($validated['source']);
-+            $structuralChange = true;
-         }
             if (array_key_exists($field, $validated)) {
                 $changes[$field] = $validated[$field];
+                $structuralChange = true;
             }
         }
+
         if (isset($validated['source'])) {
             $changes['source'] = PlanSource::from($validated['source']);
+            $structuralChange = true;
         }
         if (isset($validated['status'])) {
             $changes['status'] = PlanStatus::from($validated['status']);

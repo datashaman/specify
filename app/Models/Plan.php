@@ -4,7 +4,6 @@ namespace App\Models;
 
 use App\Enums\PlanSource;
 use App\Enums\PlanStatus;
-use App\Models\ApprovalPolicy;
 use App\Services\ApprovalService;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
