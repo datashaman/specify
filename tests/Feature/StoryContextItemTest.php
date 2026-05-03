@@ -64,6 +64,61 @@ test('author can attach project context items to a story idempotently', function
         ->toBe([$first->id, $second->id]);
 });
 
+test('author can attach a same project context item to a story', function () {
+    $user = User::factory()->create();
+    $workspace = Workspace::factory()->create();
+    $team = Team::factory()->for($workspace)->create();
+    $team->addMember($user);
+    $project = Project::factory()->for($team)->create();
+    $feature = Feature::factory()->for($project)->create();
+    $story = Story::factory()->for($feature)->create(['created_by_id' => $user->id]);
+    $contextItem = ContextItem::factory()->for($project)->create();
+
+    $this->actingAs($user)
+        ->withSession(['_token' => 'test-token'])
+        ->postJson(route('stories.context-items.store', [$project, $story]), [
+            '_token' => 'test-token',
+            'context_item_ids' => [$contextItem->id],
+        ])
+        ->assertSuccessful()
+        ->assertJsonPath('context_items.0.id', $contextItem->id)
+        ->assertJsonPath('context_items.0.project_id', $project->id)
+        ->assertJsonCount(1, 'context_items');
+
+    $this->assertDatabaseHas('context_item_story', [
+        'story_id' => $story->id,
+        'context_item_id' => $contextItem->id,
+    ]);
+});
+
+test('author cannot attach a different project context item to a story', function () {
+    $user = User::factory()->create();
+    $workspace = Workspace::factory()->create();
+    $team = Team::factory()->for($workspace)->create();
+    $team->addMember($user);
+    $project = Project::factory()->for($team)->create();
+    $feature = Feature::factory()->for($project)->create();
+    $story = Story::factory()->for($feature)->create(['created_by_id' => $user->id]);
+    $otherProjectContextItem = ContextItem::factory()->create();
+
+    $this->actingAs($user)
+        ->withSession(['_token' => 'test-token'])
+        ->postJson(route('stories.context-items.store', [$project, $story]), [
+            '_token' => 'test-token',
+            'context_item_ids' => [$otherProjectContextItem->id],
+        ])
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors('context_item_ids')
+        ->assertJsonPath('errors.context_item_ids.0', 'Only context items from this story\'s project can be attached.');
+
+    $this->assertDatabaseMissing('context_item_story', [
+        'story_id' => $story->id,
+        'context_item_id' => $otherProjectContextItem->id,
+    ]);
+
+    expect($story->fresh()->contextItems)->toHaveCount(0);
+});
+
 test('attached context items must all belong to the story project', function () {
     $user = User::factory()->create();
     $workspace = Workspace::factory()->create();
