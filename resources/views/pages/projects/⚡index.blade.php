@@ -7,6 +7,8 @@ use Livewire\Attributes\Title;
 use Livewire\Component;
 
 new #[Title('Projects')] class extends Component {
+    public ?int $confirmingDeleteId = null;
+
     #[Computed]
     public function projects()
     {
@@ -18,6 +20,41 @@ new #[Title('Projects')] class extends Component {
             ->withCount(['features', 'repos', 'stories'])
             ->orderBy('name')
             ->get();
+    }
+
+    public function canDeleteProject(Project $project): bool
+    {
+        return Auth::user()->canApproveInProject($project);
+    }
+
+    public function confirmDelete(int $projectId): void
+    {
+        $project = $this->projects->firstWhere('id', $projectId);
+        abort_unless($project, 404);
+        abort_unless($this->canDeleteProject($project), 403);
+
+        $this->confirmingDeleteId = $projectId;
+    }
+
+    public function cancelDelete(): void
+    {
+        $this->confirmingDeleteId = null;
+    }
+
+    public function deleteProject(int $projectId): void
+    {
+        $project = $this->projects->firstWhere('id', $projectId);
+        abort_unless($project, 404);
+        abort_unless($this->canDeleteProject($project), 403);
+
+        $user = Auth::user();
+        if ((int) $user->current_project_id === (int) $project->id) {
+            $user->switchProject(null);
+        }
+
+        $project->delete();
+        $this->confirmingDeleteId = null;
+        unset($this->projects);
     }
 }; ?>
 
@@ -40,10 +77,37 @@ new #[Title('Projects')] class extends Component {
                     <a href="{{ route('projects.show', $project) }}" wire:navigate>
                         <flux:button size="sm" variant="primary">{{ __('Open project') }}</flux:button>
                     </a>
+                    @if ($this->canDeleteProject($project))
+                        <flux:modal.trigger name="delete-project-index-modal">
+                            <flux:button size="sm" variant="danger" wire:click="confirmDelete({{ $project->id }})">{{ __('Delete') }}</flux:button>
+                        </flux:modal.trigger>
+                    @endif
                 </div>
             </flux:card>
         @empty
             <flux:text class="text-zinc-500">{{ __('No projects in your teams yet.') }}</flux:text>
         @endforelse
     </div>
+
+    @php($confirmingProject = $confirmingDeleteId ? $this->projects->firstWhere('id', $confirmingDeleteId) : null)
+    <flux:modal name="delete-project-index-modal" class="md:w-96" @close="$wire.cancelDelete()">
+        <div class="flex flex-col gap-4">
+            <flux:heading size="lg">{{ __('Delete project?') }}</flux:heading>
+            <flux:text>
+                @if ($confirmingProject)
+                    {{ __('This permanently removes :name, including its features, stories, tasks, subtasks, approvals, and repo attachments. This cannot be undone.', ['name' => $confirmingProject->name]) }}
+                @else
+                    {{ __('This permanently removes the project and all of its data. This cannot be undone.') }}
+                @endif
+            </flux:text>
+            <div class="flex justify-end gap-2">
+                <flux:modal.close>
+                    <flux:button type="button" variant="ghost" wire:click="cancelDelete">{{ __('Cancel') }}</flux:button>
+                </flux:modal.close>
+                <flux:modal.close>
+                    <flux:button variant="danger" icon="trash" wire:click="deleteProject({{ $confirmingDeleteId ?? 0 }})">{{ __('Delete project') }}</flux:button>
+                </flux:modal.close>
+            </div>
+        </div>
+    </flux:modal>
 </div>

@@ -100,3 +100,29 @@ test('member cannot edit project', function () {
         ->call('startEdit')
         ->assertStatus(403);
 });
+
+test('admin can delete a project from the project page', function () {
+    ['user' => $user, 'project' => $project] = projectShowScene();
+    $feature = Feature::factory()->for($project)->create();
+
+    $this->actingAs($user);
+
+    Livewire::test('pages::projects.show', ['project' => $project->id])
+        ->call('deleteProject')
+        ->assertRedirect(route('projects.index'));
+
+    expect(Project::find($project->id))->toBeNull();
+    expect(Feature::find($feature->id))->toBeNull();
+    expect($user->fresh()->current_project_id)->toBeNull();
+});
+
+test('member cannot delete a project', function () {
+    ['user' => $user, 'project' => $project] = projectShowScene(TeamRole::Member);
+    $this->actingAs($user);
+
+    Livewire::test('pages::projects.show', ['project' => $project->id])
+        ->call('deleteProject')
+        ->assertStatus(403);
+
+    expect(Project::find($project->id))->not->toBeNull();
+});

@@ -62,6 +62,11 @@ new #[Title('Project')] class extends Component {
         return $project !== null && Auth::user()->canApproveInProject($project);
     }
 
+    public function canDeleteProject(): bool
+    {
+        return $this->canEditProject();
+    }
+
     public function startEdit(): void
     {
         $project = $this->project;
@@ -119,6 +124,22 @@ new #[Title('Project')] class extends Component {
         $this->reset(['newFeatureName', 'newFeatureDescription']);
         unset($this->features);
     }
+
+    public function deleteProject(): void
+    {
+        $project = $this->project;
+        abort_unless($project, 404);
+        abort_unless($this->canDeleteProject(), 403);
+
+        $user = Auth::user();
+        if ((int) $user->current_project_id === (int) $project->id) {
+            $user->switchProject(null);
+        }
+
+        $project->delete();
+
+        $this->redirectRoute('projects.index', navigate: true);
+    }
 }; ?>
 
 <div class="flex flex-col gap-6 p-6">
@@ -139,7 +160,14 @@ new #[Title('Project')] class extends Component {
                 <div class="flex items-start justify-between gap-3">
                     <flux:heading size="xl">{{ $this->project->name }}</flux:heading>
                     @if ($this->canEditProject())
-                        <flux:button wire:click="startEdit" size="sm" icon="pencil-square">{{ __('Edit') }}</flux:button>
+                        <div class="flex items-center gap-2">
+                            <flux:button wire:click="startEdit" size="sm" icon="pencil-square">{{ __('Edit') }}</flux:button>
+                            @if ($this->canDeleteProject())
+                                <flux:modal.trigger name="delete-project-modal">
+                                    <flux:button size="sm" variant="danger" icon="trash">{{ __('Delete') }}</flux:button>
+                                </flux:modal.trigger>
+                            @endif
+                        </div>
                     @endif
                 </div>
                 @if ($this->project->description)
@@ -191,6 +219,21 @@ new #[Title('Project')] class extends Component {
                     </div>
                 </form>
             </flux:modal>
+
+            @if ($this->canDeleteProject())
+                <flux:modal name="delete-project-modal" class="md:w-96">
+                    <div class="flex flex-col gap-4">
+                        <flux:heading size="lg">{{ __('Delete project?') }}</flux:heading>
+                        <flux:text>{{ __('This permanently removes the project, its features, stories, tasks, subtasks, approvals, and repo attachments. This cannot be undone.') }}</flux:text>
+                        <div class="flex justify-end gap-2">
+                            <flux:modal.close>
+                                <flux:button type="button" variant="ghost">{{ __('Cancel') }}</flux:button>
+                            </flux:modal.close>
+                            <flux:button wire:click="deleteProject" variant="danger" icon="trash">{{ __('Delete project') }}</flux:button>
+                        </div>
+                    </div>
+                </flux:modal>
+            @endif
         @endif
     @endif
 </div>
