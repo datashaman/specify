@@ -30,7 +30,7 @@ afterEach(function () {
     Cache::flush();
 });
 
-test('lists project repos with a no-webhook badge by default', function () {
+test('lists project repos with a no-webhook indicator by default', function () {
     ['user' => $user, 'project' => $project, 'workspace' => $ws] = repoScene();
     $repo = Repo::factory()->for($ws)->create([
         'name' => 'backend',
@@ -41,7 +41,7 @@ test('lists project repos with a no-webhook badge by default', function () {
 
     Livewire::test('pages::repos.index', ['project' => $project->id])
         ->assertSee('backend')
-        ->assertSee('no webhook');
+        ->assertSee('No webhook installed');
 });
 
 test('admin can mark a repo primary; setPrimary flips the pivot flag', function () {
@@ -106,14 +106,12 @@ test('addGithubRepo creates a workspace repo and attaches it to the project', fu
     $this->actingAs($user);
 
     Http::fake([
-        'api.github.com/user/repos*' => Http::response([
-            [
-                'full_name' => 'datashaman/specify',
-                'name' => 'specify',
-                'html_url' => 'https://github.com/datashaman/specify',
-                'default_branch' => 'main',
-                'private' => false,
-            ],
+        'api.github.com/repos/datashaman/specify' => Http::response([
+            'full_name' => 'datashaman/specify',
+            'name' => 'specify',
+            'html_url' => 'https://github.com/datashaman/specify',
+            'default_branch' => 'main',
+            'private' => false,
         ], 200),
         'api.github.com/repos/datashaman/specify/hooks*' => Http::response(['id' => 1], 201),
     ]);
