@@ -20,7 +20,7 @@ class StoryContextItemsController extends Controller
 
         $story->loadMissing('feature.project');
         abort_unless((int) $story->feature->project_id === (int) $project->getKey(), 404);
-        abort_unless($this->canAttach($user, $story), 403);
+        abort_unless($this->canManageContextItems($user, $story), 403);
 
         $validated = $request->validate([
             'context_item_ids' => ['required', 'array', 'min:1'],
@@ -57,7 +57,27 @@ class StoryContextItemsController extends Controller
         ]);
     }
 
-    private function canAttach(User $user, Story $story): bool
+    public function destroy(Request $request, Project $project, Story $story, ContextItem $contextItem): JsonResponse
+    {
+        $user = $request->user();
+        abort_if($user === null, 401);
+        abort_unless(in_array((int) $project->getKey(), $user->accessibleProjectIds(), true), 404);
+
+        $story->loadMissing('feature.project');
+        abort_unless((int) $story->feature->project_id === (int) $project->getKey(), 404);
+        abort_unless((int) $contextItem->project_id === (int) $project->getKey(), 404);
+        abort_unless($this->canManageContextItems($user, $story), 403);
+
+        $story->contextItems()->detach($contextItem->getKey());
+
+        return response()->json([
+            'story_id' => $story->getKey(),
+            'context_item_id' => $contextItem->getKey(),
+            'detached' => true,
+        ]);
+    }
+
+    private function canManageContextItems(User $user, Story $story): bool
     {
         return (int) $story->created_by_id === (int) $user->getKey()
             || $user->canApproveInProject($story->feature->project);

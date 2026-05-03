@@ -86,6 +86,72 @@ test('attached context items must belong to the story project', function () {
     expect($story->fresh()->contextItems)->toHaveCount(0);
 });
 
+test('author can detach a context item from a story', function () {
+    $user = User::factory()->create();
+    $workspace = Workspace::factory()->create();
+    $team = Team::factory()->for($workspace)->create();
+    $team->addMember($user);
+    $project = Project::factory()->for($team)->create();
+    $feature = Feature::factory()->for($project)->create();
+    $story = Story::factory()->for($feature)->create(['created_by_id' => $user->id]);
+    $contextItem = ContextItem::factory()->for($project)->create();
+
+    $story->contextItems()->attach($contextItem);
+
+    $this->actingAs($user)
+        ->withSession(['_token' => 'test-token'])
+        ->deleteJson(route('stories.context-items.destroy', [$project, $story, $contextItem]), [
+            '_token' => 'test-token',
+        ])
+        ->assertSuccessful()
+        ->assertJsonPath('story_id', $story->id)
+        ->assertJsonPath('context_item_id', $contextItem->id)
+        ->assertJsonPath('detached', true);
+
+    expect($story->fresh()->contextItems)->toHaveCount(0);
+});
+
+test('detaching a project context item is idempotent when it is not attached', function () {
+    $user = User::factory()->create();
+    $workspace = Workspace::factory()->create();
+    $team = Team::factory()->for($workspace)->create();
+    $team->addMember($user);
+    $project = Project::factory()->for($team)->create();
+    $feature = Feature::factory()->for($project)->create();
+    $story = Story::factory()->for($feature)->create(['created_by_id' => $user->id]);
+    $contextItem = ContextItem::factory()->for($project)->create();
+
+    $this->actingAs($user)
+        ->withSession(['_token' => 'test-token'])
+        ->deleteJson(route('stories.context-items.destroy', [$project, $story, $contextItem]), [
+            '_token' => 'test-token',
+        ])
+        ->assertSuccessful()
+        ->assertJsonPath('story_id', $story->id)
+        ->assertJsonPath('context_item_id', $contextItem->id)
+        ->assertJsonPath('detached', true);
+
+    expect($story->fresh()->contextItems)->toHaveCount(0);
+});
+
+test('detached context item must belong to the story project', function () {
+    $user = User::factory()->create();
+    $workspace = Workspace::factory()->create();
+    $team = Team::factory()->for($workspace)->create();
+    $team->addMember($user);
+    $project = Project::factory()->for($team)->create();
+    $feature = Feature::factory()->for($project)->create();
+    $story = Story::factory()->for($feature)->create(['created_by_id' => $user->id]);
+    $otherContextItem = ContextItem::factory()->create();
+
+    $this->actingAs($user)
+        ->withSession(['_token' => 'test-token'])
+        ->deleteJson(route('stories.context-items.destroy', [$project, $story, $otherContextItem]), [
+            '_token' => 'test-token',
+        ])
+        ->assertNotFound();
+});
+
 test('story must belong to the nested project when attaching context items', function () {
     $user = User::factory()->create();
     $workspace = Workspace::factory()->create();
