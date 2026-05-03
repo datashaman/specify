@@ -863,8 +863,8 @@ new #[Title('Story')] class extends Component {
                     <flux:card data-ac="{{ $loop->iteration }}" data-ac-id="{{ $ac->id }}">
                         <details
                             class="group"
-                            x-data="{ open: ('{{ $shouldRunMode ? '1' : '0' }}' === '1') || planRunMode }"
-                            x-init="$watch('planRunMode', v => { if (v) open = true; else if ('{{ $shouldRunMode ? '1' : '0' }}' !== '1') open = false; })"
+                            x-data="{ open: {{ $shouldRunMode ? 'true' : 'false' }} || planRunMode }"
+                            x-effect="planRunMode ? (open = true) : ({{ $shouldRunMode ? 'true' : 'false' }} || (open = false))"
                             :open="open"
                             @toggle="open = $event.target.open"
                         >
