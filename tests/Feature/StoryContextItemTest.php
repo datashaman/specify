@@ -5,6 +5,7 @@ use App\Models\Feature;
 use App\Models\Project;
 use App\Models\Story;
 use App\Models\Team;
+use App\Models\User;
 use App\Models\Workspace;
 use Illuminate\Support\Facades\Schema;
 
@@ -32,4 +33,96 @@ test('story context item pivot is indexed for story lookup', function () {
         ->toBe(['story_id', 'context_item_id'])
         ->and($indexes->contains(fn (array $index) => $index['columns'] === ['context_item_id']))
         ->toBeTrue();
+});
+
+test('author can attach project context items to a story idempotently', function () {
+    $user = User::factory()->create();
+    $workspace = Workspace::factory()->create();
+    $team = Team::factory()->for($workspace)->create();
+    $team->addMember($user);
+    $project = Project::factory()->for($team)->create();
+    $feature = Feature::factory()->for($project)->create();
+    $story = Story::factory()->for($feature)->create(['created_by_id' => $user->id]);
+    $first = ContextItem::factory()->for($project)->create(['title' => 'Architecture notes']);
+    $second = ContextItem::factory()->for($project)->create(['title' => 'Customer interview']);
+
+    $story->contextItems()->attach($first);
+
+    $this->actingAs($user)
+        ->withSession(['_token' => 'test-token'])
+        ->postJson(route('stories.context-items.store', [$project, $story]), [
+            '_token' => 'test-token',
+            'context_item_ids' => [$first->id, $second->id, $second->id],
+        ])
+        ->assertSuccessful()
+        ->assertJsonPath('story_id', $story->id)
+        ->assertJsonPath('context_items.0.id', $first->id)
+        ->assertJsonPath('context_items.1.id', $second->id)
+        ->assertJsonCount(2, 'context_items');
+
+    expect($story->fresh()->contextItems()->orderBy('context_items.id')->pluck('context_items.id')->all())
+        ->toBe([$first->id, $second->id]);
+});
+
+test('attached context items must belong to the story project', function () {
+    $user = User::factory()->create();
+    $workspace = Workspace::factory()->create();
+    $team = Team::factory()->for($workspace)->create();
+    $team->addMember($user);
+    $project = Project::factory()->for($team)->create();
+    $feature = Feature::factory()->for($project)->create();
+    $story = Story::factory()->for($feature)->create(['created_by_id' => $user->id]);
+    $otherContextItem = ContextItem::factory()->create();
+
+    $this->actingAs($user)
+        ->withSession(['_token' => 'test-token'])
+        ->postJson(route('stories.context-items.store', [$project, $story]), [
+            '_token' => 'test-token',
+            'context_item_ids' => [$otherContextItem->id],
+        ])
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors('context_item_ids.0');
+
+    expect($story->fresh()->contextItems)->toHaveCount(0);
+});
+
+test('story must belong to the nested project when attaching context items', function () {
+    $user = User::factory()->create();
+    $workspace = Workspace::factory()->create();
+    $team = Team::factory()->for($workspace)->create();
+    $team->addMember($user);
+    $project = Project::factory()->for($team)->create();
+    $otherProject = Project::factory()->for($team)->create();
+    $otherFeature = Feature::factory()->for($otherProject)->create();
+    $story = Story::factory()->for($otherFeature)->create(['created_by_id' => $user->id]);
+    $contextItem = ContextItem::factory()->for($project)->create();
+
+    $this->actingAs($user)
+        ->withSession(['_token' => 'test-token'])
+        ->postJson(route('stories.context-items.store', [$project, $story]), [
+            '_token' => 'test-token',
+            'context_item_ids' => [$contextItem->id],
+        ])
+        ->assertNotFound();
+});
+
+test('non author member cannot attach context items to a story', function () {
+    $author = User::factory()->create();
+    $member = User::factory()->create();
+    $workspace = Workspace::factory()->create();
+    $team = Team::factory()->for($workspace)->create();
+    $team->addMember($author);
+    $team->addMember($member);
+    $project = Project::factory()->for($team)->create();
+    $feature = Feature::factory()->for($project)->create();
+    $story = Story::factory()->for($feature)->create(['created_by_id' => $author->id]);
+    $contextItem = ContextItem::factory()->for($project)->create();
+
+    $this->actingAs($member)
+        ->withSession(['_token' => 'test-token'])
+        ->postJson(route('stories.context-items.store', [$project, $story]), [
+            '_token' => 'test-token',
+            'context_item_ids' => [$contextItem->id],
+        ])
+        ->assertForbidden();
 });

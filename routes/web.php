@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Auth\SocialiteController;
 use App\Http\Controllers\RunEventsController;
+use App\Http\Controllers\StoryContextItemsController;
 use App\Http\Controllers\Webhooks\GithubWebhookController;
 use App\Models\AgentRun;
 use App\Models\Story;
@@ -33,6 +34,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::livewire('projects/{project}/runs', 'pages::runs.index')->name('runs.index');
     Route::livewire('projects/{project}/repos', 'pages::repos.index')->name('repos.index');
     Route::livewire('projects/{project}/stories/{story}', 'pages::stories.show')->name('stories.show');
+    Route::post('projects/{project}/stories/{story}/context-items', [StoryContextItemsController::class, 'store'])->name('stories.context-items.store');
     Route::livewire('projects/{project}/stories/{story}/tasks/{task}', 'pages::tasks.show')->name('tasks.show');
     Route::livewire('projects/{project}/stories/{story}/subtasks/{subtask}', 'pages::subtasks.show')->name('subtasks.show');
     Route::livewire('projects/{project}/stories/{story}/subtasks/{subtask}/runs/{run}', 'pages::runs.show')->name('runs.show');
