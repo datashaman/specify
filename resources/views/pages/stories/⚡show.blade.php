@@ -533,7 +533,9 @@ new #[Title('Story')] class extends Component
             ->with([
                 'feature.project',
                 'creator',
-                'contextItems',
+                'contextItems' => fn ($query) => $query
+                    ->select('context_items.id', 'context_items.type', 'context_items.title', 'context_items.description')
+                    ->orderBy('context_items.title'),
                 'acceptanceCriteria',
                 'tasks.acceptanceCriterion',
                 'tasks.dependencies',

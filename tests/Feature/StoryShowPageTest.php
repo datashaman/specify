@@ -345,7 +345,11 @@ test('plan toggle is hidden when story has no ACs and no unmapped tasks', functi
 test('story page lists attached context items and excludes them from the attach picker', function () {
     $s = showPageScene(['status' => StoryStatus::Draft]);
     attachPolicy($s['ws'], required: 1);
-    $attached = ContextItem::factory()->for($s['project'])->create(['title' => 'Attached architecture note']);
+    $attached = ContextItem::factory()->for($s['project'])->create([
+        'type' => 'document',
+        'title' => 'Attached architecture note',
+        'description' => 'Short implementation context for the executor.',
+    ]);
     $available = ContextItem::factory()->for($s['project'])->create(['title' => 'Available interview']);
     $s['story']->contextItems()->attach($attached);
 
@@ -354,6 +358,8 @@ test('story page lists attached context items and excludes them from the attach 
     $html = Livewire::test('pages::stories.show', ['story' => $s['story']->id])
         ->assertSeeHtml('data-section="story-context-items"')
         ->assertSee('Attached architecture note')
+        ->assertSee('Short implementation context for the executor.')
+        ->assertSee('document')
         ->assertSee('Available interview')
         ->html();
 
