@@ -108,12 +108,25 @@ test('admin can delete a project from the project page', function () {
     $this->actingAs($user);
 
     Livewire::test('pages::projects.show', ['project' => $project->id])
+        ->set('deleteConfirmationName', $project->name)
         ->call('deleteProject')
         ->assertRedirect(route('projects.index'));
 
     expect(Project::find($project->id))->toBeNull();
     expect(Feature::find($feature->id))->toBeNull();
     expect($user->fresh()->current_project_id)->toBeNull();
+});
+
+test('project page delete requires the project name confirmation', function () {
+    ['user' => $user, 'project' => $project] = projectShowScene();
+    $this->actingAs($user);
+
+    Livewire::test('pages::projects.show', ['project' => $project->id])
+        ->set('deleteConfirmationName', 'Wrong Name')
+        ->call('deleteProject')
+        ->assertHasErrors(['deleteConfirmationName']);
+
+    expect(Project::find($project->id))->not->toBeNull();
 });
 
 test('member cannot delete a project', function () {

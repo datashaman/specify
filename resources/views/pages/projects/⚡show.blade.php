@@ -26,6 +26,9 @@ new #[Title('Project')] class extends Component {
     #[Validate('nullable|string|max:1000')]
     public string $editDescription = '';
 
+    #[Validate('required|string|max:255')]
+    public string $deleteConfirmationName = '';
+
     public function mount(int $project): void
     {
         $this->project_id = $project;
@@ -131,6 +134,18 @@ new #[Title('Project')] class extends Component {
         abort_unless($project, 404);
         abort_unless($this->canDeleteProject(), 403);
 
+        $this->validate([
+            'deleteConfirmationName' => ['required', 'string', 'max:255'],
+        ], [], [
+            'deleteConfirmationName' => __('project name'),
+        ]);
+
+        if (trim($this->deleteConfirmationName) !== $project->name) {
+            $this->addError('deleteConfirmationName', __('Enter the project name exactly to confirm deletion.'));
+
+            return;
+        }
+
         $user = Auth::user();
         if ((int) $user->current_project_id === (int) $project->id) {
             $user->switchProject(null);
@@ -225,6 +240,12 @@ new #[Title('Project')] class extends Component {
                     <div class="flex flex-col gap-4">
                         <flux:heading size="lg">{{ __('Delete project?') }}</flux:heading>
                         <flux:text>{{ __('This permanently removes the project, its features, stories, tasks, subtasks, approvals, and repo attachments. This cannot be undone.') }}</flux:text>
+                        <flux:input
+                            wire:model="deleteConfirmationName"
+                            :label="__('Type the project name to confirm')"
+                            :placeholder="$this->project->name"
+                            required
+                        />
                         <div class="flex justify-end gap-2">
                             <flux:modal.close>
                                 <flux:button type="button" variant="ghost">{{ __('Cancel') }}</flux:button>

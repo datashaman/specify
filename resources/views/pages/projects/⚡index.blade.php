@@ -9,6 +9,8 @@ use Livewire\Component;
 new #[Title('Projects')] class extends Component {
     public ?int $confirmingDeleteId = null;
 
+    public string $deleteConfirmationName = '';
+
     #[Computed]
     public function projects()
     {
@@ -39,6 +41,8 @@ new #[Title('Projects')] class extends Component {
     public function cancelDelete(): void
     {
         $this->confirmingDeleteId = null;
+        $this->deleteConfirmationName = '';
+        $this->resetErrorBag();
     }
 
     public function deleteProject(int $projectId): void
@@ -47,6 +51,18 @@ new #[Title('Projects')] class extends Component {
         abort_unless($project, 404);
         abort_unless($this->canDeleteProject($project), 403);
 
+        $this->validate([
+            'deleteConfirmationName' => ['required', 'string', 'max:255'],
+        ], [], [
+            'deleteConfirmationName' => __('project name'),
+        ]);
+
+        if (trim($this->deleteConfirmationName) !== $project->name) {
+            $this->addError('deleteConfirmationName', __('Enter the project name exactly to confirm deletion.'));
+
+            return;
+        }
+
         $user = Auth::user();
         if ((int) $user->current_project_id === (int) $project->id) {
             $user->switchProject(null);
@@ -54,6 +70,7 @@ new #[Title('Projects')] class extends Component {
 
         $project->delete();
         $this->confirmingDeleteId = null;
+        $this->deleteConfirmationName = '';
         unset($this->projects);
     }
 }; ?>
@@ -100,13 +117,17 @@ new #[Title('Projects')] class extends Component {
                     {{ __('This permanently removes the project and all of its data. This cannot be undone.') }}
                 @endif
             </flux:text>
+            <flux:input
+                wire:model="deleteConfirmationName"
+                :label="__('Type the project name to confirm')"
+                :placeholder="$confirmingProject?->name ?? ''"
+                required
+            />
             <div class="flex justify-end gap-2">
                 <flux:modal.close>
                     <flux:button type="button" variant="ghost" wire:click="cancelDelete">{{ __('Cancel') }}</flux:button>
                 </flux:modal.close>
-                <flux:modal.close>
-                    <flux:button variant="danger" icon="trash" wire:click="deleteProject({{ $confirmingDeleteId ?? 0 }})">{{ __('Delete project') }}</flux:button>
-                </flux:modal.close>
+                <flux:button variant="danger" icon="trash" wire:click="deleteProject({{ $confirmingDeleteId ?? 0 }})">{{ __('Delete project') }}</flux:button>
             </div>
         </div>
     </flux:modal>

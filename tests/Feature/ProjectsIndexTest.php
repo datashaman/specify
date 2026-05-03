@@ -44,10 +44,30 @@ test('admin can delete a project from the projects index', function () {
 
     Livewire::test('pages::projects.index')
         ->call('confirmDelete', $project->id)
+        ->set('deleteConfirmationName', $project->name)
         ->call('deleteProject', $project->id);
 
     expect(Project::find($project->id))->toBeNull();
     expect($user->fresh()->current_project_id)->toBeNull();
+});
+
+test('projects index delete requires the project name confirmation', function () {
+    $ws = Workspace::factory()->create();
+    $team = Team::factory()->for($ws)->create();
+    $user = User::factory()->create();
+    $team->addMember($user, TeamRole::Admin);
+    $user->forceFill(['current_team_id' => $team->id])->save();
+    $project = Project::factory()->for($team)->create(['name' => 'Disposable Project']);
+
+    $this->actingAs($user);
+
+    Livewire::test('pages::projects.index')
+        ->call('confirmDelete', $project->id)
+        ->set('deleteConfirmationName', 'Wrong Name')
+        ->call('deleteProject', $project->id)
+        ->assertHasErrors(['deleteConfirmationName']);
+
+    expect(Project::find($project->id))->not->toBeNull();
 });
 
 test('member cannot delete a project from the projects index', function () {
