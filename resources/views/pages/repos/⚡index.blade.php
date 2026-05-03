@@ -218,7 +218,14 @@ new #[Title('Repositories')] class extends Component {
 }; ?>
 
 <div class="flex flex-col gap-6 p-6">
-    <flux:heading size="xl">{{ __('Repos') }}</flux:heading>
+    <div class="flex items-center justify-between gap-2">
+        <flux:heading size="xl">{{ __('Repos') }}</flux:heading>
+        @if ($this->project && $this->canManage)
+            <flux:modal.trigger name="add-repo-modal">
+                <flux:button variant="primary">{{ __('+ Add repository') }}</flux:button>
+            </flux:modal.trigger>
+        @endif
+    </div>
 
     @if (! $this->project)
         <flux:text class="text-sm text-zinc-500">{{ __('Select a project to manage its repositories.') }}</flux:text>
@@ -285,23 +292,23 @@ new #[Title('Repositories')] class extends Component {
                     </div>
                 </flux:card>
             @empty
-                <flux:text class="text-zinc-500">{{ __('No repositories yet. Add one below.') }}</flux:text>
+                <flux:text class="text-zinc-500">{{ __('No repositories yet.') }}</flux:text>
             @endforelse
         </section>
 
         @if ($this->canManage)
-            <section class="flex flex-col gap-3">
-                <flux:heading size="lg">{{ __('Add a repository') }}</flux:heading>
+            <flux:modal name="add-repo-modal" class="md:w-[32rem]">
+                <div class="flex flex-col gap-4">
+                    <flux:heading size="lg">{{ __('Add a repository') }}</flux:heading>
 
-                @if (auth()->user()->github_token)
-                    @php($options = $this->githubRepoOptions())
-                    <div class="flex flex-col gap-2">
+                    @if (auth()->user()->github_token)
+                        @php($options = $this->githubRepoOptions())
                         <flux:input
                             wire:model.live.debounce.200ms="githubRepoSearch"
                             icon="magnifying-glass"
                             :placeholder="__('Search your GitHub repositories…')"
                         />
-                        <div class="flex flex-col gap-1">
+                        <div class="flex max-h-72 flex-col gap-1 overflow-y-auto">
                             @forelse ($options as $option)
                                 <button
                                     type="button"
@@ -323,13 +330,19 @@ new #[Title('Repositories')] class extends Component {
                                 </flux:text>
                             @endforelse
                         </div>
+                    @else
+                        <flux:text class="text-sm text-zinc-500">
+                            {{ __('Connect your GitHub account from Settings to add repositories.') }}
+                        </flux:text>
+                    @endif
+
+                    <div class="flex justify-end gap-2">
+                        <flux:modal.close>
+                            <flux:button type="button" variant="ghost">{{ __('Close') }}</flux:button>
+                        </flux:modal.close>
                     </div>
-                @else
-                    <flux:text class="text-sm text-zinc-500">
-                        {{ __('Connect your GitHub account from Settings to add repositories.') }}
-                    </flux:text>
-                @endif
-            </section>
+                </div>
+            </flux:modal>
         @endif
     @endif
 </div>
