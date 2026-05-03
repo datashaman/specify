@@ -6,19 +6,24 @@ use App\Enums\StoryStatus;
 use App\Enums\TaskStatus;
 use App\Models\AcceptanceCriterion;
 use App\Models\AgentRun;
+use App\Models\ContextItem;
 use App\Models\Story;
+use App\Models\StoryApproval;
 use App\Models\Subtask;
-use App\Models\Task;
+use App\Models\User;
 use App\Services\ApprovalService;
 use App\Services\ExecutionService;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Title;
 use Livewire\Attributes\Validate;
 use Livewire\Component;
 
-new #[Title('Story')] class extends Component {
+new #[Title('Story')] class extends Component
+{
     public int $story_id;
 
     public ?string $approvalNote = null;
@@ -33,6 +38,9 @@ new #[Title('Story')] class extends Component {
 
     /** @var array<int, array{id: ?int, criterion: string}> */
     public array $editCriteria = [];
+
+    /** @var array<int, int|string> */
+    public array $selectedContextItemIds = [];
 
     /**
      * Plan view mode: false = Grooming (Tasks collapsed), true = Run (Tasks expanded).
@@ -176,6 +184,44 @@ new #[Title('Story')] class extends Component {
 
         return $story->created_by_id === $user->id
             || $user->canApproveInProject($story->feature->project);
+    }
+
+    public function canAttachContextItems(): bool
+    {
+        $story = $this->story;
+
+        return $story !== null && $this->canEdit($story);
+    }
+
+    public function attachContextItems(): void
+    {
+        $story = $this->story;
+        abort_unless($story, 404);
+        abort_unless($this->canAttachContextItems(), 403);
+
+        $this->validate([
+            'selectedContextItemIds' => ['required', 'array', 'min:1'],
+            'selectedContextItemIds.*' => [
+                'required',
+                'integer',
+                Rule::exists('context_items', 'id')
+                    ->where('project_id', $story->feature->project_id),
+            ],
+        ]);
+
+        $attachedIds = $story->contextItems->pluck('id');
+        $ids = collect($this->selectedContextItemIds)
+            ->map(fn (int|string $id) => (int) $id)
+            ->unique()
+            ->diff($attachedIds)
+            ->values();
+
+        if ($ids->isNotEmpty()) {
+            $story->contextItems()->syncWithoutDetaching($ids->all());
+        }
+
+        $this->selectedContextItemIds = [];
+        unset($this->story, $this->availableContextItems);
     }
 
     public function canEditStory(): bool
@@ -420,6 +466,7 @@ new #[Title('Story')] class extends Component {
                 if ($text !== '') {
                     $added++;
                 }
+
                 continue;
             }
             if (! $existing->has($id)) {
@@ -445,7 +492,7 @@ new #[Title('Story')] class extends Component {
      * self-approval, the author is filtered out — they cannot count toward
      * the threshold so listing them as "eligible" is misleading.
      *
-     * @return \Illuminate\Support\Collection<int, \App\Models\User>
+     * @return Collection<int, User>
      */
     #[Computed]
     public function eligibleApprovers()
@@ -458,12 +505,12 @@ new #[Title('Story')] class extends Component {
 
         $excludeAuthor = ! ($policy->allow_self_approval ?? false);
 
-        return \App\Models\User::query()
+        return User::query()
             ->whereHas('teams.workspace', fn ($q) => $q->where('workspaces.id', $story->feature->project->team->workspace_id))
             ->orderBy('name')
             ->get()
-            ->filter(fn (\App\Models\User $u) => $u->canApproveInProject($story->feature->project))
-            ->reject(fn (\App\Models\User $u) => $excludeAuthor && $u->id === $story->created_by_id)
+            ->filter(fn (User $u) => $u->canApproveInProject($story->feature->project))
+            ->reject(fn (User $u) => $excludeAuthor && $u->id === $story->created_by_id)
             ->values();
     }
 
@@ -486,6 +533,7 @@ new #[Title('Story')] class extends Component {
             ->with([
                 'feature.project',
                 'creator',
+                'contextItems',
                 'acceptanceCriteria',
                 'tasks.acceptanceCriterion',
                 'tasks.dependencies',
@@ -493,6 +541,21 @@ new #[Title('Story')] class extends Component {
                 'approvals.approver',
             ])
             ->find($this->story_id);
+    }
+
+    #[Computed]
+    public function availableContextItems()
+    {
+        $story = $this->story;
+        if (! $story) {
+            return collect();
+        }
+
+        return ContextItem::query()
+            ->where('project_id', $story->feature->project_id)
+            ->whereNotIn('id', $story->contextItems->pluck('id'))
+            ->orderBy('title')
+            ->get();
     }
 
     #[Computed]
@@ -504,7 +567,7 @@ new #[Title('Story')] class extends Component {
     /**
      * Live approvals for the current revision: replay approve/revoke per approver.
      *
-     * @return array<int, \App\Models\StoryApproval>
+     * @return array<int, StoryApproval>
      */
     #[Computed]
     public function effectiveApprovals(): array
@@ -782,6 +845,79 @@ new #[Title('Story')] class extends Component {
                         <summary class="cursor-pointer text-xs text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300">{{ __('Notes') }}</summary>
                         <x-markdown :content="$story->notes" class="mt-2" />
                     </details>
+                @endif
+            </section>
+
+            @php
+                $attachedContextItems = $story->contextItems->sortBy('title')->values();
+                $availableContextItems = $this->availableContextItems;
+            @endphp
+            <section class="flex flex-col gap-3" data-section="story-context-items">
+                <div class="flex flex-wrap items-center justify-between gap-3">
+                    <div class="flex flex-wrap items-center gap-x-3 gap-y-1">
+                        <flux:heading size="lg">{{ __('Context') }}</flux:heading>
+                        <flux:text class="text-xs text-zinc-500">
+                            {{ trans_choice(':count item attached|:count items attached', $attachedContextItems->count(), ['count' => $attachedContextItems->count()]) }}
+                        </flux:text>
+                    </div>
+                </div>
+
+                @if ($attachedContextItems->isNotEmpty())
+                    <div class="grid gap-2 sm:grid-cols-2">
+                        @foreach ($attachedContextItems as $item)
+                            <div wire:key="attached-context-{{ $item->id }}" class="rounded-md border border-zinc-200 p-3 dark:border-zinc-700">
+                                <div class="flex flex-wrap items-start justify-between gap-2">
+                                    <div class="min-w-0">
+                                        <div class="truncate text-sm font-medium text-zinc-900 dark:text-zinc-100">{{ $item->title }}</div>
+                                        @if ($item->description)
+                                            <flux:text class="mt-1 line-clamp-2 text-xs text-zinc-500">{{ $item->description }}</flux:text>
+                                        @endif
+                                    </div>
+                                    <flux:badge size="sm">{{ $item->type }}</flux:badge>
+                                </div>
+                            </div>
+                        @endforeach
+                    </div>
+                @else
+                    <flux:text class="text-sm text-zinc-500">{{ __('No context items attached yet.') }}</flux:text>
+                @endif
+
+                @if ($this->canAttachContextItems())
+                    @if ($availableContextItems->isNotEmpty())
+                        <form wire:submit="attachContextItems" class="flex flex-col gap-3 rounded-md border border-zinc-200 p-3 dark:border-zinc-700" data-form="attach-context-items">
+                            <flux:text class="text-xs uppercase tracking-wide text-zinc-500">{{ __('Attach context') }}</flux:text>
+
+                            <div class="grid gap-2 sm:grid-cols-2">
+                                @foreach ($availableContextItems as $item)
+                                    <label wire:key="available-context-{{ $item->id }}" class="flex cursor-pointer items-start gap-2 rounded-md border border-zinc-200 p-2 text-sm hover:border-zinc-300 dark:border-zinc-700 dark:hover:border-zinc-600">
+                                        <flux:checkbox wire:model="selectedContextItemIds" value="{{ $item->id }}" class="mt-0.5" />
+                                        <span class="min-w-0">
+                                            <span class="block truncate font-medium text-zinc-900 dark:text-zinc-100">{{ $item->title }}</span>
+                                            <span class="mt-0.5 flex flex-wrap items-center gap-2">
+                                                <flux:badge size="sm">{{ $item->type }}</flux:badge>
+                                                @if ($item->description)
+                                                    <span class="line-clamp-1 text-xs text-zinc-500">{{ $item->description }}</span>
+                                                @endif
+                                            </span>
+                                        </span>
+                                    </label>
+                                @endforeach
+                            </div>
+
+                            @error('selectedContextItemIds')
+                                <flux:text class="text-xs text-red-500">{{ $message }}</flux:text>
+                            @enderror
+
+                            <div>
+                                <flux:button type="submit" wire:target="attachContextItems" wire:loading.attr="disabled" variant="primary" size="sm">
+                                    <span wire:loading.remove wire:target="attachContextItems">{{ __('Attach selected') }}</span>
+                                    <span wire:loading wire:target="attachContextItems">{{ __('Attaching...') }}</span>
+                                </flux:button>
+                            </div>
+                        </form>
+                    @else
+                        <flux:text class="text-sm text-zinc-500">{{ __('All project context items are already attached.') }}</flux:text>
+                    @endif
                 @endif
             </section>
         @endunless

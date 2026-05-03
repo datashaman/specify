@@ -7,6 +7,7 @@ use App\Enums\TeamRole;
 use App\Models\AcceptanceCriterion;
 use App\Models\AgentRun;
 use App\Models\ApprovalPolicy;
+use App\Models\ContextItem;
 use App\Models\Feature;
 use App\Models\Project;
 use App\Models\Story;
@@ -339,6 +340,47 @@ test('plan toggle is hidden when story has no ACs and no unmapped tasks', functi
 
     Livewire::test('pages::stories.show', ['story' => $s['story']->id])
         ->assertDontSeeHtml('data-toggle="plan-mode"');
+});
+
+test('story page lists attached context items and excludes them from the attach picker', function () {
+    $s = showPageScene(['status' => StoryStatus::Draft]);
+    attachPolicy($s['ws'], required: 1);
+    $attached = ContextItem::factory()->for($s['project'])->create(['title' => 'Attached architecture note']);
+    $available = ContextItem::factory()->for($s['project'])->create(['title' => 'Available interview']);
+    $s['story']->contextItems()->attach($attached);
+
+    $this->actingAs($s['user']);
+
+    $html = Livewire::test('pages::stories.show', ['story' => $s['story']->id])
+        ->assertSeeHtml('data-section="story-context-items"')
+        ->assertSee('Attached architecture note')
+        ->assertSee('Available interview')
+        ->html();
+
+    expect(substr_count($html, 'Attached architecture note'))->toBe(1)
+        ->and($html)->not->toContain('available-context-'.$attached->id)
+        ->and($html)->toContain('available-context-'.$available->id);
+});
+
+test('author can attach multiple available project context items from story page', function () {
+    $s = showPageScene(['status' => StoryStatus::Draft]);
+    attachPolicy($s['ws'], required: 1);
+    $first = ContextItem::factory()->for($s['project'])->create(['title' => 'Repository map']);
+    $second = ContextItem::factory()->for($s['project'])->create(['title' => 'Product brief']);
+
+    $this->actingAs($s['user']);
+
+    Livewire::test('pages::stories.show', ['story' => $s['story']->id])
+        ->set('selectedContextItemIds', [$first->id, $second->id])
+        ->call('attachContextItems')
+        ->assertSet('selectedContextItemIds', [])
+        ->assertSee('Repository map')
+        ->assertSee('Product brief')
+        ->assertDontSeeHtml('available-context-'.$first->id)
+        ->assertDontSeeHtml('available-context-'.$second->id);
+
+    expect($s['story']->fresh()->contextItems()->orderBy('context_items.id')->pluck('context_items.id')->all())
+        ->toBe([$first->id, $second->id]);
 });
 
 test('Draft story exposes a Delete button that removes the story and redirects to the feature', function () {
