@@ -627,7 +627,7 @@ class ExecutionService
             return;
         }
 
-        $remainingTasks = $story->tasks()->where('status', '!=', TaskStatus::Done->value)->count();
+        $remainingTasks = $story->tasks()->where('tasks.status', '!=', TaskStatus::Done->value)->count();
         if ($remainingTasks === 0) {
             $story->forceFill(['status' => StoryStatus::Done->value])->save();
 

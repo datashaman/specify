@@ -20,9 +20,6 @@ return new class extends Migration
             $table->string('status')->default('draft')->after('description');
         });
 
-        Schema::table('acceptance_criteria', function (Blueprint $table) {
-            $table->boolean('met')->default(false)->after('criterion');
-        });
     }
 
     public function down(): void
@@ -39,8 +36,5 @@ return new class extends Migration
             $table->dropColumn('status');
         });
 
-        Schema::table('acceptance_criteria', function (Blueprint $table) {
-            $table->dropColumn('met');
-        });
     }
 };

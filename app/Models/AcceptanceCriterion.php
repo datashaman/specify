@@ -9,12 +9,12 @@ use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 /**
- * Observable behaviour a Story must satisfy. Maps 1:1 to a Task once a plan exists.
+ * Atomic observable rule a Story must satisfy.
  */
-#[Fillable(['story_id', 'position', 'criterion'])]
+#[Fillable(['story_id', 'position', 'statement', 'criterion'])]
 class AcceptanceCriterion extends Model
 {
     /** @use HasFactory<AcceptanceCriterionFactory> */
@@ -24,14 +24,25 @@ class AcceptanceCriterion extends Model
 
     protected static function booted(): void
     {
-        $bump = function (self $ac) {
-            if ($story = $ac->story) {
-                $story->forceFill(['revision' => ($story->revision ?? 1) + 1])->save();
+        $reopen = function (self $criterion): void {
+            $story = $criterion->story;
+            if (! $story) {
+                return;
             }
+
+            $story->silentlyForceFill([
+                'status' => $story->status === \App\Enums\StoryStatus::Draft
+                    ? \App\Enums\StoryStatus::Draft->value
+                    : \App\Enums\StoryStatus::PendingApproval->value,
+                'revision' => ($story->revision ?? 1) + 1,
+            ]);
+
+            app(\App\Services\ApprovalService::class)->recompute($story->fresh());
         };
 
-        static::saved($bump);
-        static::deleted($bump);
+        static::created($reopen);
+        static::updated($reopen);
+        static::deleted($reopen);
     }
 
     public function story(): BelongsTo
@@ -39,16 +50,26 @@ class AcceptanceCriterion extends Model
         return $this->belongsTo(Story::class);
     }
 
-    public function task(): HasOne
+    public function scenarios(): HasMany
     {
-        return $this->hasOne(Task::class);
+        return $this->hasMany(Scenario::class)->orderBy('position');
     }
 
-    /**
-     * "Met" is derived from the linked task's status — Done = met.
-     */
+    public function tasks(): HasMany
+    {
+        return $this->hasMany(Task::class);
+    }
+
+    protected function criterion(): Attribute
+    {
+        return Attribute::make(
+            get: fn () => $this->statement,
+            set: fn (?string $value) => ['statement' => $value],
+        );
+    }
+
     protected function met(): Attribute
     {
-        return Attribute::get(fn () => $this->task?->status === TaskStatus::Done);
+        return Attribute::get(fn () => $this->tasks()->where('status', TaskStatus::Done->value)->exists());
     }
 }

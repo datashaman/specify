@@ -13,11 +13,11 @@ use Illuminate\Support\Facades\Log;
 use Throwable;
 
 /**
- * Queue job that asks the `TasksGenerator` agent to produce a Story's task plan.
+ * Queue job that asks the `TasksGenerator` agent to produce a Story's implementation plan.
  *
  * The agent returns structured tasks + subtasks; this job normalises them into
- * the `PlanWriter::replacePlan()` shape and persists in one transaction. The
- * write resets approval (per ADR-0001) so reviewers re-approve the new plan.
+ * the `PlanWriter::replacePlan()` shape and persists a new current plan in one
+ * transaction. The write resets approval so reviewers re-approve the new plan.
  */
 class GenerateTasksJob implements ShouldQueue
 {
@@ -49,6 +49,7 @@ class GenerateTasksJob implements ShouldQueue
 
             $execution->markSucceeded($run, [
                 'summary' => $output['summary'] ?? null,
+                'plan_id' => $result['plan_id'],
                 'task_count' => $result['task_count'],
                 'subtask_count' => $result['subtask_count'],
             ]);

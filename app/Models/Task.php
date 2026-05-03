@@ -13,12 +13,9 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use InvalidArgumentException;
 
 /**
- * Engineering contract for one acceptance criterion.
- *
- * Holds 1+ Subtasks (the actual executor steps) and a DAG of task-level
- * `dependencies`/`dependents` (cycle-checked via `dependsOnTransitively`).
+ * Actionable work item under a Plan.
  */
-#[Fillable(['story_id', 'acceptance_criterion_id', 'position', 'name', 'description', 'status'])]
+#[Fillable(['plan_id', 'story_id', 'acceptance_criterion_id', 'scenario_id', 'position', 'name', 'description', 'status'])]
 class Task extends Model
 {
     /** @use HasFactory<TaskFactory> */
@@ -31,6 +28,11 @@ class Task extends Model
         ];
     }
 
+    public function plan(): BelongsTo
+    {
+        return $this->belongsTo(Plan::class);
+    }
+
     public function story(): BelongsTo
     {
         return $this->belongsTo(Story::class);
@@ -39,6 +41,11 @@ class Task extends Model
     public function acceptanceCriterion(): BelongsTo
     {
         return $this->belongsTo(AcceptanceCriterion::class);
+    }
+
+    public function scenario(): BelongsTo
+    {
+        return $this->belongsTo(Scenario::class);
     }
 
     public function subtasks(): HasMany
@@ -62,8 +69,8 @@ class Task extends Model
             throw new InvalidArgumentException('A task cannot depend on itself.');
         }
 
-        if ($this->story_id !== $other->story_id) {
-            throw new InvalidArgumentException('Task dependencies must live in the same story.');
+        if ($this->plan_id !== $other->plan_id) {
+            throw new InvalidArgumentException('Task dependencies must live in the same plan.');
         }
 
         if ($other->dependsOnTransitively($this)) {

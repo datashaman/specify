@@ -53,7 +53,7 @@ class PrPayloadBuilder
     {
         $task = $subtask->task;
         $story = $task?->story;
-        $criterion = $task?->acceptanceCriterion?->criterion;
+        $criterion = $task?->acceptanceCriterion?->statement;
         $summary = self::clamp(trim((string) ($output['summary'] ?? '')), 8_192);
         $files = (array) ($output['files_changed'] ?? []);
 

@@ -2,6 +2,7 @@
 
 namespace Database\Factories;
 
+use App\Enums\StoryKind;
 use App\Enums\StoryStatus;
 use App\Models\Feature;
 use App\Models\Story;
@@ -22,6 +23,10 @@ class StoryFactory extends Factory
         return [
             'feature_id' => Feature::factory(),
             'name' => fake()->sentence(4),
+            'kind' => StoryKind::UserStory,
+            'actor' => fake()->jobTitle(),
+            'intent' => fake()->sentence(6),
+            'outcome' => fake()->sentence(8),
             'description' => fake()->paragraph(),
             'status' => StoryStatus::Draft,
         ];
