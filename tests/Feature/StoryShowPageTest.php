@@ -316,7 +316,7 @@ test('reset-approval banner does not render when nothing changes during edit', f
         ->assertDontSee('Save & request re-approval');
 });
 
-test('plan section renders with grooming/run toggle controls', function () {
+test('plan section renders with compact/expanded toggle controls', function () {
     $s = showPageScene(['status' => StoryStatus::Approved]);
     attachPolicy($s['ws'], required: 1);
     AcceptanceCriterion::create([
@@ -327,8 +327,8 @@ test('plan section renders with grooming/run toggle controls', function () {
 
     Livewire::test('pages::stories.show', ['story' => $s['story']->id])
         ->assertSeeHtml('data-toggle="plan-mode"')
-        ->assertSee('Grooming')
-        ->assertSee('Run');
+        ->assertSee('Compact')
+        ->assertSee('Expanded');
 });
 
 test('plan toggle is hidden when story has no ACs and no unmapped tasks', function () {
@@ -339,4 +339,36 @@ test('plan toggle is hidden when story has no ACs and no unmapped tasks', functi
 
     Livewire::test('pages::stories.show', ['story' => $s['story']->id])
         ->assertDontSeeHtml('data-toggle="plan-mode"');
+});
+
+test('Draft story exposes a Delete button that removes the story and redirects to the feature', function () {
+    $s = showPageScene(['status' => StoryStatus::Draft]);
+    attachPolicy($s['ws'], required: 1);
+
+    $this->actingAs($s['user']);
+
+    $component = Livewire::test('pages::stories.show', ['story' => $s['story']->id])
+        ->assertSee('Delete')
+        ->call('deleteStory');
+
+    $component->assertRedirect(route('features.show', [
+        'project' => $s['project']->id,
+        'feature' => $s['feature']->id,
+    ]));
+
+    expect(Story::find($s['story']->id))->toBeNull();
+});
+
+test('Approved story does not expose a Delete button and deleteStory is forbidden', function () {
+    $s = showPageScene(['status' => StoryStatus::Approved]);
+    attachPolicy($s['ws'], required: 1);
+
+    $this->actingAs($s['user']);
+
+    Livewire::test('pages::stories.show', ['story' => $s['story']->id])
+        ->assertDontSeeHtml('wire:click="deleteStory"')
+        ->call('deleteStory')
+        ->assertForbidden();
+
+    expect(Story::find($s['story']->id))->not->toBeNull();
 });
