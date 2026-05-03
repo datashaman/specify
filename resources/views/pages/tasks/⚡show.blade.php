@@ -65,7 +65,7 @@ new #[Title('Task')] class extends Component {
                 TaskStatus::Blocked => 'run_failed',
                 default => 'draft',
             };
-            $deps = $task->dependencies->map(fn ($d) => '#'.$d->position);
+            $deps = $task->dependencies->map(fn ($d) => 'T'.$d->position);
             $subtaskTotal = $task->subtasks->count();
             $subtaskDone = $task->subtasks->filter(fn ($s) => $s->status === TaskStatus::Done)->count();
         @endphp
@@ -85,13 +85,13 @@ new #[Title('Task')] class extends Component {
 
             <div>
                 <div class="flex flex-wrap items-center gap-2 text-xs">
-                    <flux:badge variant="solid">{{ __('Task') }} #{{ $task->position }}</flux:badge>
+                    <flux:badge size="sm">T{{ $task->position }}</flux:badge>
                     <x-state-pill :state="$rail" :label="$task->status->value" />
                     @if ($subtaskTotal > 0)
                         <flux:badge>{{ $subtaskDone }}/{{ $subtaskTotal }} {{ __('subtasks') }}</flux:badge>
                     @endif
                     @if ($deps->isNotEmpty())
-                        <flux:badge>{{ __('depends on') }} {{ $deps->implode(', ') }}</flux:badge>
+                        <flux:badge size="sm">{{ __('depends on') }} {{ $deps->implode(', ') }}</flux:badge>
                     @endif
                 </div>
                 <flux:heading size="xl" class="mt-2">{{ $task->name }}</flux:heading>
@@ -100,7 +100,7 @@ new #[Title('Task')] class extends Component {
                 @endif
                 @if ($ac)
                     <div class="mt-3 rounded-md border border-zinc-200 bg-zinc-50 p-3 dark:border-zinc-700 dark:bg-zinc-900/40">
-                        <flux:text class="text-xs uppercase tracking-wide text-zinc-500">{{ __('Acceptance criterion') }} #{{ $ac->position }}</flux:text>
+                        <flux:text class="text-xs uppercase tracking-wide text-zinc-500">{{ __('Acceptance criterion') }} AC{{ $ac->position }}</flux:text>
                         <flux:text class="mt-1 text-sm">{{ $ac->criterion }}</flux:text>
                     </div>
                 @endif
@@ -127,7 +127,7 @@ new #[Title('Task')] class extends Component {
                         <x-rail :state="$subRail" class="!w-0.5" />
                         <div class="min-w-0 flex-1">
                             <div class="flex flex-wrap items-center gap-2 text-xs">
-                                <flux:badge variant="solid" size="sm">#{{ $sub->position }}</flux:badge>
+                                <flux:badge size="sm">T{{ $task->position }}.{{ $sub->position }}</flux:badge>
                                 <x-state-pill :state="$subRail" :label="$sub->status->value" />
                                 @if ($latestRun)
                                     <flux:badge size="sm">{{ __('run') }} #{{ $latestRun->id }}</flux:badge>

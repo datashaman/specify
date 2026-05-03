@@ -157,8 +157,8 @@ new #[Title('Runs')] class extends Component {
                     <flux:text class="mt-1 text-xs text-zinc-500">
                         {{ $run->runnable->task->story->feature?->project?->name }}
                         &middot; {{ $run->runnable->task->story->name }}
-                        &middot; {{ __('task') }} #{{ $run->runnable->task->position }} {{ $run->runnable->task->name }}
-                        &middot; {{ __('subtask') }} #{{ $run->runnable->position }}
+                        &middot; T{{ $run->runnable->task->position }} {{ $run->runnable->task->name }}
+                        &middot; T{{ $run->runnable->task->position }}.{{ $run->runnable->position }}
                     </flux:text>
                 @endif
 
