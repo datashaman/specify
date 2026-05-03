@@ -9,6 +9,7 @@ use App\Services\ExecutionService;
 use App\Services\PlanWriter;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
+use Illuminate\Support\Facades\Log;
 use Throwable;
 
 /**
@@ -56,6 +57,30 @@ class GenerateTasksJob implements ShouldQueue
 
             throw $e;
         }
+    }
+
+    /**
+     * Queue failure callback — covers worker death / retry exhaustion that
+     * the catch block in `handle()` can't see. `markFailed` is idempotent so
+     * a double-mark with the catch block is harmless.
+     */
+    public function failed(?Throwable $e): void
+    {
+        $run = AgentRun::find($this->agentRunId);
+        if ($run === null || $run->isTerminal()) {
+            return;
+        }
+
+        Log::error('specify.tasks.generate.job_failed', [
+            'run_id' => $run->getKey(),
+            'story_id' => $run->runnable_id,
+            'exception' => $e?->getMessage(),
+        ]);
+
+        app(ExecutionService::class)->markFailed(
+            $run,
+            $e?->getMessage() ?: 'Job failed without surfacing an exception (worker died or retries exhausted).',
+        );
     }
 
     /**

@@ -284,14 +284,35 @@ class ExecutionService
      * Persist a failed AgentRun. Subtask status is *not* flipped to Blocked
      * here — `finalizeSubtaskFromRun` decides Done vs Blocked once every
      * racing sibling has terminated.
+     *
+     * Idempotent: the UPDATE is conditional on a non-terminal status. A late
+     * caller (e.g. the queue's `failed()` callback after the catch block has
+     * already marked the row Failed, or after a cooperative Cancelled) sees
+     * zero rows affected and bails — terminal stays terminal.
      */
     public function markFailed(AgentRun $run, string $error): void
     {
+        $affected = AgentRun::query()
+            ->whereKey($run->getKey())
+            ->whereIn('status', [
+                AgentRunStatus::Queued->value,
+                AgentRunStatus::Running->value,
+            ])
+            ->update([
+                'status' => AgentRunStatus::Failed->value,
+                'error_message' => $error,
+                'finished_at' => now(),
+            ]);
+
+        if ($affected === 0) {
+            return;
+        }
+
         $run->forceFill([
             'status' => AgentRunStatus::Failed->value,
             'error_message' => $error,
             'finished_at' => now(),
-        ])->save();
+        ])->syncOriginal();
 
         if ($run->runnable_type === Subtask::class) {
             $this->finalizeSubtaskFromRun($run);
