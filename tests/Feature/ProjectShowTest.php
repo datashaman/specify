@@ -64,3 +64,39 @@ test('lists existing features with story counts', function () {
     Livewire::test('pages::projects.show', ['project' => $project->id])
         ->assertSee('Visible Feature');
 });
+
+test('mounting a project show page sets the user current_project_id to that project', function () {
+    ['user' => $user, 'project' => $project] = projectShowScene();
+    $other = Project::factory()->for($project->team)->create();
+    $user->forceFill(['current_project_id' => $other->id])->save();
+
+    $this->actingAs($user);
+
+    Livewire::test('pages::projects.show', ['project' => $project->id]);
+
+    expect($user->fresh()->current_project_id)->toBe($project->id);
+});
+
+test('admin can edit project name and description', function () {
+    ['user' => $user, 'project' => $project] = projectShowScene();
+    $this->actingAs($user);
+
+    Livewire::test('pages::projects.show', ['project' => $project->id])
+        ->call('startEdit')
+        ->set('editName', 'Renamed')
+        ->set('editDescription', 'New description')
+        ->call('saveEdit');
+
+    $project->refresh();
+    expect($project->name)->toBe('Renamed');
+    expect($project->description)->toBe('New description');
+});
+
+test('member cannot edit project', function () {
+    ['user' => $user, 'project' => $project] = projectShowScene(TeamRole::Member);
+    $this->actingAs($user);
+
+    Livewire::test('pages::projects.show', ['project' => $project->id])
+        ->call('startEdit')
+        ->assertStatus(403);
+});
