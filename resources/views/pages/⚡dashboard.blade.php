@@ -159,6 +159,7 @@ new #[Title('Dashboard')] class extends Component {
 <div class="flex flex-col gap-6 p-6">
     @php
         $currentProjectId = auth()->user()->current_project_id;
+        $approvalsHref = $currentProjectId ? route('approvals.index', ['project' => $currentProjectId]) : route('triage');
         $runsHref = $currentProjectId ? route('runs.index', ['project' => $currentProjectId]) : route('projects.index');
         $failedRunsHref = $currentProjectId ? route('runs.index', ['project' => $currentProjectId, 'status' => 'failed']) : route('projects.index');
     @endphp
@@ -166,11 +167,11 @@ new #[Title('Dashboard')] class extends Component {
     <flux:heading size="xl">{{ __('Dashboard') }}</flux:heading>
 
     <div class="grid grid-cols-1 gap-3 md:grid-cols-4">
-        <a href="{{ route('triage') }}" wire:navigate class="rounded-xl border border-zinc-200 p-4 hover:bg-zinc-50 dark:border-zinc-700 dark:hover:bg-zinc-900">
+        <a href="{{ $approvalsHref }}" wire:navigate class="rounded-xl border border-zinc-200 p-4 hover:bg-zinc-50 dark:border-zinc-700 dark:hover:bg-zinc-900">
             <div class="text-xs uppercase tracking-wide text-zinc-500">{{ __('Pending story contracts') }}</div>
             <div class="mt-1 text-3xl font-semibold">{{ $this->pendingStoryCount }}</div>
         </a>
-        <a href="{{ route('triage') }}" wire:navigate class="rounded-xl border border-zinc-200 p-4 hover:bg-zinc-50 dark:border-zinc-700 dark:hover:bg-zinc-900">
+        <a href="{{ $approvalsHref }}" wire:navigate class="rounded-xl border border-zinc-200 p-4 hover:bg-zinc-50 dark:border-zinc-700 dark:hover:bg-zinc-900">
             <div class="text-xs uppercase tracking-wide text-zinc-500">{{ __('Pending plans') }}</div>
             <div class="mt-1 text-3xl font-semibold">{{ $this->pendingPlanCount }}</div>
         </a>

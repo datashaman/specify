@@ -46,7 +46,7 @@
 
                         @if ($hasAutoStart)
                             <flux:button wire:click="startExecution" wire:target="startExecution" wire:loading.attr="disabled" variant="primary" class="w-full">
-                                <span wire:loading.remove wire:target="startExecution">{{ __('Advance story approval') }}</span>
+                                <span wire:loading.remove wire:target="startExecution">{{ __('Auto-approve story contract') }}</span>
                                 <span wire:loading wire:target="startExecution">{{ __('Working…') }}</span>
                             </flux:button>
                         @elseif ($hasApprovalActions)

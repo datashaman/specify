@@ -193,7 +193,7 @@ new #[Title('Triage')] class extends Component {
                             <flux:button variant="primary" wire:click="decide({{ $story->id }}, 'approve')">{{ __('Approve') }}</flux:button>
                         @endif
                         <flux:button variant="danger" wire:click="decide({{ $story->id }}, 'reject')">{{ __('Reject') }}</flux:button>
-                        <flux:button wire:click="decide({{ $story->id }}, 'changes_requested')">{{ __('Request changes') }}</flux:button>
+                        <flux:button wire:click="decide({{ $story->id }}, 'changes_requested')">{{ __('Request story changes') }}</flux:button>
                     </div>
                 @endif
             </x-story.summary-card>
