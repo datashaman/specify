@@ -264,6 +264,23 @@ new #[Title('Story')] class extends Component {
         unset($this->story);
     }
 
+    public function resolveConflicts(): void
+    {
+        $story = $this->story;
+        abort_unless($story, 404);
+        abort_unless(Auth::user()->canApproveInProject($story->feature->project), 403);
+
+        $result = app(ExecutionService::class)->dispatchConflictResolution($story);
+
+        match ($result['status']) {
+            'dispatched' => session()->flash('conflict_resolution', __('AI conflict-resolution run queued.')),
+            'max_cycles_reached' => session()->flash('conflict_resolution_error', __('Maximum AI conflict-resolution attempts reached for this pull request.')),
+            default => session()->flash('conflict_resolution_error', __('Could not start conflict resolution.')),
+        };
+
+        unset($this->story);
+    }
+
     public function resumeExecution(): void
     {
         $story = $this->story;
@@ -371,6 +388,12 @@ new #[Title('Story')] class extends Component {
     public function hasActiveSubtaskRun(): bool
     {
         return (bool) $this->story?->hasActiveSubtaskRun();
+    }
+
+    #[Computed]
+    public function activeConflictResolutionRun(): ?AgentRun
+    {
+        return $this->story?->activeConflictResolutionAgentRun();
     }
 
     /**
@@ -587,7 +610,7 @@ new #[Title('Story')] class extends Component {
 
 <div
     class="flex p-6"
-    @if ($this->pendingPlanRun) wire:poll.3s @endif
+    @if ($this->pendingPlanRun || $this->activeConflictResolutionRun) wire:poll.3s @endif
     x-data="{
         planRunMode: localStorage.getItem('specify.planRunMode') === '1',
         init() {
@@ -608,6 +631,17 @@ new #[Title('Story')] class extends Component {
 
         <div class="flex min-w-0 flex-1 flex-col gap-6 lg:flex-row">
             <div class="flex min-w-0 max-w-4xl flex-1 flex-col gap-6">
+
+        @if (session('conflict_resolution'))
+            <div class="rounded-md border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-900 dark:border-emerald-800 dark:bg-emerald-900/20 dark:text-emerald-200">
+                {{ session('conflict_resolution') }}
+            </div>
+        @endif
+        @if (session('conflict_resolution_error'))
+            <div class="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-900 dark:border-red-800 dark:bg-red-900/20 dark:text-red-200">
+                {{ session('conflict_resolution_error') }}
+            </div>
+        @endif
 
         {{-- ── Header ──────────────────────────────────────────── --}}
         <div>
@@ -705,7 +739,16 @@ new #[Title('Story')] class extends Component {
                     </flux:modal>
                 @endif
 
-                @php $storyPrs = $story->pullRequests(); @endphp
+                @php
+                    $storyPrs = $story->pullRequests();
+                    $primaryPr = $story->primaryPullRequest();
+                    $canResolve = $primaryPr
+                        && ($primaryPr['mergeable'] ?? null) === false
+                        && ($primaryPr['merged'] ?? null) !== true
+                        && $this->canApproveStory;
+                    $conflictRun = $this->activeConflictResolutionRun;
+                    $showResolveConflicts = $canResolve && ! $conflictRun;
+                @endphp
                 @if ($storyPrs->isNotEmpty())
                     <div class="mt-3 flex flex-col gap-1.5" data-section="story-prs">
                         <div class="flex items-baseline gap-2">
@@ -740,12 +783,45 @@ new #[Title('Story')] class extends Component {
                                             @endif
                                         </flux:badge>
                                     </a>
+                                    @if (($pr['mergeable'] ?? null) === false && ($pr['merged'] ?? null) !== true)
+                                        <flux:badge size="sm" color="amber">{{ __('conflicted') }}</flux:badge>
+                                    @endif
                                     @if ($pr['driver'])
                                         <flux:badge size="sm" icon="cpu-chip">{{ $pr['driver'] }}</flux:badge>
                                     @endif
                                 </div>
                             @endforeach
                         </div>
+                        @if ($conflictRun && $conflictRun->runnable)
+                            @php
+                                $crSub = $conflictRun->runnable;
+                                $crRunUrl = route('runs.show', [
+                                    'project' => $project->id,
+                                    'story' => $story->id,
+                                    'subtask' => $crSub->id,
+                                    'run' => $conflictRun->id,
+                                ]);
+                            @endphp
+                            <div class="flex flex-wrap items-center gap-2 pt-1">
+                                <flux:badge size="sm" color="amber">{{ __('Resolving merge conflicts (AI)…') }}</flux:badge>
+                                <a href="{{ $crRunUrl }}" wire:navigate class="text-xs font-medium text-zinc-600 underline hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200">
+                                    {{ __('Run') }} #{{ $conflictRun->id }}
+                                </a>
+                            </div>
+                        @elseif ($showResolveConflicts)
+                            <div class="pt-1">
+                                <flux:button
+                                    wire:click="resolveConflicts"
+                                    wire:target="resolveConflicts"
+                                    size="sm"
+                                    variant="primary"
+                                    wire:loading.attr="disabled"
+                                >
+                                    <span wire:loading.remove wire:target="resolveConflicts">{{ __('Resolve conflicts (AI)') }}</span>
+                                    <span wire:loading wire:target="resolveConflicts">{{ __('Queueing…') }}</span>
+                                </flux:button>
+                            </div>
+                        @endif
                     </div>
                 @endif
             @endif

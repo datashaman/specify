@@ -160,7 +160,7 @@ test('SubtaskRunPipeline does NOT append proposed subtasks when the run ends in 
             return false;
         }
 
-        public function execute(Subtask $subtask, ?string $workingDir, ?Repo $repo, ?string $workingBranch, ?string $contextBrief = null, ?ProgressEmitter $emitter = null): ExecutionResult
+        public function execute(Subtask $subtask, ?string $workingDir, ?Repo $repo, ?string $workingBranch, ?string $contextBrief = null, ?ProgressEmitter $emitter = null, ?string $promptOverride = null): ExecutionResult
         {
             return new ExecutionResult(
                 summary: 'I tried but produced no diff',
@@ -229,7 +229,7 @@ test('alreadyComplete returns the Succeeded-class outcome when evidence SHAs are
             return false;
         }
 
-        public function execute(Subtask $subtask, ?string $workingDir, ?Repo $repo, ?string $workingBranch, ?string $contextBrief = null, ?ProgressEmitter $emitter = null): ExecutionResult
+        public function execute(Subtask $subtask, ?string $workingDir, ?Repo $repo, ?string $workingBranch, ?string $contextBrief = null, ?ProgressEmitter $emitter = null, ?string $promptOverride = null): ExecutionResult
         {
             return new ExecutionResult(
                 summary: 'Confirmed already done by abc1234',
@@ -302,7 +302,7 @@ test('alreadyComplete falls through to noDiff when evidence is empty (ADR-0007 s
             return false;
         }
 
-        public function execute(Subtask $subtask, ?string $workingDir, ?Repo $repo, ?string $workingBranch, ?string $contextBrief = null, ?ProgressEmitter $emitter = null): ExecutionResult
+        public function execute(Subtask $subtask, ?string $workingDir, ?Repo $repo, ?string $workingBranch, ?string $contextBrief = null, ?ProgressEmitter $emitter = null, ?string $promptOverride = null): ExecutionResult
         {
             return new ExecutionResult(
                 summary: 'I swear it is already done',
@@ -371,7 +371,7 @@ test('alreadyComplete falls through to noDiff when ANY cited SHA is unreachable,
             return false;
         }
 
-        public function execute(Subtask $subtask, ?string $workingDir, ?Repo $repo, ?string $workingBranch, ?string $contextBrief = null, ?ProgressEmitter $emitter = null): ExecutionResult
+        public function execute(Subtask $subtask, ?string $workingDir, ?Repo $repo, ?string $workingBranch, ?string $contextBrief = null, ?ProgressEmitter $emitter = null, ?string $promptOverride = null): ExecutionResult
         {
             return new ExecutionResult(
                 summary: 'One real, one made up',
@@ -442,7 +442,7 @@ test('alreadyComplete falls through to noDiff when none of the cited SHAs are re
             return false;
         }
 
-        public function execute(Subtask $subtask, ?string $workingDir, ?Repo $repo, ?string $workingBranch, ?string $contextBrief = null, ?ProgressEmitter $emitter = null): ExecutionResult
+        public function execute(Subtask $subtask, ?string $workingDir, ?Repo $repo, ?string $workingBranch, ?string $contextBrief = null, ?ProgressEmitter $emitter = null, ?string $promptOverride = null): ExecutionResult
         {
             return new ExecutionResult(
                 summary: 'Done in commit deadbeef',
@@ -534,7 +534,7 @@ test('context_brief is persisted on AgentRun.output even when the run ends in no
             return false;
         }
 
-        public function execute(Subtask $subtask, ?string $workingDir, ?Repo $repo, ?string $workingBranch, ?string $contextBrief = null, ?ProgressEmitter $emitter = null): ExecutionResult
+        public function execute(Subtask $subtask, ?string $workingDir, ?Repo $repo, ?string $workingBranch, ?string $contextBrief = null, ?ProgressEmitter $emitter = null, ?string $promptOverride = null): ExecutionResult
         {
             return new ExecutionResult(summary: '', filesChanged: [], commitMessage: 'noop');
         }

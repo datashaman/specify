@@ -16,9 +16,15 @@ namespace App\Enums;
  * the same branch. The cascade gate **ignores** RespondToReview runs —
  * review responses don't change Subtask status. The cap on cycles per PR
  * lives on the `repos` row.
+ *
+ * `ResolveConflicts` is a human-triggered merge-conflict repair on the
+ * Story's primary PR: merge `origin/{default_branch}` with `--no-ff`, resolve
+ * conflicts with AI, push one commit. The cascade gate ignores these runs
+ * (same as RespondToReview).
  */
 enum AgentRunKind: string
 {
     case Execute = 'execute';
     case RespondToReview = 'respond_to_review';
+    case ResolveConflicts = 'resolve_conflicts';
 }

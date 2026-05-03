@@ -101,7 +101,7 @@ class SubtaskRunPipeline
         }
 
         $emitter?->setPhase('execute');
-        $result = $executor->execute($subtask, $workingDir, $repo, $agentRun->working_branch, $contextBrief !== '' ? $contextBrief : null, $emitter);
+        $result = $executor->execute($subtask, $workingDir, $repo, $agentRun->working_branch, $contextBrief !== '' ? $contextBrief : null, $emitter, null);
 
         if ($this->cancelObserved($agentRun, 'after_execute', $logCtx)) {
             $this->discardLocalChangesIfPossible($workingDir, $agentRun, $repo, $logCtx);

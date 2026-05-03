@@ -3,9 +3,11 @@
 namespace App\Models;
 
 use App\Enums\AgentRunKind;
+use App\Enums\RepoProvider;
 use App\Enums\StoryStatus;
 use App\Models\Concerns\HasSlug;
 use App\Services\ApprovalService;
+use App\Services\PullRequests\GithubPullRequestProbe;
 use Database\Factories\StoryFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -130,6 +132,23 @@ class Story extends Model
             ->exists();
     }
 
+    /**
+     * Latest in-flight `ResolveConflicts` run for any subtask under this story.
+     */
+    public function activeConflictResolutionAgentRun(): ?AgentRun
+    {
+        return AgentRun::query()
+            ->where('runnable_type', Subtask::class)
+            ->whereIn('runnable_id', Subtask::query()
+                ->whereIn('task_id', Task::query()->where('story_id', $this->getKey())->select('id'))
+                ->select('id'))
+            ->where('kind', AgentRunKind::ResolveConflicts->value)
+            ->active()
+            ->with('runnable')
+            ->latest('id')
+            ->first();
+    }
+
     public function creator(): BelongsTo
     {
         return $this->belongsTo(User::class, 'created_by_id');
@@ -158,10 +177,12 @@ class Story extends Model
      * `pull_request_number` is just a back-pointer, not a new PR.
      *
      * Each entry: `{ url, number, driver, branch, run_id, merged, action,
-     * run_finished_at }`. `run_finished_at` is the terminal timestamp of
-     * the AgentRun that recorded the PR, *not* the PR's upstream open
-     * time — we don't fetch that. Ordered by most recent run first; any
-     * merged PR is hoisted to the top.
+     * run_finished_at, mergeable, mergeable_state }`. `mergeable` and
+     * `mergeable_state` come from a best-effort GitHub API probe (null when
+     * unknown, non-GitHub repos, or API errors). `run_finished_at` is the
+     * terminal timestamp of the AgentRun that recorded the PR, *not* the PR's
+     * upstream open time — we don't fetch that. Ordered by most recent run
+     * first; any merged PR is hoisted to the top.
      *
      * @return Collection<int, array<string, mixed>>
      */
@@ -183,7 +204,7 @@ class Story extends Model
             ->where('kind', AgentRunKind::Execute->value)
             ->whereJsonContainsKey('output->pull_request_url')
             ->orderByDesc('id')
-            ->get(['id', 'executor_driver', 'working_branch', 'output', 'finished_at'])
+            ->get(['id', 'repo_id', 'executor_driver', 'working_branch', 'output', 'finished_at'])
             ->map(function (AgentRun $run) {
                 $o = (array) $run->output;
                 $url = (string) ($o['pull_request_url'] ?? '');
@@ -197,6 +218,7 @@ class Story extends Model
                     'driver' => $run->executor_driver,
                     'branch' => $run->working_branch,
                     'run_id' => $run->getKey(),
+                    'repo_id' => $run->repo_id,
                     'merged' => $o['pull_request_merged'] ?? null,
                     'action' => $o['pull_request_action'] ?? null,
                     // The run's terminal timestamp — *not* the PR's open
@@ -219,11 +241,35 @@ class Story extends Model
             ->map(fn (Collection $g) => $g->first())
             ->values();
 
+        $repoIds = $entries->pluck('repo_id')->filter()->unique()->values();
+        $reposById = Repo::query()->whereIn('id', $repoIds)->get()->keyBy('id');
+        $probe = app(GithubPullRequestProbe::class);
+
         // Hoist merged PRs to the top while preserving the id-desc order
         // within each partition. A compound sort key (merged-bit, then
         // -run_id) is order-stable across PHP / Laravel versions and
         // doesn't depend on Collection::sortBy's stability semantics.
         return $entries
+            ->map(function (array $pr) use ($probe, $reposById) {
+                $repoId = $pr['repo_id'] ?? null;
+                unset($pr['repo_id']);
+                $pr['mergeable'] = null;
+                $pr['mergeable_state'] = null;
+
+                $number = $pr['number'] ?? null;
+                if ($repoId && is_numeric($number)) {
+                    $repo = $reposById->get($repoId);
+                    if ($repo && $repo->provider === RepoProvider::Github) {
+                        $result = $probe->probeMergeable($repo, (int) $number);
+                        if ($result !== null) {
+                            $pr['mergeable'] = $result['mergeable'];
+                            $pr['mergeable_state'] = $result['mergeable_state'];
+                        }
+                    }
+                }
+
+                return $pr;
+            })
             ->sortBy(fn ($pr) => [
                 $pr['merged'] === true ? 0 : 1,
                 -1 * (int) $pr['run_id'],

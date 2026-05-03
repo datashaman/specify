@@ -10,6 +10,7 @@ use App\Enums\TaskStatus;
 use App\Jobs\ExecuteSubtaskJob;
 use App\Jobs\GenerateTasksJob;
 use App\Jobs\OpenPullRequestJob;
+use App\Jobs\ResolveConflictsJob;
 use App\Jobs\RespondToPrReviewJob;
 use App\Models\AgentRun;
 use App\Models\Repo;
@@ -139,6 +140,69 @@ class ExecutionService
             ]);
 
             RespondToPrReviewJob::dispatch($run->getKey());
+
+            return ['status' => 'dispatched', 'run' => $run, 'cycle' => $cycles + 1];
+        });
+    }
+
+    /**
+     * Queue a `ResolveConflicts` AgentRun for the Story's primary GitHub PR when
+     * mergeability is false, subject to a per-PR attempt cap.
+     *
+     * @return array{status: string, run?: AgentRun, cycle?: int, cycles?: int}
+     */
+    public function dispatchConflictResolution(Story $story): array
+    {
+        $pr = $story->primaryPullRequest();
+        if ($pr === null || ($pr['mergeable'] ?? null) !== false) {
+            return ['status' => 'not_applicable'];
+        }
+
+        $executeRun = AgentRun::query()->with('repo')->find($pr['run_id'] ?? 0);
+        if (! $executeRun instanceof AgentRun || $executeRun->kind !== AgentRunKind::Execute) {
+            return ['status' => 'missing_origin_run'];
+        }
+
+        $repo = $executeRun->repo;
+        if ($repo === null) {
+            return ['status' => 'missing_repo'];
+        }
+
+        $prNumber = (int) ($pr['number'] ?? 0);
+        if ($prNumber === 0) {
+            return ['status' => 'missing_pr_number'];
+        }
+
+        $max = (int) config('specify.conflict_resolution.max_cycles_per_pr', 3);
+
+        return DB::transaction(function () use ($repo, $executeRun, $prNumber, $max) {
+            $repo = Repo::query()->whereKey($repo->getKey())->lockForUpdate()->first() ?? $repo;
+
+            $cycles = AgentRun::query()
+                ->where('repo_id', $repo->getKey())
+                ->where('kind', AgentRunKind::ResolveConflicts->value)
+                ->whereJsonContains('output->pull_request_number', $prNumber)
+                ->count();
+
+            if ($cycles >= $max) {
+                return ['status' => 'max_cycles_reached', 'cycles' => $cycles];
+            }
+
+            $run = AgentRun::create([
+                'runnable_type' => $executeRun->runnable_type,
+                'runnable_id' => $executeRun->runnable_id,
+                'repo_id' => $repo->getKey(),
+                'working_branch' => $executeRun->working_branch,
+                'executor_driver' => $executeRun->executor_driver,
+                'kind' => AgentRunKind::ResolveConflicts->value,
+                'status' => AgentRunStatus::Queued,
+                'output' => [
+                    'pull_request_number' => $prNumber,
+                    'origin_run_id' => $executeRun->getKey(),
+                ],
+            ]);
+
+            ResolveConflictsJob::dispatch($run->getKey());
 
             return ['status' => 'dispatched', 'run' => $run, 'cycle' => $cycles + 1];
         });
@@ -287,6 +351,11 @@ class ExecutionService
      */
     public function markFailed(AgentRun $run, string $error): void
     {
+        $run->refresh();
+        if ($run->isTerminal()) {
+            return;
+        }
+
         $run->forceFill([
             'status' => AgentRunStatus::Failed->value,
             'error_message' => $error,
@@ -382,6 +451,9 @@ class ExecutionService
         }
         if ($fromRun->kind === AgentRunKind::RespondToReview) {
             throw new RuntimeException('Review-response runs are not retryable; new review events re-fire automatically.');
+        }
+        if ($fromRun->kind === AgentRunKind::ResolveConflicts) {
+            throw new RuntimeException('Conflict-resolution runs are not retryable from the run console.');
         }
         if (! $fromRun->isTerminal()) {
             throw new RuntimeException('Cannot retry a run that is still in flight.');
@@ -485,7 +557,7 @@ class ExecutionService
         // RespondToReview run only pushes a `fix(review):` commit on its
         // open PR. Returning here keeps the cascade gate purely about
         // Execute-kind run terminations.
-        if ($run->kind === AgentRunKind::RespondToReview) {
+        if (in_array($run->kind, [AgentRunKind::RespondToReview, AgentRunKind::ResolveConflicts], true)) {
             return;
         }
 

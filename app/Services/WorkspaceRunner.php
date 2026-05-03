@@ -239,6 +239,56 @@ class WorkspaceRunner
     }
 
     /**
+     * `git merge --no-ff origin/{baseBranch}` — allow failure so callers can detect conflicts.
+     */
+    public function mergeNoFfFromOrigin(string $workingDir, string $baseBranch): int
+    {
+        $r = $this->run(
+            ['git', 'merge', '--no-ff', 'origin/'.$baseBranch],
+            $workingDir,
+            allowFailure: true,
+        );
+
+        return $r['exitCode'] ?? 1;
+    }
+
+    public function resetHardToOriginBranch(string $workingDir, string $branch): void
+    {
+        $this->run(['git', 'reset', '--hard', 'origin/'.$branch], $workingDir);
+    }
+
+    public function currentHeadSha(string $workingDir): string
+    {
+        return trim($this->run(['git', 'rev-parse', 'HEAD'], $workingDir)['stdout']);
+    }
+
+    /**
+     * @return list<string>
+     */
+    public function unmergedPaths(string $workingDir): array
+    {
+        $r = $this->run(['git', 'diff', '--name-only', '--diff-filter=U'], $workingDir, allowFailure: true);
+        $lines = array_filter(array_map('trim', explode("\n", $r['stdout'])));
+
+        return array_values($lines);
+    }
+
+    public function hasUnmergedPaths(string $workingDir): bool
+    {
+        return $this->unmergedPaths($workingDir) !== [];
+    }
+
+    public function mergeAbort(string $workingDir): void
+    {
+        $this->run(['git', 'merge', '--abort'], $workingDir, allowFailure: true);
+    }
+
+    public function fetchOriginBranch(string $workingDir, string $branch): void
+    {
+        $this->run(['git', 'fetch', 'origin', $branch], $workingDir);
+    }
+
+    /**
      * Inject the access token into HTTPS URLs so authenticated clones work without a credential helper.
      * Local file:// URLs and SSH URLs are returned unchanged.
      */

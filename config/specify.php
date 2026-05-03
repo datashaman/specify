@@ -157,6 +157,21 @@ return [
         )),
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | PR merge-conflict resolution (AI)
+    |--------------------------------------------------------------------------
+    |
+    | Caps how many ResolveConflicts AgentRuns may be queued per pull request
+    | number (per repo) to avoid infinite retry loops when GitHub still
+    | reports merge conflicts after a push.
+    |
+    */
+
+    'conflict_resolution' => [
+        'max_cycles_per_pr' => (int) env('SPECIFY_CONFLICT_RESOLUTION_MAX_CYCLES', 3),
+    ],
+
     'context' => [
         'builder' => env('SPECIFY_CONTEXT_BUILDER', 'recency'),
         'recency' => [

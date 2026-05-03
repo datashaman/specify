@@ -23,8 +23,9 @@ use RuntimeException;
  *
  * `kind` distinguishes the historical `Execute` run (produces the Subtask
  * diff and opens a PR) from `RespondToReview` (ADR-0008 — pushes a
- * `fix(review):` commit on the originating Subtask's open PR). The cascade
- * gate ignores RespondToReview runs.
+ * `fix(review):` commit on the originating Subtask's open PR) and
+ * `ResolveConflicts` (human-triggered merge-conflict repair on the primary
+ * PR). The cascade gate ignores RespondToReview and ResolveConflicts runs.
  */
 #[Fillable([
     'runnable_type', 'runnable_id',

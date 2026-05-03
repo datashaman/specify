@@ -77,7 +77,7 @@ new #[Title('Run')] class extends Component {
         if (! $run->isTerminal() || ! $run->status->isFailure()) {
             return;
         }
-        if ($run->kind === AgentRunKind::RespondToReview) {
+        if ($run->kind === AgentRunKind::RespondToReview || $run->kind === AgentRunKind::ResolveConflicts) {
             return;
         }
 
@@ -168,7 +168,8 @@ new #[Title('Run')] class extends Component {
             // the manual chain (ADR-0010).
             $canRetry = $run->isTerminal()
                 && $run->status->isFailure()
-                && $run->kind !== AgentRunKind::RespondToReview;
+                && $run->kind !== AgentRunKind::RespondToReview
+                && $run->kind !== AgentRunKind::ResolveConflicts;
             $duration = $run->started_at && $run->finished_at
                 ? $run->started_at->diffInSeconds($run->finished_at)
                 : null;
