@@ -14,7 +14,7 @@ use Laravel\Mcp\Server\Tool;
 /**
  * MCP tool: set-tasks
  */
-#[Description('Replace the entire task list for a story in one transaction. Each task gets 1+ ordered subtasks; tasks may declare task-level dependencies via positions; each task may link to one acceptance_criterion_id belonging to the story. If the story is currently Approved, this resets it to PendingApproval. Markdown is supported in description fields.')]
+#[Description('Replace the entire task list for a story in one transaction. Each task gets 1+ ordered subtasks; tasks may declare task-level dependencies via positions; each task may link to one acceptance_criterion_id belonging to the story. Replacing tasks creates a fresh current plan and reopens plan approval. Markdown is supported in description fields.')]
 class SetTasksTool extends Tool
 {
     use ResolvesProjectAccess;

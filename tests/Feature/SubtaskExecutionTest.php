@@ -127,6 +127,7 @@ test('full story execution: subtasks succeed and story flips to Done', function 
 
     $story->forceFill(['status' => StoryStatus::Draft->value])->save();
     $story->fresh()->submitForApproval();
+    $taskA->plan->submitForApproval();
     expect($story->fresh()->status)->toBe(StoryStatus::Approved);
 
     app(ExecutionService::class)->startStoryExecution($story->fresh());

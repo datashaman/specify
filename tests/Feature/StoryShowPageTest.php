@@ -2,6 +2,7 @@
 
 use App\Enums\AgentRunStatus;
 use App\Enums\ApprovalDecision;
+use App\Enums\PlanStatus;
 use App\Enums\StoryStatus;
 use App\Enums\TeamRole;
 use App\Models\AcceptanceCriterion;
@@ -180,6 +181,34 @@ test('eligible-approvers section hidden when threshold = 1', function () {
 
     Livewire::test('pages::stories.show', ['story' => $s['story']->id])
         ->assertDontSeeHtml('data-section="eligible-approvers"');
+});
+
+test('approval tracks render separately for story contract and current plan', function () {
+    $s = showPageScene(['status' => StoryStatus::Approved]);
+    attachPolicy($s['ws'], required: 1, allowSelf: true);
+
+    $ac = AcceptanceCriterion::create([
+        'story_id' => $s['story']->id,
+        'position' => 1,
+        'criterion' => 'AC-text-must-lead',
+    ]);
+    $task = Task::factory()->for($s['story'])->create([
+        'name' => 'task-name-secondary',
+        'position' => 1,
+        'acceptance_criterion_id' => $ac->id,
+    ]);
+    $task->plan->forceFill(['status' => PlanStatus::PendingApproval->value])->save();
+
+    $this->actingAs($s['user']);
+
+    Livewire::test('pages::stories.show', ['story' => $s['story']->id])
+        ->assertSeeHtml('data-section="approval-tracks"')
+        ->assertSeeHtml('data-track="story"')
+        ->assertSeeHtml('data-track="plan"')
+        ->assertSee('Story contract')
+        ->assertSee('Current plan')
+        ->assertSee('Execution is blocked until the current plan is approved.')
+        ->assertSee('Approve current plan');
 });
 
 test('plan section is AC-led: AC text leads, Task name follows', function () {

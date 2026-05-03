@@ -9,7 +9,7 @@ use Laravel\Mcp\Server\Attributes\Description;
 use Laravel\Mcp\Server\Tool;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 
-#[Description('Get a plan in detail, including task and subtask counts and whether it is the story\'s current plan.')]
+#[Description('Get a plan in detail, including approval revision, task and subtask counts, and whether it is the story\'s current plan.')]
 class GetPlanTool extends Tool
 {
     use ResolvesProjectAccess;
@@ -40,6 +40,7 @@ class GetPlanTool extends Tool
             'id' => $plan->id,
             'story_id' => $plan->story_id,
             'version' => $plan->version,
+            'revision' => $plan->revision,
             'name' => $plan->name,
             'summary' => $plan->summary,
             'design_notes' => $plan->design_notes,

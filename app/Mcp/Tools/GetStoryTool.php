@@ -67,6 +67,7 @@ class GetStoryTool extends Tool
             'current_plan' => $story->currentPlan ? [
                 'id' => $story->currentPlan->id,
                 'version' => $story->currentPlan->version,
+                'revision' => $story->currentPlan->revision,
                 'name' => $story->currentPlan->name,
                 'status' => $story->currentPlan->status?->value,
             ] : null,

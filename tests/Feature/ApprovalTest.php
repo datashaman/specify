@@ -15,19 +15,6 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);
 
-function makeStory(): Story
-{
-    $workspace = Workspace::factory()->create();
-    $team = Team::factory()->for($workspace)->create();
-    $project = Project::factory()->for($team)->create();
-    $feature = Feature::factory()->for($project)->create();
-
-    $story = Story::factory()->for($feature)->create(['status' => StoryStatus::Draft]);
-    AcceptanceCriterion::factory()->for($story)->create(['position' => 1]);
-
-    return $story->fresh();
-}
-
 function policyFor(string $scope, int $id, array $attrs): ApprovalPolicy
 {
     return ApprovalPolicy::create(array_merge([

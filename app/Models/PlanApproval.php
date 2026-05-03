@@ -27,6 +27,12 @@ class PlanApproval extends Model
 
     protected static function booted(): void
     {
+        static::creating(function (self $model) {
+            if (! $model->created_at) {
+                $model->created_at = now();
+            }
+        });
+
         static::updating(fn () => throw new RuntimeException('Plan approvals are immutable.'));
         static::deleting(fn () => throw new RuntimeException('Plan approvals are immutable.'));
     }

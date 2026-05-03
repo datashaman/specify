@@ -5,6 +5,7 @@ use App\Enums\ApprovalDecision;
 use App\Enums\StoryStatus;
 use App\Models\AgentRun;
 use App\Models\ApprovalPolicy;
+use App\Models\Plan;
 use App\Models\Repo;
 use App\Models\Subtask;
 use App\Models\Task;
@@ -36,7 +37,7 @@ function approvedStoryScene(): array
     $task = Task::factory()->for($story)->create(['position' => 0, 'acceptance_criterion_id' => $ac->id]);
     Subtask::factory()->for($task)->create(['position' => 0]);
 
-    return ['story' => $story->fresh(), 'project' => $project, 'task' => $task];
+    return ['story' => $story->fresh(), 'project' => $project, 'task' => $task, 'plan' => Plan::query()->findOrFail($task->plan_id)];
 }
 
 test('approving the threshold flips story to Approved without dispatching subtasks', function () {
@@ -71,8 +72,8 @@ test('required_approvals=0 skips PendingApproval and lands on Approved without a
         ->and(AgentRun::where('runnable_type', Subtask::class)->count())->toBe(0);
 });
 
-test('explicit startStoryExecution dispatches subtasks once the story is Approved', function () {
-    ['story' => $story, 'project' => $project] = approvedStoryScene();
+test('explicit startStoryExecution requires an approved current plan before dispatching subtasks', function () {
+    ['story' => $story, 'project' => $project, 'plan' => $plan] = approvedStoryScene();
     ApprovalPolicy::create([
         'scope_type' => ApprovalPolicy::SCOPE_PROJECT,
         'scope_id' => $project->id,
@@ -80,7 +81,14 @@ test('explicit startStoryExecution dispatches subtasks once the story is Approve
     ]);
 
     $story->fresh()->submitForApproval();
-    expect($story->fresh()->status)->toBe(StoryStatus::Approved);
+    expect($story->fresh()->status)->toBe(StoryStatus::Approved)
+        ->and($plan->fresh()->status->value)->toBe('draft');
+
+    expect(fn () => app(ExecutionService::class)->startStoryExecution($story->fresh()))
+        ->toThrow(RuntimeException::class, 'Current plan must be Approved');
+
+    $plan->submitForApproval();
+    expect($plan->fresh()->status->value)->toBe('approved');
 
     app(ExecutionService::class)->startStoryExecution($story->fresh());
 

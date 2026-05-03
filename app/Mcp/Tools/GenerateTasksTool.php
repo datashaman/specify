@@ -17,7 +17,7 @@ use Laravel\Mcp\Server\Tool;
  * Drives the planning agent for an Approved story. Generates a new current
  * plan containing tasks and subtasks.
  */
-#[Description('Generate a new implementation plan (tasks + subtasks) for an Approved story using the planning agent. The story must be Approved and have no current-plan tasks. Generated tasks reopen approval so a human can review the breakdown before execution.')]
+#[Description('Generate a new implementation plan (tasks + subtasks) for an Approved story using the planning agent. The story must be Approved and have no current-plan tasks. Generated tasks create a new current plan that reopens plan approval so a human can review the breakdown before execution.')]
 class GenerateTasksTool extends Tool
 {
     use ResolvesProjectAccess;

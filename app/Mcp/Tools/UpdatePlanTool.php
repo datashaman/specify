@@ -44,7 +44,17 @@ class UpdatePlanTool extends Tool
         }
 
         $changes = [];
+        $structuralChange = false;
         foreach (['name', 'summary', 'design_notes', 'implementation_notes', 'risks', 'assumptions', 'source_label'] as $field) {
+             if (array_key_exists($field, $validated)) {
+                 $changes[$field] = $validated[$field];
++                $structuralChange = true;
+             }
+         }
+         if (isset($validated['source'])) {
+             $changes['source'] = PlanSource::from($validated['source']);
++            $structuralChange = true;
+         }
             if (array_key_exists($field, $validated)) {
                 $changes[$field] = $validated[$field];
             }
@@ -61,12 +71,18 @@ class UpdatePlanTool extends Tool
         }
 
         $plan->fill($changes)->save();
+
+        if ($structuralChange && (int) $plan->story->current_plan_id === (int) $plan->id) {
+            $plan->reopenForApproval();
+        }
+
         $plan->refresh();
 
         return Response::json([
             'id' => $plan->id,
             'story_id' => $plan->story_id,
             'version' => $plan->version,
+            'revision' => $plan->revision,
             'name' => $plan->name,
             'summary' => $plan->summary,
             'design_notes' => $plan->design_notes,

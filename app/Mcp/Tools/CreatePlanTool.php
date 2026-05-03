@@ -46,6 +46,7 @@ class CreatePlanTool extends Tool
 
         $plan = $story->plans()->create([
             'version' => ((int) $story->plans()->max('version')) + 1,
+            'revision' => 1,
             'name' => $validated['name'],
             'summary' => $validated['summary'] ?? null,
             'design_notes' => $validated['design_notes'] ?? null,
@@ -65,6 +66,7 @@ class CreatePlanTool extends Tool
             'id' => $plan->id,
             'story_id' => $plan->story_id,
             'version' => $plan->version,
+            'revision' => $plan->revision,
             'name' => $plan->name,
             'summary' => $plan->summary,
             'design_notes' => $plan->design_notes,

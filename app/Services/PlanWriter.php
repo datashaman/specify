@@ -49,13 +49,18 @@ class PlanWriter
                 $previousPlan->forceFill(['status' => PlanStatus::Superseded])->save();
             }
 
+            $nextVersion = ((int) $story->plans()->max('version')) + 1;
+
             $plan = Plan::create([
                 'story_id' => $story->getKey(),
-                'version' => ((int) $story->plans()->max('version')) + 1,
-                'name' => 'Plan v'.(((int) $story->plans()->max('version')) + 1),
+                'version' => $nextVersion,
+                'revision' => 1,
+                'name' => 'Plan v'.$nextVersion,
                 'summary' => null,
                 'source' => PlanSource::Human,
-                'status' => PlanStatus::Draft,
+                'status' => $story->status === StoryStatus::Approved
+                    ? PlanStatus::PendingApproval
+                    : PlanStatus::Draft,
             ]);
 
             $tasksByPosition = [];
@@ -94,10 +99,6 @@ class PlanWriter
 
             $story->silentlyForceFill([
                 'current_plan_id' => $plan->getKey(),
-                'status' => in_array($story->status, [StoryStatus::Approved, StoryStatus::ChangesRequested], true)
-                    ? StoryStatus::PendingApproval->value
-                    : $story->status->value,
-                'revision' => ($story->revision ?? 1) + 1,
             ]);
 
             return [
@@ -106,8 +107,6 @@ class PlanWriter
                 'subtask_count' => Subtask::whereIn('task_id', collect($tasksByPosition)->map->getKey()->all())->count(),
             ];
         });
-
-        $this->approvals->recompute($story->fresh());
 
         return $result;
     }

@@ -2,11 +2,9 @@
 
 namespace App\Mcp\Tools;
 
-use App\Enums\StoryStatus;
 use App\Enums\TaskStatus;
 use App\Mcp\Concerns\ResolvesProjectAccess;
 use App\Models\Task;
-use App\Services\ApprovalService;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Illuminate\Support\Facades\DB;
 use Laravel\Mcp\Request;
@@ -17,7 +15,7 @@ use Laravel\Mcp\Server\Tool;
 /**
  * MCP tool: update-task
  */
-#[Description('Update a single task. Any of: name, description (markdown), status, acceptance_criterion_id, scenario_id, depends_on_positions (replaces existing). Editing structural fields on an Approved story resets it to PendingApproval.')]
+#[Description('Update a single task. Any of: name, description (markdown), status, acceptance_criterion_id, scenario_id, depends_on_positions (replaces existing). Editing structural fields on the current plan reopens plan approval.')]
 class UpdateTaskTool extends Tool
 {
     use ResolvesProjectAccess;
@@ -112,17 +110,8 @@ class UpdateTaskTool extends Tool
             }
         });
 
-        if ($structuralChange) {
-            if ($task->story->status === StoryStatus::Approved) {
-                $task->story->silentlyForceFill([
-                    'status' => StoryStatus::PendingApproval->value,
-                    'revision' => ($task->story->revision ?? 1) + 1,
-                ]);
-            } elseif ($task->story->status === StoryStatus::ChangesRequested) {
-                $task->story->silentlyForceFill(['status' => StoryStatus::PendingApproval->value]);
-            }
-
-            app(ApprovalService::class)->recompute($task->story->fresh());
+        if ($structuralChange && $task->plan) {
+            $task->plan->reopenForApproval();
         }
 
         $task->refresh()->load('dependencies:id,position', 'acceptanceCriterion:id,position,statement', 'scenario:id,position,name');

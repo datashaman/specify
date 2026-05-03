@@ -37,6 +37,10 @@ class AcceptanceCriterion extends Model
                 'revision' => ($story->revision ?? 1) + 1,
             ]);
 
+            if ($story->currentPlan) {
+                $story->currentPlan->reopenForApproval();
+            }
+
             app(\App\Services\ApprovalService::class)->recompute($story->fresh());
         };
 

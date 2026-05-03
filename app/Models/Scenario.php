@@ -13,6 +13,33 @@ class Scenario extends Model
 {
     use HasFactory;
 
+    protected static function booted(): void
+    {
+        $reopen = function (self $scenario): void {
+            $story = $scenario->story;
+            if (! $story) {
+                return;
+            }
+
+            $story->silentlyForceFill([
+                'status' => $story->status === \App\Enums\StoryStatus::Draft
+                    ? \App\Enums\StoryStatus::Draft->value
+                    : \App\Enums\StoryStatus::PendingApproval->value,
+                'revision' => ($story->revision ?? 1) + 1,
+            ]);
+
+            if ($story->currentPlan) {
+                $story->currentPlan->reopenForApproval();
+            }
+
+            app(\App\Services\ApprovalService::class)->recompute($story->fresh());
+        };
+
+        static::created($reopen);
+        static::updated($reopen);
+        static::deleted($reopen);
+    }
+
     protected function casts(): array
     {
         return [

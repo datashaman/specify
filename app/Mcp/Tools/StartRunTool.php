@@ -13,7 +13,7 @@ use Laravel\Mcp\Server\Tool;
 /**
  * MCP tool: start-run
  */
-#[Description('Start (or resume) execution of an Approved story. Dispatches agent runs for the next actionable subtasks in the story\'s current plan (parent task dependencies satisfied AND lower-position siblings done). The story must already be Approved.')]
+#[Description('Start (or resume) execution of a story whose product contract is Approved and whose current plan is also Approved. Dispatches agent runs for the next actionable subtasks in the story\'s current plan (parent task dependencies satisfied AND lower-position siblings done).')]
 class StartRunTool extends Tool
 {
     use ResolvesProjectAccess;
@@ -60,7 +60,7 @@ class StartRunTool extends Tool
     public function schema(JsonSchema $schema): array
     {
         return [
-            'story_id' => $schema->integer()->description('Story to execute. Must be Approved.')->required(),
+            'story_id' => $schema->integer()->description('Story to execute. Story and current plan must both be Approved.')->required(),
         ];
     }
 }

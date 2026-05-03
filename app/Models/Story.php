@@ -85,6 +85,12 @@ class Story extends Model
             if (! $story->wasChanged('revision')) {
                 return;
             }
+
+            $currentPlan = $story->currentPlan()->first();
+            if ($currentPlan) {
+                $currentPlan->reopenForApproval();
+            }
+
             if (in_array($story->status, [StoryStatus::Draft, StoryStatus::Rejected, StoryStatus::Done, StoryStatus::Cancelled], true)) {
                 return;
             }

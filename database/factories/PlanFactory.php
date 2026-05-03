@@ -18,6 +18,7 @@ class PlanFactory extends Factory
         return [
             'story_id' => Story::factory(),
             'version' => 1,
+            'revision' => 1,
             'name' => fake()->sentence(3),
             'summary' => fake()->paragraph(),
             'design_notes' => fake()->paragraph(),

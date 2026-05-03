@@ -4,10 +4,15 @@ use App\Ai\Agents\SubtaskExecutor;
 use App\Enums\StoryStatus;
 use App\Models\AcceptanceCriterion;
 use App\Models\ApprovalPolicy;
+use App\Models\Feature;
+use App\Models\Plan;
+use App\Models\Project;
 use App\Models\Repo;
 use App\Models\Story;
 use App\Models\Subtask;
 use App\Models\Task;
+use App\Models\Team;
+use App\Models\Workspace;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -61,6 +66,19 @@ expect()->extend('toBeOne', function () {
 |
 */
 
+function makeStory(): Story
+{
+    $workspace = Workspace::factory()->create();
+    $team = Team::factory()->for($workspace)->create();
+    $project = Project::factory()->for($team)->create();
+    $feature = Feature::factory()->for($project)->create();
+
+    $story = Story::factory()->for($feature)->create(['status' => StoryStatus::Draft]);
+    AcceptanceCriterion::factory()->for($story)->create(['position' => 1]);
+
+    return $story->fresh();
+}
+
 function approvedStoryInProjectWithRepo(): Story
 {
     config(['queue.default' => 'sync']);
@@ -97,6 +115,11 @@ function approvedStoryInProjectWithRepo(): Story
 
     $story->forceFill(['status' => StoryStatus::Draft->value])->save();
     $story->fresh()->submitForApproval();
+
+    $plan = Plan::query()->find($task->plan_id);
+    if ($plan) {
+        $plan->submitForApproval();
+    }
 
     return $story->fresh();
 }

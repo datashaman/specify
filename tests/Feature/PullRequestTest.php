@@ -200,6 +200,7 @@ test('full pipeline records pull_request_error after a non-fatal PR failure on a
     $subtask = Subtask::factory()->for($task)->create(['name' => 'add file', 'position' => 0]);
     $story->forceFill(['status' => StoryStatus::Draft->value])->save();
     $story->fresh()->submitForApproval();
+    $task->plan->submitForApproval();
     app(ExecutionService::class)->startStoryExecution($story->fresh());
 
     $run = AgentRun::where('runnable_id', $subtask->id)

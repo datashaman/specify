@@ -5,6 +5,7 @@ namespace App\Mcp\Servers;
 use App\Mcp\Tools\AddAcceptanceCriterionTool;
 use App\Mcp\Tools\AddGithubRepoToProjectTool;
 use App\Mcp\Tools\AddStoryDependencyTool;
+use App\Mcp\Tools\ApprovePlanTool;
 use App\Mcp\Tools\ApproveStoryTool;
 use App\Mcp\Tools\CreateFeatureTool;
 use App\Mcp\Tools\CreatePlanTool;
@@ -15,6 +16,7 @@ use App\Mcp\Tools\CurrentContextTool;
 use App\Mcp\Tools\GenerateTasksTool;
 use App\Mcp\Tools\GetFeatureTool;
 use App\Mcp\Tools\GetPlanTool;
+use App\Mcp\Tools\RejectPlanTool;
 use App\Mcp\Tools\GetProjectTool;
 use App\Mcp\Tools\GetRepoTool;
 use App\Mcp\Tools\GetRunTool;
@@ -30,11 +32,13 @@ use App\Mcp\Tools\ListStoriesTool;
 use App\Mcp\Tools\ListTasksTool;
 use App\Mcp\Tools\RejectStoryTool;
 use App\Mcp\Tools\RemoveProjectRepoTool;
+use App\Mcp\Tools\RequestPlanChangesTool;
 use App\Mcp\Tools\RequestStoryChangesTool;
 use App\Mcp\Tools\SetCurrentPlanTool;
 use App\Mcp\Tools\SetPrimaryRepoTool;
 use App\Mcp\Tools\SetTasksTool;
 use App\Mcp\Tools\StartRunTool;
+use App\Mcp\Tools\SubmitPlanTool;
 use App\Mcp\Tools\SubmitStoryTool;
 use App\Mcp\Tools\SwitchProjectTool;
 use App\Mcp\Tools\UpdateFeatureTool;
@@ -60,6 +64,7 @@ Voice and scope, very important:
 - An ACCEPTANCE CRITERION is a short, atomic, observable rule. Do not put whole Given/When/Then scenarios here.
 - A SCENARIO holds Given/When/Then behaviour examples.
 - A PLAN is the implementation interpretation of a story.
+- Plans have their own approval lifecycle. Story approval gates the product contract; current-plan approval gates execution.
 - A TASK is an actionable work item under a plan. A SUBTASK is the executor-sized engineering step.
 
 Never put schemas, class names, file paths, or migration steps in a feature or story description — that belongs in plans, tasks, or subtasks.
@@ -97,6 +102,10 @@ class SpecifyServer extends Server
         GetPlanTool::class,
         UpdatePlanTool::class,
         SetCurrentPlanTool::class,
+        SubmitPlanTool::class,
+        ApprovePlanTool::class,
+        RequestPlanChangesTool::class,
+        RejectPlanTool::class,
         AddStoryDependencyTool::class,
         SubmitStoryTool::class,
         ApproveStoryTool::class,
