@@ -191,6 +191,38 @@ new #[Title('Story')] class extends Component {
         return $this->canEdit($story);
     }
 
+    public function canDeleteStory(): bool
+    {
+        $story = $this->story;
+        if (! $story) {
+            return false;
+        }
+        if (! in_array($story->status, [
+            StoryStatus::Draft,
+            StoryStatus::ProposedByAI,
+            StoryStatus::Cancelled,
+            StoryStatus::Rejected,
+        ], true)) {
+            return false;
+        }
+
+        return $this->canEdit($story);
+    }
+
+    public function deleteStory(): void
+    {
+        $story = $this->story;
+        abort_unless($story, 404);
+        abort_unless($this->canDeleteStory(), 403);
+
+        $featureId = $story->feature_id;
+        $projectId = $story->feature->project_id;
+
+        $story->delete();
+
+        $this->redirectRoute('features.show', ['project' => $projectId, 'feature' => $featureId], navigate: true);
+    }
+
     public function submit(): void
     {
         $story = $this->story;
@@ -655,17 +687,44 @@ new #[Title('Story')] class extends Component {
             @else
                 <div class="mt-2 flex items-start justify-between gap-3">
                     <flux:heading size="xl">{{ $story->name }}</flux:heading>
-                    @if ($this->canEditStory())
-                        <flux:button wire:click="startEdit" size="sm" icon="pencil-square">{{ __('Edit') }}</flux:button>
-                    @endif
+                    <div class="flex items-center gap-2">
+                        @if ($this->canEditStory())
+                            <flux:button wire:click="startEdit" size="sm" icon="pencil-square">{{ __('Edit') }}</flux:button>
+                        @endif
+                        @if ($this->canDeleteStory())
+                            <flux:modal.trigger name="delete-story-modal">
+                                <flux:button size="sm" variant="danger" icon="trash">{{ __('Delete') }}</flux:button>
+                            </flux:modal.trigger>
+                        @endif
+                    </div>
                 </div>
                 <div class="mt-2 flex flex-wrap items-center gap-2">
                     <x-state-pill :state="$pill['state']" :tally="$pill['tally']" :label="$pill['label']" />
-                    <flux:badge>v{{ $story->revision }}</flux:badge>
+                    <flux:badge>{{ __('rev') }} {{ $story->revision }}</flux:badge>
                     @if ($story->creator)
-                        <flux:badge>{{ __('by') }} {{ $story->creator->name }}</flux:badge>
+                        <flux:avatar
+                            size="xs"
+                            :name="$story->creator->name"
+                            :initials="$story->creator->initials()"
+                            :tooltip="$story->creator->name"
+                        />
                     @endif
                 </div>
+
+                @if ($this->canDeleteStory())
+                    <flux:modal name="delete-story-modal" class="md:w-96">
+                        <div class="flex flex-col gap-4">
+                            <flux:heading size="lg">{{ __('Delete story?') }}</flux:heading>
+                            <flux:text>{{ __('This permanently removes the story and its acceptance criteria. Cannot be undone.') }}</flux:text>
+                            <div class="flex justify-end gap-2">
+                                <flux:modal.close>
+                                    <flux:button variant="ghost">{{ __('Cancel') }}</flux:button>
+                                </flux:modal.close>
+                                <flux:button wire:click="deleteStory" variant="danger" icon="trash">{{ __('Delete') }}</flux:button>
+                            </div>
+                        </div>
+                    </flux:modal>
+                @endif
 
                 @php $storyPrs = $story->pullRequests(); @endphp
                 @if ($storyPrs->isNotEmpty())
@@ -683,24 +742,25 @@ new #[Title('Story')] class extends Component {
                         <div class="flex flex-col gap-1">
                             @foreach ($storyPrs as $pr)
                                 <div class="flex flex-wrap items-center gap-2 text-sm">
-                                    <flux:badge size="sm" :color="$pr['merged'] === true ? 'emerald' : 'zinc'">
-                                        @if ($pr['merged'] === true)
-                                            {{ __('merged') }}
-                                        @elseif ($pr['merged'] === false)
-                                            {{ __('open') }}
-                                        @else
-                                            {{ __('PR') }}
-                                        @endif
-                                        @if ($pr['number'])
-                                            #{{ $pr['number'] }}
-                                        @endif
-                                    </flux:badge>
                                     <a
                                         href="{{ $pr['url'] }}"
                                         target="_blank"
                                         rel="noopener"
-                                        class="truncate text-zinc-700 underline decoration-dotted hover:decoration-solid dark:text-zinc-300"
-                                    >{{ $pr['url'] }}</a>
+                                        class="inline-flex"
+                                    >
+                                        <flux:badge size="sm" :color="$pr['merged'] === true ? 'emerald' : 'zinc'" icon="arrow-top-right-on-square">
+                                            @if ($pr['merged'] === true)
+                                                {{ __('merged') }}
+                                            @elseif ($pr['merged'] === false)
+                                                {{ __('open') }}
+                                            @else
+                                                {{ __('PR') }}
+                                            @endif
+                                            @if ($pr['number'])
+                                                #{{ $pr['number'] }}
+                                            @endif
+                                        </flux:badge>
+                                    </a>
                                     @if ($pr['driver'])
                                         <flux:badge size="sm" icon="cpu-chip">{{ $pr['driver'] }}</flux:badge>
                                     @endif
@@ -766,19 +826,19 @@ new #[Title('Story')] class extends Component {
                     <div class="flex flex-wrap items-center gap-x-3 gap-y-1">
                         <flux:heading size="lg">{{ __('Plan') }}</flux:heading>
                         <flux:text class="text-xs text-zinc-500">
-                            {{ $acs->count() }} {{ __('ACs') }} · {{ $subtaskCount }} {{ __('subtasks') }} · v{{ $story->revision }}
+                            {{ $acs->count() }} {{ __('ACs') }} · {{ $subtaskCount }} {{ __('subtasks') }}
                         </flux:text>
                         @if ($repo)
                             <flux:badge size="sm" icon="folder">{{ $repo->name }}</flux:badge>
                         @endif
                         @if ($branch)
-                            <flux:badge size="sm" icon="code-bracket">{{ $branch }}</flux:badge>
+                            <flux:text class="font-mono text-xs text-zinc-400 truncate max-w-[24rem]" :title="$branch">{{ $branch }}</flux:text>
                         @endif
                     </div>
 
                     <div class="flex items-center gap-2">
                         @if ($acs->isNotEmpty() || $unmappedTasks->isNotEmpty())
-                            <div class="inline-flex rounded-md border border-zinc-200 p-0.5 text-xs dark:border-zinc-700" role="tablist" data-toggle="plan-mode">
+                            <div class="inline-flex rounded-md border border-zinc-200 p-0.5 text-xs dark:border-zinc-700" role="tablist" data-toggle="plan-mode" aria-label="{{ __('Plan view density') }}">
                                 <button
                                     type="button"
                                     role="tab"
@@ -786,7 +846,7 @@ new #[Title('Story')] class extends Component {
                                     :aria-selected="!planRunMode ? 'true' : 'false'"
                                     :class="!planRunMode ? 'bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900' : 'text-zinc-600 dark:text-zinc-300'"
                                     class="rounded px-2 py-0.5"
-                                >{{ __('Grooming') }}</button>
+                                >{{ __('Compact') }}</button>
                                 <button
                                     type="button"
                                     role="tab"
@@ -794,7 +854,7 @@ new #[Title('Story')] class extends Component {
                                     :aria-selected="planRunMode ? 'true' : 'false'"
                                     :class="planRunMode ? 'bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900' : 'text-zinc-600 dark:text-zinc-300'"
                                     class="rounded px-2 py-0.5"
-                                >{{ __('Run') }}</button>
+                                >{{ __('Expanded') }}</button>
                             </div>
                         @endif
 

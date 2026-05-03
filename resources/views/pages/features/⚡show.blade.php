@@ -258,16 +258,29 @@ new #[Title('Feature')] class extends Component {
                     <a href="{{ route('stories.show', ['project' => $feature->project_id, 'story' => $story->id]) }}" wire:navigate class="flex items-stretch gap-3 rounded-lg border border-zinc-200 p-4 hover:bg-zinc-50 dark:border-zinc-700 dark:hover:bg-zinc-800/50" data-story-row="{{ $story->id }}">
                         <x-rail :state="$rowState" class="!w-0.5" />
                         <div class="min-w-0 flex-1">
-                            <div class="flex flex-wrap items-center gap-2">
-                                <x-state-pill :state="$rowState" :label="$story->status->value" />
-                                <flux:badge size="sm">rev {{ $story->revision }}</flux:badge>
-                                @if ($story->creator)
-                                    <flux:badge size="sm">{{ __('by') }} {{ $story->creator->name }}</flux:badge>
-                                @endif
-                                @if ($tasksTotal > 0)
-                                    <flux:badge size="sm">{{ $tasksDone }}/{{ $tasksTotal }} {{ __('tasks') }}</flux:badge>
-                                @endif
-                                <flux:text class="ml-auto text-xs text-zinc-500">{{ $story->updated_at?->diffForHumans() }}</flux:text>
+                            <div class="flex items-center gap-2">
+                                <div class="w-24 flex-none">
+                                    <x-state-pill :state="$rowState" :label="$story->status->value" />
+                                </div>
+                                <div class="w-14 flex-none">
+                                    <flux:badge size="sm">{{ __('rev') }} {{ $story->revision }}</flux:badge>
+                                </div>
+                                <div class="w-16 flex-none">
+                                    @if ($tasksTotal > 0)
+                                        <flux:badge size="sm">{{ $tasksDone }}/{{ $tasksTotal }}</flux:badge>
+                                    @endif
+                                </div>
+                                <div class="ml-auto flex flex-none items-center gap-2">
+                                    @if ($story->creator)
+                                        <flux:avatar
+                                            size="xs"
+                                            :name="$story->creator->name"
+                                            :initials="$story->creator->initials()"
+                                            :tooltip="$story->creator->name"
+                                        />
+                                    @endif
+                                    <flux:text class="text-xs text-zinc-500 tabular-nums">{{ $story->updated_at?->diffForHumans(short: true) }}</flux:text>
+                                </div>
                             </div>
                             <flux:heading class="mt-2">{{ $story->name }}</flux:heading>
                             @if ($story->description)
