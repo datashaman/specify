@@ -1,11 +1,11 @@
 @php
     /** @var \App\Models\Task $task */
-    $deps = $task->dependencies->map(fn ($d) => '#'.$d->position);
+    $deps = $task->dependencies->map(fn ($d) => 'T'.$d->position);
 @endphp
 
 <div class="mt-4 border-l-2 border-zinc-100 pl-3 dark:border-zinc-800" data-task-id="{{ $task->id }}">
     <div class="flex flex-wrap items-center gap-2 text-xs">
-        <flux:badge variant="solid" size="sm">#{{ $task->position }}</flux:badge>
+        <flux:badge size="sm">T{{ $task->position }}</flux:badge>
         <flux:badge size="sm">{{ $task->status->value }}</flux:badge>
         @if ($deps->isNotEmpty())
             <flux:badge size="sm">{{ __('depends on') }} {{ $deps->implode(', ') }}</flux:badge>
@@ -25,7 +25,7 @@
     @endif
 
     @if ($task->subtasks->isNotEmpty())
-        <ol class="mt-3 flex list-decimal flex-col gap-3 pl-5 text-sm marker:text-zinc-400">
+        <div class="mt-3 flex flex-col gap-3 text-sm">
             @foreach ($task->subtasks->sortBy('position') as $sub)
                 @php
                     $runs = $sub->agentRuns->sortByDesc('id')->values();
@@ -34,8 +34,9 @@
                     $appended = ! is_null($sub->proposed_by_run_id ?? null);
                     $hasError = $latestRun && $latestRun->error_message;
                 @endphp
-                <li data-subtask-id="{{ $sub->id }}">
+                <div data-subtask-id="{{ $sub->id }}">
                     <div class="flex flex-wrap items-center gap-2">
+                        <flux:badge size="sm">T{{ $task->position }}.{{ $sub->position }}</flux:badge>
                         <a
                             href="{{ route('subtasks.show', ['project' => $task->story->feature->project_id, 'story' => $task->story_id, 'subtask' => $sub->id]) }}"
                             wire:navigate
@@ -134,8 +135,8 @@
                             @endif
                         </div>
                     @endif
-                </li>
+                </div>
             @endforeach
-        </ol>
+        </div>
     @endif
 </div>

@@ -96,11 +96,11 @@ new #[Title('Subtask')] class extends Component {
 
             <div>
                 <div class="flex flex-wrap items-center gap-2 text-xs">
-                    <flux:badge variant="solid">{{ __('Subtask') }} #{{ $subtask->position }}</flux:badge>
-                    <flux:badge>{{ $subtask->status->value }}</flux:badge>
-                    <flux:badge>{{ __('Task') }} #{{ $task->position }}: {{ $task->name }}</flux:badge>
+                    <flux:badge size="sm">T{{ $task->position }}.{{ $subtask->position }}</flux:badge>
+                    <flux:badge size="sm">{{ $subtask->status->value }}</flux:badge>
+                    <flux:badge size="sm">T{{ $task->position }}: {{ $task->name }}</flux:badge>
                     @if ($subtask->proposed_by_run_id)
-                        <flux:badge color="amber" title="{{ __('Appended mid-run by') }} #{{ $subtask->proposed_by_run_id }} (ADR-0005)">{{ __('appended') }}</flux:badge>
+                        <flux:badge color="amber" size="sm" title="{{ __('Appended mid-run by') }} #{{ $subtask->proposed_by_run_id }} (ADR-0005)">{{ __('appended') }}</flux:badge>
                     @endif
                 </div>
                 <flux:heading size="xl" class="mt-2">{{ $subtask->name }}</flux:heading>

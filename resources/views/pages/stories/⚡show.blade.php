@@ -662,7 +662,7 @@ new #[Title('Story')] class extends Component {
                         <flux:label>{{ __('Acceptance criteria') }}</flux:label>
                         @foreach ($editCriteria as $i => $row)
                             <div wire:key="ac-{{ $i }}" class="flex items-start gap-2">
-                                <flux:badge class="mt-2">{{ __('AC') }} #{{ $i + 1 }}</flux:badge>
+                                <flux:badge class="mt-2" size="sm">AC{{ $i + 1 }}</flux:badge>
                                 <flux:textarea wire:model="editCriteria.{{ $i }}.criterion" rows="2" class="flex-1" />
                                 <flux:button wire:click="removeCriterion({{ $i }})" variant="ghost" size="sm" class="mt-1">{{ __('Remove') }}</flux:button>
                             </div>
@@ -881,7 +881,7 @@ new #[Title('Story')] class extends Component {
                         >
                             <summary class="flex cursor-pointer list-none flex-wrap items-baseline gap-2 text-sm [&::-webkit-details-marker]:hidden">
                                 <span class="text-zinc-400 transition-transform group-open:rotate-90" aria-hidden="true">▸</span>
-                                <flux:badge>{{ __('AC') }} #{{ $loop->iteration }}</flux:badge>
+                                <flux:badge size="sm">AC{{ $loop->iteration }}</flux:badge>
                                 <span class="font-medium">{{ $ac->criterion }}</span>
                             </summary>
 
