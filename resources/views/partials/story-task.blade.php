@@ -12,7 +12,13 @@
         @endif
     </div>
 
-    <flux:heading class="mt-1" size="sm">{{ $task->name }}</flux:heading>
+    <flux:heading class="mt-1" size="sm">
+        <a
+            href="{{ route('tasks.show', ['project' => $task->story->feature->project_id, 'story' => $task->story_id, 'task' => $task->id]) }}"
+            wire:navigate
+            class="hover:underline"
+        >{{ $task->name }}</a>
+    </flux:heading>
 
     @if ($task->description)
         <x-markdown :content="$task->description" class="mt-1 text-sm text-zinc-600 dark:text-zinc-400" />
