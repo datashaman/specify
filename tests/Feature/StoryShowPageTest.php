@@ -362,6 +362,24 @@ test('story page lists attached context items and excludes them from the attach 
         ->and($html)->toContain('available-context-'.$available->id);
 });
 
+test('story attach picker only lists context items from the story project', function () {
+    $s = showPageScene(['status' => StoryStatus::Draft]);
+    attachPolicy($s['ws'], required: 1);
+    $sameProject = ContextItem::factory()->for($s['project'])->create(['title' => 'Same project brief']);
+    $otherProject = Project::factory()->for($s['team'])->create();
+    $otherProjectItem = ContextItem::factory()->for($otherProject)->create(['title' => 'Other project brief']);
+
+    $this->actingAs($s['user']);
+
+    $html = Livewire::test('pages::stories.show', ['story' => $s['story']->id])
+        ->assertSee('Same project brief')
+        ->assertDontSee('Other project brief')
+        ->html();
+
+    expect($html)->toContain('available-context-'.$sameProject->id)
+        ->and($html)->not->toContain('available-context-'.$otherProjectItem->id);
+});
+
 test('author can attach multiple available project context items from story page', function () {
     $s = showPageScene(['status' => StoryStatus::Draft]);
     attachPolicy($s['ws'], required: 1);

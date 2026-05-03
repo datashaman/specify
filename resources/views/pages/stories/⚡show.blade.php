@@ -544,15 +544,14 @@ new #[Title('Story')] class extends Component
     }
 
     #[Computed]
-    public function availableContextItems()
+    public function availableContextItems(): Collection
     {
         $story = $this->story;
         if (! $story) {
             return collect();
         }
 
-        return ContextItem::query()
-            ->where('project_id', $story->feature->project_id)
+        return $story->feature->project->contextItems()
             ->whereNotIn('id', $story->contextItems->pluck('id'))
             ->orderBy('title')
             ->get();
