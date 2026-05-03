@@ -1,14 +1,17 @@
 <?php
 
 use App\Enums\ApprovalDecision;
+use App\Enums\PlanStatus;
 use App\Enums\StoryStatus;
 use App\Enums\TeamRole;
 use App\Models\AcceptanceCriterion;
 use App\Models\ApprovalPolicy;
 use App\Models\Feature;
+use App\Models\PlanApproval;
 use App\Models\Project;
 use App\Models\Story;
 use App\Models\StoryApproval;
+use App\Models\Task;
 use App\Models\Team;
 use App\Models\User;
 use App\Models\Workspace;
@@ -48,19 +51,34 @@ function pendingStoryFor(Feature $feature, string $name = 'Visible story'): Stor
     return $story->fresh();
 }
 
+function pendingPlanFor(Feature $feature, string $name = 'Visible plan story')
+{
+    $story = Story::factory()->for($feature)->create([
+        'status' => StoryStatus::Approved,
+        'name' => $name,
+    ]);
+    $task = Task::factory()->for($story)->create(['position' => 1]);
+    $task->plan->forceFill(['status' => PlanStatus::PendingApproval->value])->save();
+
+    return $task->plan->fresh();
+}
+
 test('inbox redirects unauthenticated users', function () {
     $this->get(route('triage'))->assertRedirect(route('login'));
 });
 
-test('inbox lists pending stories in scope', function () {
+test('inbox lists pending stories and current plans in scope', function () {
     ['user' => $user, 'feature' => $feature] = inboxScene();
 
     pendingStoryFor($feature, 'Visible story');
+    pendingPlanFor($feature, 'Visible plan');
 
     $this->actingAs($user);
 
     Livewire::test('pages::triage')
-        ->assertSee('Visible story');
+        ->assertSee('Visible story')
+        ->assertSee('Visible plan')
+        ->assertSee('Current plans pending approval');
 });
 
 test('inbox excludes items from teams the user does not belong to', function () {
@@ -88,6 +106,18 @@ test('approving a story flips its status', function () {
         ->call('decide', $story->id, 'approve');
 
     expect($story->fresh()->status)->toBe(StoryStatus::Approved);
+});
+
+test('approving a current plan flips its status', function () {
+    ['user' => $user, 'feature' => $feature] = inboxScene();
+    $plan = pendingPlanFor($feature);
+
+    $this->actingAs($user);
+
+    Livewire::test('pages::triage')
+        ->call('decidePlan', $plan->id, 'approve');
+
+    expect($plan->fresh()->status)->toBe(PlanStatus::Approved);
 });
 
 test('Member sees only the no-permission notice (no buttons)', function () {
@@ -169,6 +199,21 @@ test('pinning a project narrows the inbox to that project only', function () {
     Livewire::test('pages::triage')
         ->assertSee('in-A')
         ->assertDontSee('in-B');
+});
+
+test('deciding on an out-of-scope plan 404s', function () {
+    ['user' => $user] = inboxScene();
+
+    $otherWorkspace = Workspace::factory()->create();
+    $otherTeam = Team::factory()->for($otherWorkspace)->create();
+    $otherProject = Project::factory()->for($otherTeam)->create();
+    $otherFeature = Feature::factory()->for($otherProject)->create();
+    $otherPlan = pendingPlanFor($otherFeature);
+
+    $this->actingAs($user);
+
+    expect(fn () => Livewire::test('pages::triage')->call('decidePlan', $otherPlan->id, 'approve'))
+        ->toThrow(ModelNotFoundException::class);
 });
 
 test('deciding on an out-of-scope item 404s', function () {
