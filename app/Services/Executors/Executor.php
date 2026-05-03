@@ -40,10 +40,9 @@ interface Executor
      * should prepend it to the user prompt so the model orients faster.
      * Defaults to null so existing tests and minimal drivers remain valid.
      *
-     * `$emitter`, when non-null (only passed when `supportsProgressEvents()`
-     * is true — ADR-0011), is the per-run progress channel. Drivers call
-     * `$emitter->emit($type, $payload)` from within tool-call hooks /
-     * stdout handlers / sentinel parsers to surface live events.
+     * `$promptOverride`, when non-null, replaces the executor's default prompt
+     * built from the Subtask (used for merge-conflict resolution and similar).
+     * `$contextBrief` is still prepended when both are set.
      */
-    public function execute(Subtask $subtask, ?string $workingDir, ?Repo $repo, ?string $workingBranch, ?string $contextBrief = null, ?ProgressEmitter $emitter = null): ExecutionResult;
+    public function execute(Subtask $subtask, ?string $workingDir, ?Repo $repo, ?string $workingBranch, ?string $contextBrief = null, ?ProgressEmitter $emitter = null, ?string $promptOverride = null): ExecutionResult;
 }

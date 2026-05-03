@@ -24,13 +24,25 @@ class FakeExecutor implements Executor
         return false;
     }
 
-    public function execute(Subtask $subtask, ?string $workingDir, ?Repo $repo, ?string $workingBranch, ?string $contextBrief = null, ?ProgressEmitter $emitter = null): ExecutionResult
+    public function execute(Subtask $subtask, ?string $workingDir, ?Repo $repo, ?string $workingBranch, ?string $contextBrief = null, ?ProgressEmitter $emitter = null, ?string $promptOverride = null): ExecutionResult
     {
         // Pass a real (but throwaway) directory so SubtaskExecutor::tools() can construct
         // a Sandbox during fake/test invocations. The tools are never actually called
         // because the prompt response is intercepted by SubtaskExecutor::fake().
         $agent = new SubtaskExecutor($subtask, $repo, $workingBranch, $workingDir ?? sys_get_temp_dir());
-        $response = $agent->prompt($agent->buildPrompt());
+        if ($promptOverride !== null) {
+            $prompt = $promptOverride;
+            if ($contextBrief !== null && $contextBrief !== '') {
+                $prompt = $contextBrief."\n\n".$prompt;
+            }
+        } else {
+            $prompt = $agent->buildPrompt();
+            if ($contextBrief !== null && $contextBrief !== '') {
+                $prompt = $contextBrief."\n\n".$prompt;
+            }
+        }
+
+        $response = $agent->prompt($prompt);
         $output = $response->toArray();
 
         return new ExecutionResult(

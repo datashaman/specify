@@ -104,7 +104,8 @@ class RespondToPrReviewJob implements ShouldQueue
                     workingDir: $workingDir,
                 );
 
-                $output = $agent->run()->structured();
+                $response = $agent->prompt($agent->buildPrompt());
+                $output = $response->toArray();
 
                 $clarifications = (array) ($output['clarifications'] ?? []);
                 $summary = trim((string) ($output['summary'] ?? ''));

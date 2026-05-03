@@ -103,7 +103,7 @@ test('CliExecutor emits stdout / stderr / sentinel events when an emitter is pas
     $emitter->setPhase('execute');
 
     (new CliExecutor([$bin]))
-        ->execute($run->runnable, $workingDir, null, null, null, $emitter);
+        ->execute($run->runnable, $workingDir, null, null, null, $emitter, null);
 
     $events = AgentRunEvent::where('agent_run_id', $run->getKey())->orderBy('seq')->get();
     $types = $events->pluck('type')->all();
