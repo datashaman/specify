@@ -37,7 +37,9 @@ new #[Title('Projects')] class extends Component {
                     &middot; {{ $project->repos_count }} {{ __('repos') }}
                 </flux:text>
                 <div class="mt-3 flex flex-wrap gap-2">
-                    <a href="{{ route('projects.show', $project) }}" wire:navigate class="text-sm underline">{{ __('Open project') }}</a>
+                    <a href="{{ route('projects.show', $project) }}" wire:navigate>
+                        <flux:button size="sm" variant="primary">{{ __('Open project') }}</flux:button>
+                    </a>
                 </div>
             </flux:card>
         @empty

@@ -63,7 +63,6 @@ new #[Title('Stories')] class extends Component {
             <a href="{{ route('stories.show', ['project' => $story->feature->project_id, 'story' => $story->id]) }}" wire:navigate>
                 <flux:card class="hover:bg-zinc-50 dark:hover:bg-zinc-800/50">
                     <div class="flex flex-wrap items-center gap-2">
-                        <flux:badge variant="solid">{{ $story->feature->project->name }}</flux:badge>
                         <flux:badge>{{ $story->status->value }}</flux:badge>
                         <flux:badge>rev {{ $story->revision }}</flux:badge>
                         @if ($story->creator)

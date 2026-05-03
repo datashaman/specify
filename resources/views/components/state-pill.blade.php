@@ -4,7 +4,7 @@
     $palette = [
         'draft' => 'bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300',
         'pending' => 'bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-200',
-        'approved' => 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-200',
+        'approved' => 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900/40 dark:text-indigo-200',
         'changes_requested' => 'bg-rose-100 text-rose-800 dark:bg-rose-900/40 dark:text-rose-200',
         'rejected' => 'bg-zinc-200 text-zinc-700 dark:bg-zinc-700 dark:text-zinc-300',
         'running' => 'bg-sky-100 text-sky-800 dark:bg-sky-900/40 dark:text-sky-200',
