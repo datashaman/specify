@@ -24,7 +24,7 @@ use InvalidArgumentException;
  * on plan replacement), and the only approval gate in the system
  * (see ADR-0001). Tasks attach directly to the Story (ADR-0002).
  */
-#[Fillable(['feature_id', 'created_by_id', 'name', 'slug', 'description', 'notes', 'status', 'revision'])]
+#[Fillable(['feature_id', 'created_by_id', 'name', 'slug', 'description', 'notes', 'status', 'revision', 'position'])]
 class Story extends Model
 {
     /** @use HasFactory<StoryFactory> */
@@ -55,6 +55,13 @@ class Story extends Model
 
     protected static function booted(): void
     {
+        static::creating(function (self $story) {
+            if (empty($story->position)) {
+                $max = static::where('feature_id', $story->feature_id)->max('position') ?? 0;
+                $story->position = $max + 1;
+            }
+        });
+
         static::updating(function (self $story) {
             if (self::$suppressRevisionBump) {
                 return;
@@ -93,6 +100,7 @@ class Story extends Model
         return [
             'status' => StoryStatus::class,
             'revision' => 'integer',
+            'position' => 'integer',
         ];
     }
 
