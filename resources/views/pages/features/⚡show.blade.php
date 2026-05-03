@@ -4,6 +4,7 @@ use App\Enums\StoryStatus;
 use App\Enums\TaskStatus;
 use App\Models\Feature;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Title;
 use Livewire\Attributes\Validate;
@@ -92,8 +93,40 @@ new #[Title('Feature')] class extends Component {
     public function stories()
     {
         return $this->feature
-            ? $this->feature->stories()->with('creator', 'tasks:id,story_id,status')->latest('updated_at')->get()
+            ? $this->feature->stories()
+                ->with('creator', 'tasks:id,story_id,status')
+                ->orderBy('position')
+                ->orderBy('id')
+                ->get()
             : collect();
+    }
+
+    /**
+     * @param  array<int, int>  $orderedIds  Story IDs in the new visual order.
+     */
+    public function reorderStories(array $orderedIds): void
+    {
+        $feature = $this->feature;
+        abort_unless($feature, 404);
+        abort_unless(Auth::user()->canApproveInProject($feature->project), 403);
+
+        $owned = $feature->stories()->pluck('id')->all();
+        $clean = array_values(array_filter(
+            array_map('intval', $orderedIds),
+            fn (int $id) => in_array($id, $owned, true),
+        ));
+
+        if (count($clean) !== count($owned)) {
+            return;
+        }
+
+        DB::transaction(function () use ($clean) {
+            foreach ($clean as $i => $id) {
+                DB::table('stories')->where('id', $id)->update(['position' => $i + 1]);
+            }
+        });
+
+        unset($this->stories);
     }
 
     /**
@@ -241,56 +274,85 @@ new #[Title('Feature')] class extends Component {
 
             <section class="flex flex-col gap-3" data-section="stories">
                 <flux:heading size="lg">{{ __('Stories') }}</flux:heading>
-                @forelse ($this->stories as $story)
-                    @php
-                        $rowState = match ($story->status->value) {
-                            StoryStatus::Draft->value, StoryStatus::ProposedByAI->value => 'draft',
-                            StoryStatus::PendingApproval->value => 'pending',
-                            StoryStatus::Approved->value => 'approved',
-                            StoryStatus::ChangesRequested->value => 'changes_requested',
-                            StoryStatus::Rejected->value, StoryStatus::Cancelled->value => 'rejected',
-                            StoryStatus::Done->value => 'run_complete',
-                            default => 'draft',
-                        };
-                        $tasksTotal = $story->tasks->count();
-                        $tasksDone = $story->tasks->filter(fn ($t) => $t->status === TaskStatus::Done)->count();
-                    @endphp
-                    <a href="{{ route('stories.show', ['project' => $feature->project_id, 'story' => $story->id]) }}" wire:navigate class="flex items-stretch gap-3 rounded-lg border border-zinc-200 p-4 hover:bg-zinc-50 dark:border-zinc-700 dark:hover:bg-zinc-800/50" data-story-row="{{ $story->id }}">
-                        <x-rail :state="$rowState" class="!w-0.5" />
-                        <div class="min-w-0 flex-1">
-                            <div class="flex items-center gap-2">
-                                <div class="w-24 flex-none">
-                                    <x-state-pill :state="$rowState" :label="$story->status->value" />
-                                </div>
-                                <div class="w-14 flex-none">
-                                    <flux:badge size="sm">{{ __('rev') }} {{ $story->revision }}</flux:badge>
-                                </div>
-                                <div class="w-16 flex-none">
-                                    @if ($tasksTotal > 0)
-                                        <flux:badge size="sm">{{ $tasksDone }}/{{ $tasksTotal }}</flux:badge>
-                                    @endif
-                                </div>
-                                <div class="ml-auto flex flex-none items-center gap-2">
-                                    @if ($story->creator)
-                                        <flux:avatar
-                                            size="xs"
-                                            :name="$story->creator->name"
-                                            :initials="$story->creator->initials()"
-                                            :tooltip="$story->creator->name"
-                                        />
-                                    @endif
-                                    <flux:text class="text-xs text-zinc-500 tabular-nums">{{ $story->updated_at?->diffForHumans(short: true) }}</flux:text>
-                                </div>
-                            </div>
-                            <flux:heading class="mt-2">{{ $story->name }}</flux:heading>
-                            @if ($story->description)
-                                <x-markdown :content="$story->description" class="mt-1 text-sm text-zinc-600 dark:text-zinc-400" />
+                @php $canReorder = $this->canEditFeature() && $this->stories->count() > 1; @endphp
+                <div
+                    class="flex flex-col gap-3"
+                    @if ($canReorder)
+                        x-data
+                        x-sortable="$wire.reorderStories"
+                    @endif
+                    data-stories-list
+                >
+                    @forelse ($this->stories as $story)
+                        @php
+                            $rowState = match ($story->status->value) {
+                                StoryStatus::Draft->value, StoryStatus::ProposedByAI->value => 'draft',
+                                StoryStatus::PendingApproval->value => 'pending',
+                                StoryStatus::Approved->value => 'approved',
+                                StoryStatus::ChangesRequested->value => 'changes_requested',
+                                StoryStatus::Rejected->value, StoryStatus::Cancelled->value => 'rejected',
+                                StoryStatus::Done->value => 'run_complete',
+                                default => 'draft',
+                            };
+                            $tasksTotal = $story->tasks->count();
+                            $tasksDone = $story->tasks->filter(fn ($t) => $t->status === TaskStatus::Done)->count();
+                            $storyUrl = route('stories.show', ['project' => $feature->project_id, 'story' => $story->id]);
+                        @endphp
+                        <div
+                            class="relative flex items-stretch gap-3 rounded-lg border border-zinc-200 p-4 hover:bg-zinc-50 dark:border-zinc-700 dark:hover:bg-zinc-800/50"
+                            data-story-row="{{ $story->id }}"
+                            data-sortable-id="{{ $story->id }}"
+                            wire:key="story-{{ $story->id }}"
+                        >
+                            <x-rail :state="$rowState" class="!w-0.5" />
+                            @if ($canReorder)
+                                <button
+                                    type="button"
+                                    data-sortable-handle
+                                    class="relative z-10 flex flex-none cursor-grab items-center text-zinc-400 hover:text-zinc-600 active:cursor-grabbing dark:hover:text-zinc-300"
+                                    aria-label="{{ __('Drag to reorder') }}"
+                                    title="{{ __('Drag to reorder') }}"
+                                >
+                                    <flux:icon.bars-3 class="size-5" />
+                                </button>
                             @endif
+                            <div class="min-w-0 flex-1">
+                                <div class="flex items-center gap-2">
+                                    <div class="w-24 flex-none">
+                                        <x-state-pill :state="$rowState" :label="$story->status->value" />
+                                    </div>
+                                    <div class="w-14 flex-none">
+                                        <flux:badge size="sm">{{ __('rev') }} {{ $story->revision }}</flux:badge>
+                                    </div>
+                                    <div class="w-16 flex-none">
+                                        @if ($tasksTotal > 0)
+                                            <flux:badge size="sm">{{ $tasksDone }}/{{ $tasksTotal }}</flux:badge>
+                                        @endif
+                                    </div>
+                                    <div class="ml-auto flex flex-none items-center gap-2">
+                                        @if ($story->creator)
+                                            <flux:avatar
+                                                size="xs"
+                                                :name="$story->creator->name"
+                                                :initials="$story->creator->initials()"
+                                                :tooltip="$story->creator->name"
+                                            />
+                                        @endif
+                                        <flux:text class="text-xs text-zinc-500 tabular-nums">{{ $story->updated_at?->diffForHumans(short: true) }}</flux:text>
+                                    </div>
+                                </div>
+                                <flux:heading class="mt-2">
+                                    <a href="{{ $storyUrl }}" wire:navigate class="before:absolute before:inset-0 before:content-['']">{{ $story->name }}</a>
+                                </flux:heading>
+                                @if ($story->description)
+                                    <x-markdown :content="$story->description" class="relative z-10 mt-1 text-sm text-zinc-600 dark:text-zinc-400" />
+                                @endif
+                            </div>
                         </div>
-                    </a>
-                @empty
-                    <flux:text class="text-zinc-500">{{ __('No stories yet for this feature.') }}</flux:text>
-                @endforelse
+                    @empty
+                        <flux:text class="text-zinc-500">{{ __('No stories yet for this feature.') }}</flux:text>
+                    @endforelse
+                </div>
             </section>
         </div>
     @endif
