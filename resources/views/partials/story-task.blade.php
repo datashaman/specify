@@ -32,7 +32,6 @@
                     $latestRun = $runs->first();
                     $priorRuns = $runs->slice(1);
                     $appended = ! is_null($sub->proposed_by_run_id ?? null);
-                    $hasError = $latestRun && $latestRun->error_message;
                 @endphp
                 <div data-subtask-id="{{ $sub->id }}">
                     <div class="flex flex-wrap items-center gap-2">
@@ -84,55 +83,15 @@
                                         <a href="{{ $url }}" target="_blank" rel="noopener" class="underline">{{ $url }}</a>
                                     </flux:text>
                                 @endif
-                                @if ($hasError)
-                                    <details>
-                                        <summary class="cursor-pointer select-none text-xs font-medium text-rose-700 hover:text-rose-900 dark:text-rose-400 dark:hover:text-rose-300">
-                                            {{ __('Error output') }}
-                                        </summary>
-                                        <pre class="mt-1 max-h-48 overflow-auto rounded bg-rose-50 p-2 font-mono text-[11px] leading-snug text-rose-900 dark:bg-rose-950/40 dark:text-rose-200">{{ $latestRun->error_message }}</pre>
-                                    </details>
-                                @endif
+                                <x-run.error-output :message="$latestRun->error_message" />
                             </div>
 
-                            @if ($priorRuns->isNotEmpty())
-                                <details class="border-t border-zinc-200 dark:border-zinc-700">
-                                    <summary class="cursor-pointer px-2 py-1 text-xs text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300">{{ __('Run history') }} ({{ $priorRuns->count() }})</summary>
-                                    <div class="flex flex-col">
-                                        @foreach ($priorRuns as $run)
-                                            @php
-                                                $priorRunUrl = route('runs.show', [
-                                                    'project' => $task->story->feature->project_id,
-                                                    'story' => $task->story_id,
-                                                    'subtask' => $sub->id,
-                                                    'run' => $run->id,
-                                                ]);
-                                            @endphp
-                                            <div class="border-t border-zinc-100 px-2 py-1 dark:border-zinc-800">
-                                                <a href="{{ $priorRunUrl }}" wire:navigate class="flex flex-wrap items-center gap-2 text-xs hover:underline">
-                                                    <flux:badge size="sm">#{{ $run->id }}</flux:badge>
-                                                    <flux:badge size="sm">{{ $run->status->value }}</flux:badge>
-                                                    @if ($run->finished_at)
-                                                        <flux:text class="ml-auto text-xs text-zinc-500">{{ $run->finished_at->diffForHumans() }}</flux:text>
-                                                    @endif
-                                                </a>
-                                                @if ($url = $run->output['pull_request_url'] ?? null)
-                                                    <flux:text class="mt-1 text-xs">
-                                                        <a href="{{ $url }}" target="_blank" rel="noopener" class="underline">{{ $url }}</a>
-                                                    </flux:text>
-                                                @endif
-                                                @if ($run->error_message)
-                                                    <details class="mt-1">
-                                                        <summary class="cursor-pointer select-none text-xs font-medium text-rose-700 hover:text-rose-900 dark:text-rose-400 dark:hover:text-rose-300">
-                                                            {{ __('Error output') }}
-                                                        </summary>
-                                                        <pre class="mt-1 max-h-32 overflow-auto rounded bg-rose-50 p-2 font-mono text-[11px] leading-snug text-rose-900 dark:bg-rose-950/40 dark:text-rose-200">{{ $run->error_message }}</pre>
-                                                    </details>
-                                                @endif
-                                            </div>
-                                        @endforeach
-                                    </div>
-                                </details>
-                            @endif
+                            <x-run.history-panel
+                                :runs="$priorRuns"
+                                :project-id="$task->story->feature->project_id"
+                                :story-id="$task->story_id"
+                                :subtask-id="$sub->id"
+                            />
                         </div>
                     @endif
                 </div>

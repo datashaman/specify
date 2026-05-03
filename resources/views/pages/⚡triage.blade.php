@@ -87,19 +87,18 @@ new #[Title('Triage')] class extends Component {
                 $isAuthor = $story->created_by_id === $user->id;
                 $blockedBySelfApproval = $isAuthor && ! $policy->allow_self_approval;
             @endphp
-            <flux:card>
-                <div class="flex items-center gap-2">
-                    <flux:badge variant="solid">{{ $project->name }}</flux:badge>
-                    <flux:badge>rev {{ $story->revision }}</flux:badge>
-                    <flux:badge>{{ $approveCount }}/{{ $required }} {{ __('approvals') }}</flux:badge>
-                    @if ($story->creator)
-                        <flux:badge>{{ __('by') }} {{ $story->creator->name }}</flux:badge>
-                    @endif
-                    <flux:text class="ml-auto text-xs text-zinc-500">{{ $story->updated_at->diffForHumans() }}</flux:text>
-                </div>
-
-                <flux:heading class="mt-2">{{ $story->name }}</flux:heading>
-                <x-markdown :content="$story->description" class="mt-1" />
+            <x-story.summary-card :story="$story" card-class="">
+                <x-slot:meta>
+                    <div class="flex items-center gap-2">
+                        <flux:badge variant="solid">{{ $project->name }}</flux:badge>
+                        <flux:badge>rev {{ $story->revision }}</flux:badge>
+                        <flux:badge>{{ $approveCount }}/{{ $required }} {{ __('approvals') }}</flux:badge>
+                        @if ($story->creator)
+                            <flux:badge>{{ __('by') }} {{ $story->creator->name }}</flux:badge>
+                        @endif
+                        <flux:text class="ml-auto text-xs text-zinc-500">{{ $story->updated_at->diffForHumans() }}</flux:text>
+                    </div>
+                </x-slot:meta>
 
                 @if ($story->acceptanceCriteria->isNotEmpty())
                     <ul class="mt-3 list-disc pl-5 text-sm">
@@ -130,7 +129,7 @@ new #[Title('Triage')] class extends Component {
                     <flux:textarea
                         class="mt-3"
                         wire:model.defer="notes.story:{{ $story->id }}"
-                        :placeholder="__('Notes (optional)')"
+                        :label="__('Decision notes (optional)')"
                     />
                     <div class="mt-3 flex flex-wrap gap-2">
                         @if ($userApproved)
@@ -142,7 +141,7 @@ new #[Title('Triage')] class extends Component {
                         <flux:button wire:click="decide({{ $story->id }}, 'changes_requested')">{{ __('Request changes') }}</flux:button>
                     </div>
                 @endif
-            </flux:card>
+            </x-story.summary-card>
         @empty
             <flux:text class="text-zinc-500">{{ __('No stories pending approval.') }}</flux:text>
         @endforelse

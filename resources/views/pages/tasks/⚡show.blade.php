@@ -118,30 +118,13 @@ new #[Title('Task')] class extends Component {
                         };
                         $latestRun = $sub->agentRuns->sortByDesc('id')->first();
                     @endphp
-                    <a
-                        href="{{ route('subtasks.show', ['project' => $project->id, 'story' => $story->id, 'subtask' => $sub->id]) }}"
-                        wire:navigate
-                        class="flex items-stretch gap-3 rounded-lg border border-zinc-200 p-3 hover:bg-zinc-50 dark:border-zinc-700 dark:hover:bg-zinc-800/50"
-                        data-subtask-id="{{ $sub->id }}"
-                    >
-                        <x-rail :state="$subRail" class="!w-0.5" />
-                        <div class="min-w-0 flex-1">
-                            <div class="flex flex-wrap items-center gap-2 text-xs">
-                                <flux:badge size="sm">T{{ $task->position }}.{{ $sub->position }}</flux:badge>
-                                <x-state-pill :state="$subRail" :label="$sub->status->value" />
-                                @if ($latestRun)
-                                    <flux:badge size="sm">{{ __('run') }} #{{ $latestRun->id }}</flux:badge>
-                                @endif
-                                @if ($sub->updated_at)
-                                    <flux:text class="ml-auto text-xs text-zinc-500">{{ $sub->updated_at->diffForHumans(short: true) }}</flux:text>
-                                @endif
-                            </div>
-                            <flux:heading size="sm" class="mt-1">{{ $sub->name }}</flux:heading>
-                            @if ($sub->description)
-                                <x-markdown :content="$sub->description" class="mt-1 text-xs text-zinc-500" />
-                            @endif
-                        </div>
-                    </a>
+                    <x-subtask.summary-row
+                        :subtask="$sub"
+                        :href="route('subtasks.show', ['project' => $project->id, 'story' => $story->id, 'subtask' => $sub->id])"
+                        :task-position="$task->position"
+                        :rail-state="$subRail"
+                        :latest-run="$latestRun"
+                    />
                 @empty
                     <flux:text class="text-zinc-500">{{ __('No subtasks yet.') }}</flux:text>
                 @endforelse

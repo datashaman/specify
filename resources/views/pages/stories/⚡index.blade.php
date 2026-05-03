@@ -60,27 +60,10 @@ new #[Title('Stories')] class extends Component {
 
     <div class="flex flex-col gap-3">
         @forelse ($this->stories as $story)
-            <a href="{{ route('stories.show', ['project' => $story->feature->project_id, 'story' => $story->id]) }}" wire:navigate>
-                <flux:card class="hover:bg-zinc-50 dark:hover:bg-zinc-800/50">
-                    <div class="flex flex-wrap items-center gap-2">
-                        <flux:badge>{{ $story->status->value }}</flux:badge>
-                        <flux:badge>rev {{ $story->revision }}</flux:badge>
-                        @if ($story->creator)
-                            <flux:badge>{{ __('by') }} {{ $story->creator->name }}</flux:badge>
-                        @endif
-                        @php
-                            $tasksTotal = $story->tasks->count();
-                            $tasksDone = $story->tasks->filter(fn ($t) => $t->status === \App\Enums\TaskStatus::Done)->count();
-                        @endphp
-                        @if ($tasksTotal > 0)
-                            <flux:badge>{{ $tasksDone }}/{{ $tasksTotal }} {{ __('tasks') }}</flux:badge>
-                        @endif
-                        <flux:text class="ml-auto text-xs text-zinc-500">{{ $story->updated_at?->diffForHumans() }}</flux:text>
-                    </div>
-                    <flux:heading class="mt-2">{{ $story->name }}</flux:heading>
-                    <x-markdown :content="$story->description" class="mt-1" />
-                </flux:card>
-            </a>
+            <x-story.summary-card
+                :story="$story"
+                :href="route('stories.show', ['project' => $story->feature->project_id, 'story' => $story->id])"
+            />
         @empty
             <flux:text class="text-zinc-500">{{ __('No stories found.') }}</flux:text>
         @endforelse

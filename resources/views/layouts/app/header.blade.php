@@ -23,7 +23,7 @@
                 </flux:tooltip>
             </flux:navbar>
 
-            <x-desktop-user-menu />
+            <livewire:user-menu :compact="false" :key="'header-user-menu-desktop'" />
         </flux:header>
 
         <!-- Mobile Menu -->

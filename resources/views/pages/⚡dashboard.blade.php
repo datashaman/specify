@@ -184,26 +184,7 @@ new #[Title('Dashboard')] class extends Component {
                         ])
                         : null;
                 @endphp
-                <a
-                    @if ($runHref) href="{{ $runHref }}" wire:navigate @endif
-                    @class([
-                        'flex items-center gap-2 rounded-lg border border-zinc-200 p-3 dark:border-zinc-700',
-                        'hover:bg-zinc-50 dark:hover:bg-zinc-900' => $runHref,
-                    ])
-                >
-                    <flux:badge variant="solid" size="sm">#{{ $run->id }}</flux:badge>
-                    <flux:badge size="sm">{{ $run->status->value }}</flux:badge>
-                    <flux:text class="truncate text-sm">
-                        @if ($run->runnable)
-                            {{ $run->runnable->name }}
-                        @else
-                            {{ __('Run') }}
-                        @endif
-                    </flux:text>
-                    @if ($run->finished_at)
-                        <flux:text class="ml-auto shrink-0 text-xs text-zinc-500">{{ $run->finished_at->diffForHumans(short: true) }}</flux:text>
-                    @endif
-                </a>
+                <x-run.summary-card :run="$run" :href="$runHref" compact />
             @empty
                 <flux:text class="text-zinc-500">{{ __('No runs yet.') }}</flux:text>
             @endforelse

@@ -698,132 +698,8 @@ new #[Title('Story')] class extends Component {
                     </div>
                 </div>
             @else
-                <div class="mt-2 flex items-start justify-between gap-3">
-                    <flux:heading size="xl">{{ $story->name }}</flux:heading>
-                    <div class="flex items-center gap-2">
-                        @if ($this->canEditStory())
-                            <flux:button wire:click="startEdit" size="sm" icon="pencil-square">{{ __('Edit') }}</flux:button>
-                        @endif
-                        @if ($this->canDeleteStory())
-                            <flux:modal.trigger name="delete-story-modal">
-                                <flux:button size="sm" variant="danger" icon="trash">{{ __('Delete') }}</flux:button>
-                            </flux:modal.trigger>
-                        @endif
-                    </div>
-                </div>
-                <div class="mt-2 flex flex-wrap items-center gap-2">
-                    <x-state-pill :state="$pill['state']" :tally="$pill['tally']" :label="$pill['label']" />
-                    <flux:badge>{{ __('rev') }} {{ $story->revision }}</flux:badge>
-                    @if ($story->creator)
-                        <flux:avatar
-                            size="xs"
-                            :name="$story->creator->name"
-                            :initials="$story->creator->initials()"
-                            :tooltip="$story->creator->name"
-                        />
-                    @endif
-                </div>
-
-                @if ($this->canDeleteStory())
-                    <flux:modal name="delete-story-modal" class="md:w-96">
-                        <div class="flex flex-col gap-4">
-                            <flux:heading size="lg">{{ __('Delete story?') }}</flux:heading>
-                            <flux:text>{{ __('This permanently removes the story and its acceptance criteria. Cannot be undone.') }}</flux:text>
-                            <div class="flex justify-end gap-2">
-                                <flux:modal.close>
-                                    <flux:button variant="ghost">{{ __('Cancel') }}</flux:button>
-                                </flux:modal.close>
-                                <flux:button wire:click="deleteStory" variant="danger" icon="trash">{{ __('Delete') }}</flux:button>
-                            </div>
-                        </div>
-                    </flux:modal>
-                @endif
-
-                @php
-                    $storyPrs = $story->pullRequests();
-                    $primaryPr = $story->primaryPullRequest();
-                    $canResolve = $primaryPr
-                        && ($primaryPr['mergeable'] ?? null) === false
-                        && ($primaryPr['merged'] ?? null) !== true
-                        && $this->canApproveStory;
-                    $conflictRun = $this->activeConflictResolutionRun;
-                    $showResolveConflicts = $canResolve && ! $conflictRun;
-                @endphp
-                @if ($storyPrs->isNotEmpty())
-                    <div class="mt-3 flex flex-col gap-1.5" data-section="story-prs">
-                        <div class="flex items-baseline gap-2">
-                            <flux:text class="text-xs uppercase tracking-wide text-zinc-500">
-                                {{ trans_choice('Pull request|Pull requests', $storyPrs->count()) }}
-                            </flux:text>
-                            @if ($storyPrs->count() > 1)
-                                <flux:text class="text-xs text-zinc-400">
-                                    {{ __('race candidates — reviewer picks the winner by merging it') }}
-                                </flux:text>
-                            @endif
-                        </div>
-                        <div class="flex flex-col gap-1">
-                            @foreach ($storyPrs as $pr)
-                                <div class="flex flex-wrap items-center gap-2 text-sm">
-                                    <a
-                                        href="{{ $pr['url'] }}"
-                                        target="_blank"
-                                        rel="noopener"
-                                        class="inline-flex"
-                                    >
-                                        <flux:badge size="sm" :color="$pr['merged'] === true ? 'emerald' : 'zinc'" icon="arrow-top-right-on-square">
-                                            @if ($pr['merged'] === true)
-                                                {{ __('merged') }}
-                                            @elseif ($pr['merged'] === false)
-                                                {{ __('open') }}
-                                            @else
-                                                {{ __('PR') }}
-                                            @endif
-                                            @if ($pr['number'])
-                                                #{{ $pr['number'] }}
-                                            @endif
-                                        </flux:badge>
-                                    </a>
-                                    @if (($pr['mergeable'] ?? null) === false && ($pr['merged'] ?? null) !== true)
-                                        <flux:badge size="sm" color="amber">{{ __('conflicted') }}</flux:badge>
-                                    @endif
-                                    @if ($pr['driver'])
-                                        <flux:badge size="sm" icon="cpu-chip">{{ $pr['driver'] }}</flux:badge>
-                                    @endif
-                                </div>
-                            @endforeach
-                        </div>
-                        @if ($conflictRun && $conflictRun->runnable)
-                            @php
-                                $crSub = $conflictRun->runnable;
-                                $crRunUrl = route('runs.show', [
-                                    'project' => $project->id,
-                                    'story' => $story->id,
-                                    'subtask' => $crSub->id,
-                                    'run' => $conflictRun->id,
-                                ]);
-                            @endphp
-                            <div class="flex flex-wrap items-center gap-2 pt-1">
-                                <flux:badge size="sm" color="amber">{{ __('Resolving merge conflicts (AI)…') }}</flux:badge>
-                                <a href="{{ $crRunUrl }}" wire:navigate class="text-xs font-medium text-zinc-600 underline hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200">
-                                    {{ __('Run') }} #{{ $conflictRun->id }}
-                                </a>
-                            </div>
-                        @elseif ($showResolveConflicts)
-                            <div class="pt-1">
-                                <flux:button
-                                    wire:click="resolveConflicts"
-                                    wire:target="resolveConflicts"
-                                    size="sm"
-                                    variant="primary"
-                                    wire:loading.attr="disabled"
-                                >
-                                    <span wire:loading.remove wire:target="resolveConflicts">{{ __('Resolve conflicts (AI)') }}</span>
-                                    <span wire:loading wire:target="resolveConflicts">{{ __('Queueing…') }}</span>
-                                </flux:button>
-                            </div>
-                        @endif
-                    </div>
-                @endif
+                @php $storyPrs = $story->pullRequests(); @endphp
+                @include('partials.story-show.header', ['story' => $story, 'pill' => $pill, 'storyPrs' => $storyPrs])
             @endif
         </div>
 
@@ -874,129 +750,20 @@ new #[Title('Story')] class extends Component {
                 $latestRun = $story->tasks->flatMap->subtasks->flatMap->agentRuns->sortByDesc('id')->first();
                 $branch = $latestRun?->working_branch;
                 $repo = $latestRun?->repo;
+                $planGenRuns = $this->planGenerationRuns;
             @endphp
 
-            <section class="flex flex-col gap-3" data-section="plan">
-                <div class="flex flex-wrap items-center justify-between gap-3">
-                    <div class="flex flex-wrap items-center gap-x-3 gap-y-1">
-                        <flux:heading size="lg">{{ __('Plan') }}</flux:heading>
-                        <flux:text class="text-xs text-zinc-500">
-                            {{ $acs->count() }} {{ __('ACs') }} · {{ $subtaskCount }} {{ __('subtasks') }}
-                        </flux:text>
-                        @if ($repo)
-                            <flux:badge size="sm" icon="folder">{{ $repo->name }}</flux:badge>
-                        @endif
-                        @if ($branch)
-                            <flux:text class="font-mono text-xs text-zinc-400 truncate max-w-[24rem]" :title="$branch">{{ $branch }}</flux:text>
-                        @endif
-                    </div>
-
-                    <div class="flex items-center gap-2">
-                        @if ($acs->isNotEmpty() || $unmappedTasks->isNotEmpty())
-                            <div class="inline-flex rounded-md border border-zinc-200 p-0.5 text-xs dark:border-zinc-700" role="tablist" data-toggle="plan-mode" aria-label="{{ __('Plan view density') }}">
-                                <button
-                                    type="button"
-                                    role="tab"
-                                    @click="planRunMode = false"
-                                    :aria-selected="!planRunMode ? 'true' : 'false'"
-                                    :class="!planRunMode ? 'bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900' : 'text-zinc-600 dark:text-zinc-300'"
-                                    class="rounded px-2 py-0.5"
-                                >{{ __('Compact') }}</button>
-                                <button
-                                    type="button"
-                                    role="tab"
-                                    @click="planRunMode = true"
-                                    :aria-selected="planRunMode ? 'true' : 'false'"
-                                    :class="planRunMode ? 'bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900' : 'text-zinc-600 dark:text-zinc-300'"
-                                    class="rounded px-2 py-0.5"
-                                >{{ __('Expanded') }}</button>
-                            </div>
-                        @endif
-
-                        @if ($story->status === StoryStatus::Approved && $story->tasks->isEmpty() && ! $this->pendingPlanRun && $this->canApproveStory)
-                            <flux:button wire:click="generatePlan" wire:target="generatePlan" wire:loading.attr="disabled" variant="primary">
-                                <span wire:loading.remove wire:target="generatePlan">{{ __('Generate plan') }}</span>
-                                <span wire:loading wire:target="generatePlan">{{ __('Working…') }}</span>
-                            </flux:button>
-                        @endif
-                    </div>
-                </div>
-
-                @forelse ($acs as $ac)
-                    @php
-                        $acTasks = $tasksByAc->get($ac->id, collect())->sortBy('position');
-                    @endphp
-                    <flux:card data-ac="{{ $loop->iteration }}" data-ac-id="{{ $ac->id }}">
-                        <details
-                            class="group"
-                            x-data="{ open: {{ $shouldRunMode ? 'true' : 'false' }} || planRunMode }"
-                            x-effect="planRunMode ? (open = true) : ({{ $shouldRunMode ? 'true' : 'false' }} || (open = false))"
-                            :open="open"
-                            @toggle="open = $event.target.open"
-                        >
-                            <summary class="flex cursor-pointer list-none flex-wrap items-baseline gap-2 text-sm [&::-webkit-details-marker]:hidden">
-                                <span class="text-zinc-400 transition-transform group-open:rotate-90" aria-hidden="true">▸</span>
-                                <flux:badge size="sm">AC{{ $loop->iteration }}</flux:badge>
-                                <span class="font-medium">{{ $ac->criterion }}</span>
-                            </summary>
-
-                            @if ($acTasks->isEmpty())
-                                <flux:text class="mt-2 text-xs text-zinc-500">{{ __('No task generated for this AC yet.') }}</flux:text>
-                            @else
-                                @foreach ($acTasks as $task)
-                                    @include('partials.story-task', ['task' => $task])
-                                @endforeach
-                            @endif
-                        </details>
-                    </flux:card>
-                @empty
-                    @if ($this->pendingPlanRun)
-                        <flux:text class="text-zinc-500">{{ __('Generating plan…') }}</flux:text>
-                    @elseif ($story->acceptanceCriteria->isEmpty())
-                        <flux:text class="text-zinc-500">{{ __('No acceptance criteria yet.') }}</flux:text>
-                    @endif
-                @endforelse
-
-                @if ($unmappedTasks->isNotEmpty())
-                    <flux:card data-ac="unmapped">
-                        <details :open="planRunMode">
-                            <summary class="cursor-pointer text-sm font-medium">
-                                {{ __('Unmapped tasks') }} ({{ $unmappedTasks->count() }})
-                            </summary>
-                            @foreach ($unmappedTasks as $task)
-                                @include('partials.story-task', ['task' => $task])
-                            @endforeach
-                        </details>
-                    </flux:card>
-                @endif
-
-                @if ($acs->isEmpty() && $story->tasks->isEmpty() && ! $this->pendingPlanRun && $story->status !== StoryStatus::Approved)
-                    <flux:text class="text-zinc-500">{{ __('Plan is generated once the story is approved.') }}</flux:text>
-                @endif
-
-                @php $planGenRuns = $this->planGenerationRuns; @endphp
-                @if ($planGenRuns->isNotEmpty())
-                    <details class="mt-1">
-                        <summary class="cursor-pointer text-xs text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300">{{ __('Plan generation runs') }} ({{ $planGenRuns->count() }})</summary>
-                        <div class="mt-2 flex flex-col gap-2">
-                            @foreach ($planGenRuns as $run)
-                                <div class="rounded border border-zinc-200 px-2 py-1 dark:border-zinc-700">
-                                    <div class="flex flex-wrap items-center gap-2 text-xs">
-                                        <flux:badge size="sm">#{{ $run->id }}</flux:badge>
-                                        <flux:badge size="sm">{{ $run->status->value }}</flux:badge>
-                                        @if ($run->finished_at)
-                                            <flux:text class="ml-auto text-xs text-zinc-500">{{ $run->finished_at->diffForHumans() }}</flux:text>
-                                        @endif
-                                    </div>
-                                    @if ($run->error_message)
-                                        <flux:text class="mt-1 text-xs text-red-600">{{ $run->error_message }}</flux:text>
-                                    @endif
-                                </div>
-                            @endforeach
-                        </div>
-                    </details>
-                @endif
-            </section>
+            @include('partials.story-show.plan', [
+                'story' => $story,
+                'tasksByAc' => $tasksByAc,
+                'unmappedTasks' => $unmappedTasks,
+                'acs' => $acs,
+                'subtaskCount' => $subtaskCount,
+                'shouldRunMode' => $shouldRunMode,
+                'branch' => $branch,
+                'repo' => $repo,
+                'planGenRuns' => $planGenRuns,
+            ])
         @endunless
 
             </div>{{-- /center column --}}
@@ -1018,99 +785,22 @@ new #[Title('Story')] class extends Component {
                     $decisionVisible = $hasAnyDecisionAction || $blockedNotice || $this->pendingPlanRun;
                     $showRail = $decisionVisible || $rrCurrent->isNotEmpty() || $rrPrior->isNotEmpty() || $rrEligible->isNotEmpty();
                 @endphp
-                @if ($showRail)
-                    <aside class="flex w-full flex-col gap-4 lg:w-80 lg:flex-none" data-rail-aside>
-                        @if ($decisionVisible)
-                            <section data-section="decision" class="flex flex-col gap-3 rounded-lg border border-zinc-200 p-4 dark:border-zinc-700">
-                                <flux:text class="text-xs uppercase tracking-wide text-zinc-500">{{ __('Decision') }}</flux:text>
-
-                                @if ($hasAnyDecisionAction)
-                                    <div class="flex flex-wrap items-center gap-2">
-                                        @if ($hasDraftSubmit)
-                                            <flux:button wire:click="submit" wire:target="submit" wire:loading.attr="disabled" variant="primary" class="w-full">
-                                                <span wire:loading.remove wire:target="submit">{{ $autoPromotes ? __('Submit & generate plan') : __('Submit for approval') }}</span>
-                                                <span wire:loading wire:target="submit">{{ __('Working…') }}</span>
-                                            </flux:button>
-                                        @endif
-
-                                        @if ($hasAutoStart)
-                                            <flux:button wire:click="startExecution" wire:target="startExecution" wire:loading.attr="disabled" variant="primary" class="w-full">
-                                                <span wire:loading.remove wire:target="startExecution">{{ __('Start execution') }}</span>
-                                                <span wire:loading wire:target="startExecution">{{ __('Working…') }}</span>
-                                            </flux:button>
-                                        @elseif ($hasApprovalActions)
-                                            @if ($userApproved)
-                                                <flux:button wire:click="decide('revoke')" wire:target="decide" wire:loading.attr="disabled" class="w-full">{{ __('Revoke approval') }}</flux:button>
-                                            @else
-                                                <flux:button wire:click="decide('approve')" wire:target="decide" wire:loading.attr="disabled" variant="primary" class="w-full">{{ __('Approve') }}</flux:button>
-                                            @endif
-                                            <flux:button wire:click="decide('changes_requested')" wire:target="decide" wire:loading.attr="disabled" class="w-full">{{ __('Request changes') }}</flux:button>
-                                            <flux:button wire:click="decide('reject')" wire:target="decide" wire:loading.attr="disabled" variant="danger" class="w-full">{{ __('Reject') }}</flux:button>
-                                        @endif
-
-                                        @if ($hasResume)
-                                            <flux:button wire:click="resumeExecution" wire:target="resumeExecution" wire:loading.attr="disabled" class="w-full">
-                                                <span wire:loading.remove wire:target="resumeExecution">{{ __('Resume execution') }}</span>
-                                                <span wire:loading wire:target="resumeExecution">{{ __('Working…') }}</span>
-                                            </flux:button>
-                                        @endif
-                                    </div>
-                                @endif
-
-                                @if ($needsApprovalNote)
-                                    <flux:textarea
-                                        wire:model.defer="approvalNote"
-                                        :placeholder="__('Notes (optional)')"
-                                        rows="3"
-                                    />
-                                @endif
-
-                                @if ($blockedNotice)
-                                    <flux:text class="text-xs text-amber-600">
-                                        {{ __('You authored this story; the policy disallows self-approval.') }}
-                                    </flux:text>
-                                @endif
-
-                                @if ($this->pendingPlanRun)
-                                    <flux:badge color="amber">{{ __('Generating plan…') }}</flux:badge>
-                                @endif
-                            </section>
-                        @endif
-
-                        @if ($rrCurrent->isNotEmpty() || $rrPrior->isNotEmpty())
-                            <section data-section="decision-log" class="flex flex-col gap-2 rounded-lg border border-zinc-200 p-4 dark:border-zinc-700">
-                                <flux:text class="text-xs uppercase tracking-wide text-zinc-500">{{ __('Decision log') }}</flux:text>
-                                @forelse ($rrCurrent as $approval)
-                                    <x-decision-row :approval="$approval" />
-                                @empty
-                                    <flux:text class="text-xs text-zinc-500">{{ __('No decisions on this revision yet.') }}</flux:text>
-                                @endforelse
-
-                                @if ($rrPrior->isNotEmpty())
-                                    <details class="mt-1">
-                                        <summary class="cursor-pointer text-xs text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300">{{ __('Prior revisions') }} ({{ $rrPrior->count() }})</summary>
-                                        <div class="mt-2 flex flex-col gap-2">
-                                            @foreach ($rrPrior as $approval)
-                                                <x-decision-row :approval="$approval" />
-                                            @endforeach
-                                        </div>
-                                    </details>
-                                @endif
-                            </section>
-                        @endif
-
-                        @if ($rrEligible->isNotEmpty())
-                            <section data-section="eligible-approvers" class="flex flex-col gap-2 rounded-lg border border-zinc-200 p-4 dark:border-zinc-700">
-                                <flux:text class="text-xs uppercase tracking-wide text-zinc-500">{{ __('Eligible approvers') }}</flux:text>
-                                <ul class="text-sm">
-                                    @foreach ($rrEligible as $u)
-                                        <li class="py-0.5">{{ $u->name }}</li>
-                                    @endforeach
-                                </ul>
-                            </section>
-                        @endif
-                    </aside>
-                @endif
+                @include('partials.story-show.decision-rail', [
+                    'showRail' => $showRail,
+                    'decisionVisible' => $decisionVisible,
+                    'hasAnyDecisionAction' => $hasAnyDecisionAction,
+                    'hasDraftSubmit' => $hasDraftSubmit,
+                    'autoPromotes' => $autoPromotes,
+                    'hasAutoStart' => $hasAutoStart,
+                    'hasApprovalActions' => $hasApprovalActions,
+                    'userApproved' => $userApproved,
+                    'hasResume' => $hasResume,
+                    'needsApprovalNote' => $needsApprovalNote,
+                    'blockedNotice' => $blockedNotice,
+                    'rrCurrent' => $rrCurrent,
+                    'rrPrior' => $rrPrior,
+                    'rrEligible' => $rrEligible,
+                ])
             @endunless
 
         </div>{{-- /two-column wrapper --}}
