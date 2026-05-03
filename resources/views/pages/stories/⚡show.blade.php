@@ -606,7 +606,7 @@ new #[Title('Story')] class extends Component {
     class="flex p-6"
     @if ($this->pendingPlanRun) wire:poll.3s @endif
     x-data="{
-        planRunMode: $wire.entangle('planRunMode'),
+        planRunMode: $wire.$entangle('planRunMode').live,
         init() {
             const saved = localStorage.getItem('specify.planRunMode');
             if (saved !== null) {
