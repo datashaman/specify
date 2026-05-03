@@ -34,13 +34,6 @@ new #[Title('Story')] class extends Component {
     /** @var array<int, array{id: ?int, criterion: string}> */
     public array $editCriteria = [];
 
-    /**
-     * Plan view mode: false = Grooming (Tasks collapsed), true = Run (Tasks expanded).
-     * Persisted client-side per user via localStorage; server-side default below
-     * is overridden when an active run exists.
-     */
-    public bool $planRunMode = false;
-
     public function mount(int $story, ?int $project = null): void
     {
         $this->story_id = $story;
@@ -606,12 +599,8 @@ new #[Title('Story')] class extends Component {
     class="flex p-6"
     @if ($this->pendingPlanRun) wire:poll.3s @endif
     x-data="{
-        planRunMode: $wire.$entangle('planRunMode').live,
+        planRunMode: localStorage.getItem('specify.planRunMode') === '1',
         init() {
-            const saved = localStorage.getItem('specify.planRunMode');
-            if (saved !== null) {
-                this.planRunMode = saved === '1';
-            }
             this.$watch('planRunMode', v => localStorage.setItem('specify.planRunMode', v ? '1' : '0'));
         },
     }"
