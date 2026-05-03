@@ -121,10 +121,12 @@ test('app-switcher component sets and clears the project pin', function () {
     $this->actingAs($user);
 
     Livewire::test('app-switcher')
-        ->call('switchProject', $projects[0][0]->id);
+        ->call('switchProject', $projects[0][0]->id)
+        ->assertRedirect(route('projects.show', $projects[0][0]));
     expect($user->fresh()->current_project_id)->toBe($projects[0][0]->id);
 
     Livewire::test('app-switcher')
-        ->call('switchProject', null);
+        ->call('switchProject', null)
+        ->assertRedirect(route('projects.index'));
     expect($user->fresh()->current_project_id)->toBeNull();
 });

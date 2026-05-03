@@ -78,7 +78,12 @@ new class extends Component {
         }
 
         $this->user->switchProject($project);
-        $this->redirect(request()->header('Referer') ?? route('dashboard'), navigate: true);
+
+        $target = $project
+            ? route('projects.show', $project)
+            : route('projects.index');
+
+        $this->redirect($target, navigate: true);
     }
 
     public function createProject(): void
