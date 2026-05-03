@@ -40,6 +40,8 @@ new #[Title('Profile settings')] class extends Component {
 
         $user->save();
 
+        $this->dispatch('profile-updated');
+
         Flux::toast(variant: 'success', text: __('Profile updated.'));
     }
 
