@@ -282,7 +282,7 @@ new #[Title('Story')] class extends Component {
 
         AgentRun::where('runnable_type', Subtask::class)
             ->whereIn('runnable_id', $subtaskIds)
-            ->whereIn('status', [AgentRunStatus::Queued, AgentRunStatus::Running])
+            ->active()
             ->update([
                 'status' => AgentRunStatus::Aborted->value,
                 'error_message' => 'Aborted on resume.',
@@ -377,17 +377,7 @@ new #[Title('Story')] class extends Component {
     #[Computed]
     public function hasActiveSubtaskRun(): bool
     {
-        $story = $this->story;
-        if (! $story) {
-            return false;
-        }
-
-        return $story->tasks->flatMap->subtasks->flatMap->agentRuns
-            ->contains(fn (AgentRun $run) => in_array(
-                $run->status,
-                [AgentRunStatus::Queued, AgentRunStatus::Running],
-                true,
-            ));
+        return (bool) $this->story?->hasActiveSubtaskRun();
     }
 
     /**
@@ -473,7 +463,7 @@ new #[Title('Story')] class extends Component {
         return AgentRun::query()
             ->where('runnable_type', Story::class)
             ->where('runnable_id', $this->story_id)
-            ->whereIn('status', [AgentRunStatus::Queued, AgentRunStatus::Running])
+            ->active()
             ->latest('id')
             ->first();
     }

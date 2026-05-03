@@ -114,6 +114,22 @@ class Story extends Model
         return $this->hasMany(Task::class)->orderBy('position');
     }
 
+    /**
+     * True if any subtask under this story has an AgentRun that is still
+     * active (queued or running). Single source of truth for "this story
+     * is mid-execution" — UI gates and rail roll-ups read this.
+     */
+    public function hasActiveSubtaskRun(): bool
+    {
+        return AgentRun::query()
+            ->where('runnable_type', Subtask::class)
+            ->whereIn('runnable_id', Subtask::query()
+                ->whereIn('task_id', Task::query()->where('story_id', $this->getKey())->select('id'))
+                ->select('id'))
+            ->active()
+            ->exists();
+    }
+
     public function creator(): BelongsTo
     {
         return $this->belongsTo(User::class, 'created_by_id');
