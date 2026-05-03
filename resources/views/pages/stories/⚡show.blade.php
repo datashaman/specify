@@ -188,6 +188,11 @@ new #[Title('Story')] class extends Component
 
     public function canAttachContextItems(): bool
     {
+        return $this->canManageContextItems();
+    }
+
+    public function canManageContextItems(): bool
+    {
         $story = $this->story;
 
         return $story !== null && $this->canEdit($story);
@@ -221,6 +226,21 @@ new #[Title('Story')] class extends Component
         }
 
         $this->selectedContextItemIds = [];
+        unset($this->story, $this->availableContextItems);
+    }
+
+    public function detachContextItem(int $contextItemId): void
+    {
+        $story = $this->story;
+        abort_unless($story, 404);
+        abort_unless($this->canManageContextItems(), 403);
+
+        $contextItem = ContextItem::query()
+            ->where('project_id', $story->feature->project_id)
+            ->findOrFail($contextItemId);
+
+        $story->contextItems()->detach($contextItem->getKey());
+
         unset($this->story, $this->availableContextItems);
     }
 
@@ -874,7 +894,21 @@ new #[Title('Story')] class extends Component
                                             <flux:text class="mt-1 line-clamp-2 text-xs text-zinc-500">{{ $item->description }}</flux:text>
                                         @endif
                                     </div>
-                                    <flux:badge size="sm">{{ $item->type }}</flux:badge>
+                                    <div class="flex shrink-0 items-center gap-1">
+                                        <flux:badge size="sm">{{ $item->type }}</flux:badge>
+                                        @if ($this->canManageContextItems())
+                                            <flux:button
+                                                wire:click="detachContextItem({{ $item->id }})"
+                                                wire:target="detachContextItem({{ $item->id }})"
+                                                wire:loading.attr="disabled"
+                                                type="button"
+                                                variant="ghost"
+                                                size="sm"
+                                                icon="x-mark"
+                                                :aria-label="__('Detach context item')"
+                                            />
+                                        @endif
+                                    </div>
                                 </div>
                             </div>
                         @endforeach

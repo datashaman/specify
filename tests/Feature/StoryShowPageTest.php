@@ -407,6 +407,30 @@ test('author can attach multiple available project context items from story page
         ->toBe([$first->id, $second->id]);
 });
 
+test('author can detach a context item from the story page without a refresh', function () {
+    $s = showPageScene(['status' => StoryStatus::Draft]);
+    attachPolicy($s['ws'], required: 1);
+    $detached = ContextItem::factory()->for($s['project'])->create(['title' => 'Outdated note']);
+    $kept = ContextItem::factory()->for($s['project'])->create(['title' => 'Current note']);
+    $s['story']->contextItems()->attach([$detached->id, $kept->id]);
+
+    $this->actingAs($s['user']);
+
+    $component = Livewire::test('pages::stories.show', ['story' => $s['story']->id])
+        ->assertSee('Outdated note')
+        ->assertSee('Current note')
+        ->assertSeeHtml('wire:click="detachContextItem('.$detached->id.')"')
+        ->call('detachContextItem', $detached->id)
+        ->assertSee('Current note')
+        ->assertDontSeeHtml('attached-context-'.$detached->id)
+        ->assertSeeHtml('available-context-'.$detached->id);
+
+    expect(substr_count($component->html(), 'Outdated note'))->toBe(1);
+
+    expect($s['story']->fresh()->contextItems()->orderBy('context_items.id')->pluck('context_items.id')->all())
+        ->toBe([$kept->id]);
+});
+
 test('Draft story exposes a Delete button that removes the story and redirects to the feature', function () {
     $s = showPageScene(['status' => StoryStatus::Draft]);
     attachPolicy($s['ws'], required: 1);
