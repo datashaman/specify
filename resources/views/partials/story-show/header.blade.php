@@ -12,9 +12,30 @@
             @endif
         </div>
     </div>
+    <div class="mt-3 grid gap-3 md:grid-cols-2" data-section="approval-tracks">
+        <div class="rounded-lg border border-zinc-200 p-3 dark:border-zinc-700">
+            <div class="text-[11px] uppercase tracking-wide text-zinc-500">{{ __('Story contract') }}</div>
+            <div class="mt-2 flex flex-wrap items-center gap-2">
+                <x-state-pill :state="$pill['state']" :tally="$pill['tally']" :label="$pill['label']" />
+                <flux:badge>{{ __('rev') }} {{ $story->revision }}</flux:badge>
+            </div>
+        </div>
+
+        <div class="rounded-lg border border-zinc-200 p-3 dark:border-zinc-700" data-section="current-plan-track">
+            <div class="text-[11px] uppercase tracking-wide text-zinc-500">{{ __('Current plan') }}</div>
+            <div class="mt-2 flex flex-wrap items-center gap-2">
+                <x-state-pill :state="$planPill['state']" :tally="$planPill['tally']" :label="$planPill['label']" />
+                @if ($story->currentPlan)
+                    <flux:badge>{{ __('v') }}{{ $story->currentPlan->version }}</flux:badge>
+                    <flux:badge>{{ __('rev') }} {{ $story->currentPlan->revision }}</flux:badge>
+                @else
+                    <flux:badge>{{ __('No plan yet') }}</flux:badge>
+                @endif
+            </div>
+        </div>
+    </div>
+
     <div class="mt-2 flex flex-wrap items-center gap-2">
-        <x-state-pill :state="$pill['state']" :tally="$pill['tally']" :label="$pill['label']" />
-        <flux:badge>{{ __('rev') }} {{ $story->revision }}</flux:badge>
         @if ($story->creator)
             <flux:avatar
                 size="xs"

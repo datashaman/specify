@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Enums\AgentRunKind;
 use App\Enums\AgentRunStatus;
 use App\Enums\ApprovalDecision;
+use App\Enums\PlanStatus;
 use App\Enums\StoryStatus;
 use App\Enums\TaskStatus;
 use App\Jobs\ExecuteSubtaskJob;
@@ -13,6 +14,7 @@ use App\Jobs\OpenPullRequestJob;
 use App\Jobs\ResolveConflictsJob;
 use App\Jobs\RespondToPrReviewJob;
 use App\Models\AgentRun;
+use App\Models\PlanApproval;
 use App\Models\Repo;
 use App\Models\Story;
 use App\Models\StoryApproval;
@@ -73,7 +75,7 @@ class ExecutionService
      * (`finalizeSubtaskFromRun`) is the authoritative observer of all
      * siblings, not this return value.
      */
-    public function dispatchSubtaskExecution(Subtask $subtask, ?StoryApproval $approval = null, ?Repo $repo = null): AgentRun
+    public function dispatchSubtaskExecution(Subtask $subtask, ?PlanApproval $approval = null, ?Repo $repo = null): AgentRun
     {
         $repo ??= $subtask->task?->story?->feature?->project?->primaryRepo();
 
@@ -208,7 +210,7 @@ class ExecutionService
         });
     }
 
-    private function createAndDispatchRun(Subtask $subtask, ?StoryApproval $approval, ?Repo $repo, string $driver, ?string $branchSuffix, ?int $retryOfId = null): AgentRun
+    private function createAndDispatchRun(Subtask $subtask, ?PlanApproval $approval, ?Repo $repo, string $driver, ?string $branchSuffix, ?int $retryOfId = null): AgentRun
     {
         $run = AgentRun::create([
             'runnable_type' => $subtask->getMorphClass(),
@@ -251,7 +253,7 @@ class ExecutionService
      *
      * @throws RuntimeException When the Story is not in Approved status.
      */
-    public function startStoryExecution(Story $story, ?StoryApproval $approval = null): void
+    public function startStoryExecution(Story $story, ?PlanApproval $approval = null): void
     {
         if (in_array($story->status, [StoryStatus::Done, StoryStatus::Cancelled, StoryStatus::Rejected], true)) {
             return;
@@ -260,6 +262,21 @@ class ExecutionService
         if ($story->status !== StoryStatus::Approved) {
             throw new RuntimeException('Story must be Approved before execution starts.');
         }
+
+        $currentPlan = $story->currentPlan;
+        if (! $currentPlan) {
+            throw new RuntimeException('Story must have a current plan before execution starts.');
+        }
+        if (! $currentPlan->isApproved()) {
+            throw new RuntimeException('Current plan must be Approved before execution starts.');
+        }
+
+        $approval ??= PlanApproval::query()
+            ->where('plan_id', $currentPlan->getKey())
+            ->where('plan_revision', $currentPlan->revision ?? 1)
+            ->where('decision', ApprovalDecision::Approve->value)
+            ->latest('created_at')
+            ->first();
 
         DB::transaction(function () use ($story, $approval) {
             foreach ($this->nextActionableSubtasks($story) as $subtask) {
@@ -451,10 +468,10 @@ class ExecutionService
      * Retry a Subtask Execute run by dispatching a fresh sibling AgentRun
      * that points at the prior run via `retry_of_id` (ADR-0010).
      *
-     * Authorization re-resolves through the current StoryApproval — if the
-     * Story has been edited since (revision bumped → approval reset), the
-     * retry binds to the current approving approval. Throws when the Story
-     * is not Approved (revoked / changes-requested / superseded).
+     * Authorization re-resolves through the current PlanApproval — if the
+     * current plan has been edited since (revision bumped → approval reset),
+     * the retry binds to the current approving plan approval. Throws when the
+     * story or current plan are not currently approved.
      *
      * Race mode: this retries one driver. The driver defaults to the prior
      * run's `executor_driver` so a single-sibling retry is just "do that
@@ -484,12 +501,17 @@ class ExecutionService
 
         $story = $subtask->task?->story;
         if (! $story || $story->status !== StoryStatus::Approved) {
-            throw new RuntimeException('Story is not Approved; retry is gated on a current approval.');
+            throw new RuntimeException('Story is not Approved; retry is gated on a current plan approval.');
         }
 
-        $approval = StoryApproval::query()
-            ->where('story_id', $story->getKey())
-            ->where('story_revision', $story->revision ?? 1)
+        $plan = $story->currentPlan;
+        if (! $plan || ! $plan->isApproved()) {
+            throw new RuntimeException('Current plan is not Approved; retry is gated on a current plan approval.');
+        }
+
+        $approval = PlanApproval::query()
+            ->where('plan_id', $plan->getKey())
+            ->where('plan_revision', $plan->revision ?? 1)
             ->where('decision', ApprovalDecision::Approve->value)
             ->latest('created_at')
             ->first();
@@ -627,14 +649,17 @@ class ExecutionService
             return;
         }
 
-        $remainingTasks = $story->tasks()->where('status', '!=', TaskStatus::Done->value)->count();
+        $remainingTasks = $story->tasks()->where('tasks.status', '!=', TaskStatus::Done->value)->count();
         if ($remainingTasks === 0) {
+            if ($story->currentPlan) {
+                $story->currentPlan->forceFill(['status' => PlanStatus::Done->value])->save();
+            }
             $story->forceFill(['status' => StoryStatus::Done->value])->save();
 
             return;
         }
 
-        $approval = $authorizingApproval instanceof StoryApproval ? $authorizingApproval : null;
+        $approval = $authorizingApproval instanceof PlanApproval ? $authorizingApproval : null;
 
         foreach ($this->nextActionableSubtasks($story->fresh()) as $next) {
             if ($next->agentRuns()->active()->exists()) {

@@ -118,6 +118,9 @@
             <flux:text class="mt-1 text-xs text-zinc-500">
                 {{ $run->runnable->task->story->feature?->project?->name }}
                 &middot; {{ $run->runnable->task->story->name }}
+                @if ($run->runnable->task->plan)
+                    &middot; {{ __('plan') }} v{{ $run->runnable->task->plan->version }}
+                @endif
                 &middot; T{{ $run->runnable->task->position }} {{ $run->runnable->task->name }}
                 &middot; T{{ $run->runnable->task->position }}.{{ $run->runnable->position }}
             </flux:text>

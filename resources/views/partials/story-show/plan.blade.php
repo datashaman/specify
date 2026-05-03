@@ -4,7 +4,13 @@
             <flux:heading size="lg">{{ __('Plan') }}</flux:heading>
             <flux:text class="text-xs text-zinc-500">
                 {{ $acs->count() }} {{ __('ACs') }} · {{ $subtaskCount }} {{ __('subtasks') }}
+                @if ($story->currentPlan)
+                    · {{ __('current') }} {{ $story->currentPlan->name ?? ('v'.$story->currentPlan->version) }}
+                @endif
             </flux:text>
+            @if ($story->currentPlan)
+                <x-state-pill :state="$this->planPill['state']" :tally="$this->planPill['tally']" :label="__('Plan').' · '.$this->planPill['label']" />
+            @endif
             @if ($repo)
                 <flux:badge size="sm" icon="folder">{{ $repo->name }}</flux:badge>
             @endif
@@ -59,7 +65,7 @@
                 <summary class="flex cursor-pointer list-none flex-wrap items-baseline gap-2 text-sm [&::-webkit-details-marker]:hidden">
                     <span class="text-zinc-400 transition-transform group-open:rotate-90" aria-hidden="true">▸</span>
                     <flux:badge size="sm">AC{{ $loop->iteration }}</flux:badge>
-                    <span class="font-medium">{{ $ac->criterion }}</span>
+                    <span class="font-medium">{{ $ac->statement }}</span>
                 </summary>
 
                 @if ($acTasks->isEmpty())
@@ -93,7 +99,13 @@
     @endif
 
     @if ($acs->isEmpty() && $story->tasks->isEmpty() && ! $this->pendingPlanRun && $story->status !== \App\Enums\StoryStatus::Approved)
-        <flux:text class="text-zinc-500">{{ __('Plan is generated once the story is approved.') }}</flux:text>
+        <flux:text class="text-zinc-500">{{ __('Plan is generated once the story contract is approved.') }}</flux:text>
+    @endif
+
+    @if ($story->currentPlan && $story->currentPlan->status !== \App\Enums\PlanStatus::Approved && $story->tasks->isNotEmpty())
+        <div class="rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-700 dark:bg-amber-900/20 dark:text-amber-200" data-section="plan-approval-note">
+            {{ __('Execution is blocked until the current plan is approved.') }}
+        </div>
     @endif
 
     @if ($planGenRuns->isNotEmpty())

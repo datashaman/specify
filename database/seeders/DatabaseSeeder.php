@@ -2,11 +2,9 @@
 
 namespace Database\Seeders;
 
-use App\Models\User;
-// use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
 
-/** Top-level seeder. Creates the `test@example.com` development user. */
+/** Top-level seeder. Creates a usable demo workspace/project with stories, scenarios, plans, tasks, and subtasks. */
 class DatabaseSeeder extends Seeder
 {
     /**
@@ -14,11 +12,6 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
-        // User::factory(10)->create();
-
-        User::factory()->create([
-            'name' => 'Test User',
-            'email' => 'test@example.com',
-        ]);
+        $this->call(DemoDataSeeder::class);
     }
 }

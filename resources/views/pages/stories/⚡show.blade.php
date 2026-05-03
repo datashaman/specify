@@ -2,6 +2,7 @@
 
 use App\Enums\AgentRunStatus;
 use App\Enums\ApprovalDecision;
+use App\Enums\PlanStatus;
 use App\Enums\StoryStatus;
 use App\Enums\TaskStatus;
 use App\Models\AcceptanceCriterion;
@@ -23,6 +24,8 @@ new #[Title('Story')] class extends Component {
 
     public ?string $approvalNote = null;
 
+    public ?string $planApprovalNote = null;
+
     public bool $editing = false;
 
     #[Validate('required|string|max:255')]
@@ -31,7 +34,7 @@ new #[Title('Story')] class extends Component {
     #[Validate('required|string')]
     public string $editDescription = '';
 
-    /** @var array<int, array{id: ?int, criterion: string}> */
+    /** @var array<int, array{id: ?int, statement: string}> */
     public array $editCriteria = [];
 
     public function mount(int $story, ?int $project = null): void
@@ -60,17 +63,17 @@ new #[Title('Story')] class extends Component {
         $this->editCriteria = $story->acceptanceCriteria
             ->sortBy('position')
             ->values()
-            ->map(fn (AcceptanceCriterion $ac) => ['id' => $ac->id, 'criterion' => (string) $ac->criterion])
+            ->map(fn (AcceptanceCriterion $ac) => ['id' => $ac->id, 'statement' => (string) $ac->statement])
             ->all();
         if ($this->editCriteria === []) {
-            $this->editCriteria = [['id' => null, 'criterion' => '']];
+            $this->editCriteria = [['id' => null, 'statement' => '']];
         }
         $this->editing = true;
     }
 
     public function addCriterion(): void
     {
-        $this->editCriteria[] = ['id' => null, 'criterion' => ''];
+        $this->editCriteria[] = ['id' => null, 'statement' => ''];
     }
 
     public function removeCriterion(int $index): void
@@ -102,7 +105,7 @@ new #[Title('Story')] class extends Component {
             'editName' => 'required|string|max:255',
             'editDescription' => 'required|string',
             'editCriteria' => 'array|min:1',
-            'editCriteria.*.criterion' => 'required|string|max:1000',
+            'editCriteria.*.statement' => 'required|string|max:1000',
         ]);
 
         $criteriaChanged = $this->syncCriteria($story);
@@ -133,13 +136,13 @@ new #[Title('Story')] class extends Component {
         return DB::transaction(function () use ($story, $existing, &$kept, &$changed) {
             foreach ($this->editCriteria as $i => $row) {
                 $position = $i + 1;
-                $text = trim((string) ($row['criterion'] ?? ''));
+                $text = trim((string) ($row['statement'] ?? $row['criterion'] ?? ''));
                 $id = $row['id'] ?? null;
 
                 if ($id !== null && $existing->has($id)) {
                     $ac = $existing[$id];
-                    if ($ac->criterion !== $text || $ac->position !== $position) {
-                        $ac->update(['criterion' => $text, 'position' => $position]);
+                    if ($ac->statement !== $text || $ac->position !== $position) {
+                        $ac->update(['statement' => $text, 'position' => $position]);
                         $changed = true;
                     }
                     $kept[] = $id;
@@ -147,7 +150,7 @@ new #[Title('Story')] class extends Component {
                     AcceptanceCriterion::create([
                         'story_id' => $story->id,
                         'position' => $position,
-                        'criterion' => $text,
+                        'statement' => $text,
                     ]);
                     $changed = true;
                 }
@@ -248,6 +251,34 @@ new #[Title('Story')] class extends Component {
         );
 
         $this->approvalNote = null;
+        unset($this->story);
+    }
+
+    public function submitPlan(): void
+    {
+        $story = $this->story;
+        abort_unless($story && $story->currentPlan, 404);
+        abort_unless(Auth::user()->canApproveInProject($story->feature->project), 403);
+
+        $story->currentPlan->submitForApproval();
+        unset($this->story);
+    }
+
+    public function decidePlan(string $decision): void
+    {
+        $story = $this->story;
+        abort_unless($story && $story->currentPlan, 404);
+        $user = Auth::user();
+        abort_unless($user->canApproveInProject($story->feature->project), 403);
+
+        app(ApprovalService::class)->recordPlanDecision(
+            $story->currentPlan,
+            $user,
+            ApprovalDecision::from($decision),
+            $this->planApprovalNote ?: null,
+        );
+
+        $this->planApprovalNote = null;
         unset($this->story);
     }
 
@@ -421,7 +452,7 @@ new #[Title('Story')] class extends Component {
         $kept = [];
         foreach ($this->editCriteria as $row) {
             $id = $row['id'] ?? null;
-            $text = trim((string) ($row['criterion'] ?? ''));
+            $text = trim((string) ($row['statement'] ?? $row['criterion'] ?? ''));
             if ($id === null) {
                 if ($text !== '') {
                     $added++;
@@ -432,7 +463,7 @@ new #[Title('Story')] class extends Component {
                 continue;
             }
             $kept[] = $id;
-            if (trim((string) $existing[$id]->criterion) !== $text) {
+            if (trim((string) $existing[$id]->statement) !== $text) {
                 $edited++;
             }
         }
@@ -493,7 +524,11 @@ new #[Title('Story')] class extends Component {
                 'feature.project',
                 'creator',
                 'acceptanceCriteria',
+                'scenarios.acceptanceCriterion',
+                'currentPlan.approvals.approver',
+                'tasks.plan',
                 'tasks.acceptanceCriterion',
+                'tasks.scenario',
                 'tasks.dependencies',
                 'tasks.subtasks.agentRuns.repo',
                 'approvals.approver',
@@ -547,6 +582,63 @@ new #[Title('Story')] class extends Component {
     }
 
     #[Computed]
+    public function effectivePlanApprovals(): array
+    {
+        $plan = $this->story?->currentPlan;
+        if (! $plan) {
+            return [];
+        }
+
+        $effective = [];
+        foreach ($plan->approvals->where('plan_revision', $plan->revision ?? 1)->sortBy('created_at') as $a) {
+            $key = (int) $a->approver_id;
+            if ($a->decision === ApprovalDecision::Approve) {
+                $effective[$key] = $a;
+            } elseif ($a->decision === ApprovalDecision::Revoke) {
+                unset($effective[$key]);
+            }
+        }
+
+        return $effective;
+    }
+
+    #[Computed]
+    public function userApprovedPlan(): bool
+    {
+        return isset($this->effectivePlanApprovals[Auth::id()]);
+    }
+
+    #[Computed]
+    public function planPill(): array
+    {
+        $plan = $this->story?->currentPlan;
+        if (! $plan) {
+            return ['state' => 'draft', 'tally' => null, 'label' => __('No current plan')];
+        }
+
+        $policy = $this->effectivePolicy;
+        $required = $policy?->required_approvals ?? 0;
+        $count = count($this->effectivePlanApprovals);
+
+        return match ($plan->status) {
+            PlanStatus::Draft => ['state' => 'draft', 'tally' => null, 'label' => __('Draft')],
+            PlanStatus::PendingApproval => [
+                'state' => 'pending',
+                'tally' => $required > 0 ? sprintf('%d/%d', $count, $required) : null,
+                'label' => __('Pending'),
+            ],
+            PlanStatus::Approved => [
+                'state' => 'approved',
+                'tally' => $required > 0 ? sprintf('%d/%d', $required, $required) : null,
+                'label' => __('Approved'),
+            ],
+            PlanStatus::Rejected => ['state' => 'rejected', 'tally' => null, 'label' => __('Rejected')],
+            PlanStatus::Superseded => ['state' => 'changes_requested', 'tally' => null, 'label' => __('Superseded')],
+            PlanStatus::Done => ['state' => 'run_complete', 'tally' => null, 'label' => __('Done')],
+        };
+    }
+
+    #[Computed]
     public function isAuthor(): bool
     {
         return $this->story?->created_by_id === Auth::id();
@@ -566,6 +658,12 @@ new #[Title('Story')] class extends Component {
         $policy = $this->effectivePolicy;
 
         return $policy !== null && ($policy->auto_approve || $policy->required_approvals === 0);
+    }
+
+    #[Computed]
+    public function planBlockedBySelfApproval(): bool
+    {
+        return $this->story?->currentPlan !== null && $this->blockedBySelfApproval;
     }
 
     #[Computed]
@@ -625,6 +723,7 @@ new #[Title('Story')] class extends Component {
             $story = $this->story;
             $project = $story->feature->project;
             $pill = $this->pill;
+            $planPill = $this->planPill;
         @endphp
 
         <x-rail :state="$this->railState" class="mr-4" />
@@ -676,7 +775,7 @@ new #[Title('Story')] class extends Component {
                         @foreach ($editCriteria as $i => $row)
                             <div wire:key="ac-{{ $i }}" class="flex items-start gap-2">
                                 <flux:badge class="mt-2" size="sm">AC{{ $i + 1 }}</flux:badge>
-                                <flux:textarea wire:model="editCriteria.{{ $i }}.criterion" rows="2" class="flex-1" />
+                                <flux:textarea wire:model="editCriteria.{{ $i }}.statement" rows="2" class="flex-1" />
                                 <flux:button wire:click="removeCriterion({{ $i }})" variant="ghost" size="sm" class="mt-1">{{ __('Remove') }}</flux:button>
                             </div>
                         @endforeach
@@ -699,14 +798,65 @@ new #[Title('Story')] class extends Component {
                 </div>
             @else
                 @php $storyPrs = $story->pullRequests(); @endphp
-                @include('partials.story-show.header', ['story' => $story, 'pill' => $pill, 'storyPrs' => $storyPrs])
+                @include('partials.story-show.header', ['story' => $story, 'pill' => $pill, 'planPill' => $planPill, 'storyPrs' => $storyPrs])
             @endif
         </div>
 
         @unless ($editing)
-            {{-- ── Story body: description + notes (ACs lead the plan section below) ── --}}
+            {{-- ── Story body: framing + description + notes ── --}}
             <section class="flex flex-col gap-3">
+                @if ($story->kind || $story->actor || $story->intent || $story->outcome || $story->currentPlan)
+                    <div class="flex flex-wrap gap-2 text-xs text-zinc-500">
+                        @if ($story->kind)
+                            <flux:badge size="sm">{{ $story->kind->value }}</flux:badge>
+                        @endif
+                        @if ($story->currentPlan)
+                            <flux:badge size="sm">{{ __('current plan') }} v{{ $story->currentPlan->version }}</flux:badge>
+                            <x-state-pill :state="$planPill['state']" :tally="$planPill['tally']" :label="__('Plan').' · '.$planPill['label']" />
+                        @endif
+                    </div>
+                    @if ($story->actor || $story->intent || $story->outcome)
+                        <div class="rounded-md border border-zinc-200 bg-zinc-50 p-3 text-sm dark:border-zinc-700 dark:bg-zinc-900/40">
+                            @if ($story->actor)
+                                <div><span class="font-medium">{{ __('As a') }}</span> {{ $story->actor }}</div>
+                            @endif
+                            @if ($story->intent)
+                                <div class="mt-1"><span class="font-medium">{{ __('I want') }}</span> {{ $story->intent }}</div>
+                            @endif
+                            @if ($story->outcome)
+                                <div class="mt-1"><span class="font-medium">{{ __('So that') }}</span> {{ $story->outcome }}</div>
+                            @endif
+                        </div>
+                    @endif
+                @endif
+
                 <x-markdown :content="$story->description" />
+
+                @if ($story->scenarios->isNotEmpty())
+                    <div class="flex flex-col gap-2">
+                        <flux:heading size="sm">{{ __('Scenarios') }}</flux:heading>
+                        @foreach ($story->scenarios->sortBy('position') as $scenario)
+                            <div class="rounded-md border border-zinc-200 bg-zinc-50 p-3 text-sm dark:border-zinc-700 dark:bg-zinc-900/40">
+                                <div class="flex flex-wrap items-center gap-2 text-xs text-zinc-500">
+                                    <flux:badge size="sm">{{ __('Scenario') }} {{ $scenario->position }}</flux:badge>
+                                    @if ($scenario->acceptanceCriterion)
+                                        <flux:badge size="sm">{{ __('AC') }}{{ $scenario->acceptanceCriterion->position }}</flux:badge>
+                                    @endif
+                                </div>
+                                <div class="mt-1 font-medium">{{ $scenario->name }}</div>
+                                @if ($scenario->given_text)
+                                    <div class="mt-1"><span class="font-medium">{{ __('Given') }}</span> {{ $scenario->given_text }}</div>
+                                @endif
+                                @if ($scenario->when_text)
+                                    <div class="mt-1"><span class="font-medium">{{ __('When') }}</span> {{ $scenario->when_text }}</div>
+                                @endif
+                                @if ($scenario->then_text)
+                                    <div class="mt-1"><span class="font-medium">{{ __('Then') }}</span> {{ $scenario->then_text }}</div>
+                                @endif
+                            </div>
+                        @endforeach
+                    </div>
+                @endif
 
                 @if ($story->notes)
                     <details>
@@ -720,10 +870,14 @@ new #[Title('Story')] class extends Component {
         @php
             $policy = $this->effectivePolicy;
             $userApproved = $this->userApproved;
+            $userApprovedPlan = $this->userApprovedPlan;
             $canApprove = $this->canApproveStory;
+            $canApprovePlan = $story->currentPlan !== null && $canApprove;
             $isAuthor = $this->isAuthor;
             $blockedBySelfApproval = $this->blockedBySelfApproval;
+            $planBlockedBySelfApproval = $this->planBlockedBySelfApproval;
             $autoPromotes = $this->autoPromotes;
+            $currentPlan = $story->currentPlan;
             $hasIncompleteWork = $story->status === StoryStatus::Approved
                 && $story->tasks->isNotEmpty()
                 && $story->tasks->flatMap->subtasks->contains(fn ($s) => $s->status !== TaskStatus::Done);
@@ -731,11 +885,23 @@ new #[Title('Story')] class extends Component {
                 && $canApprove
                 && ! $blockedBySelfApproval
                 && ! $autoPromotes;
+            $needsPlanApprovalNote = $currentPlan !== null
+                && in_array($currentPlan->status, [PlanStatus::PendingApproval], true)
+                && $canApprovePlan
+                && ! $planBlockedBySelfApproval
+                && ! $autoPromotes;
             $hasDraftSubmit = $story->status === StoryStatus::Draft && ($isAuthor || $canApprove);
             $hasAutoStart = $story->status === StoryStatus::PendingApproval && $story->tasks->isNotEmpty() && $autoPromotes && $canApprove;
             $hasApprovalActions = in_array($story->status, [StoryStatus::PendingApproval, StoryStatus::ChangesRequested], true) && $canApprove && ! $blockedBySelfApproval;
+            $hasPlanSubmit = $currentPlan !== null && $currentPlan->status === PlanStatus::Draft && $story->tasks->isNotEmpty() && $canApprovePlan;
+            $hasPlanApprovalActions = $currentPlan !== null && $currentPlan->status === PlanStatus::PendingApproval && $canApprovePlan && ! $planBlockedBySelfApproval;
             $hasResume = $hasIncompleteWork && $canApprove;
-            $hasAnyDecisionAction = $hasDraftSubmit || $hasAutoStart || $hasApprovalActions || $hasResume;
+            $hasStartExecution = $story->status === StoryStatus::Approved
+                && $currentPlan?->status === PlanStatus::Approved
+                && $story->tasks->isNotEmpty()
+                && ! $this->hasActiveSubtaskRun
+                && $canApprove;
+            $hasAnyDecisionAction = $hasDraftSubmit || $hasAutoStart || $hasApprovalActions || $hasPlanSubmit || $hasPlanApprovalActions || $hasResume || $hasStartExecution;
             $isTerminal = in_array($story->status, [StoryStatus::Done, StoryStatus::Cancelled, StoryStatus::Rejected], true);
         @endphp
 
@@ -773,17 +939,24 @@ new #[Title('Story')] class extends Component {
                 @php
                     $rrCurrent = $story->approvals->where('story_revision', $story->revision ?? 1)->sortBy('created_at')->values();
                     $rrPrior = $story->approvals->where('story_revision', '!=', $story->revision ?? 1)->sortByDesc('created_at')->values();
+                    $planCurrent = $currentPlan?->approvals?->where('plan_revision', $currentPlan->revision ?? 1)?->sortBy('created_at')?->values() ?? collect();
+                    $planPrior = $currentPlan?->approvals?->where('plan_revision', '!=', $currentPlan->revision ?? 1)?->sortByDesc('created_at')?->values() ?? collect();
                     $rrPolicy = $this->effectivePolicy;
                     $rrEligibleVisible = ! $isTerminal
                         && $rrPolicy
                         && ($rrPolicy->required_approvals ?? 0) > 1
-                        && in_array($story->status, [StoryStatus::PendingApproval, StoryStatus::ChangesRequested], true);
+                        && (in_array($story->status, [StoryStatus::PendingApproval, StoryStatus::ChangesRequested], true)
+                            || ($currentPlan && in_array($currentPlan->status, [PlanStatus::PendingApproval], true)));
                     $rrEligible = $rrEligibleVisible ? $this->eligibleApprovers : collect();
                     $blockedNotice = $blockedBySelfApproval
                         && ! $autoPromotes
                         && in_array($story->status, [StoryStatus::PendingApproval, StoryStatus::ChangesRequested], true);
-                    $decisionVisible = $hasAnyDecisionAction || $blockedNotice || $this->pendingPlanRun;
-                    $showRail = $decisionVisible || $rrCurrent->isNotEmpty() || $rrPrior->isNotEmpty() || $rrEligible->isNotEmpty();
+                    $planBlockedNotice = $planBlockedBySelfApproval
+                        && ! $autoPromotes
+                        && $currentPlan
+                        && in_array($currentPlan->status, [PlanStatus::PendingApproval], true);
+                    $decisionVisible = $hasAnyDecisionAction || $blockedNotice || $planBlockedNotice || $this->pendingPlanRun;
+                    $showRail = $decisionVisible || $rrCurrent->isNotEmpty() || $rrPrior->isNotEmpty() || $planCurrent->isNotEmpty() || $planPrior->isNotEmpty() || $rrEligible->isNotEmpty();
                 @endphp
                 @include('partials.story-show.decision-rail', [
                     'showRail' => $showRail,
@@ -793,13 +966,24 @@ new #[Title('Story')] class extends Component {
                     'autoPromotes' => $autoPromotes,
                     'hasAutoStart' => $hasAutoStart,
                     'hasApprovalActions' => $hasApprovalActions,
+                    'hasPlanSubmit' => $hasPlanSubmit,
+                    'hasPlanApprovalActions' => $hasPlanApprovalActions,
+                    'hasStartExecution' => $hasStartExecution,
                     'userApproved' => $userApproved,
+                    'userApprovedPlan' => $userApprovedPlan,
                     'hasResume' => $hasResume,
                     'needsApprovalNote' => $needsApprovalNote,
+                    'needsPlanApprovalNote' => $needsPlanApprovalNote,
                     'blockedNotice' => $blockedNotice,
+                    'planBlockedNotice' => $planBlockedNotice,
                     'rrCurrent' => $rrCurrent,
                     'rrPrior' => $rrPrior,
+                    'planCurrent' => $planCurrent,
+                    'planPrior' => $planPrior,
                     'rrEligible' => $rrEligible,
+                    'pill' => $pill,
+                    'planPill' => $planPill,
+                    'currentPlan' => $currentPlan,
                 ])
             @endunless
 

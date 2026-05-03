@@ -74,7 +74,7 @@ class ListRunsTool extends Tool
                 }
             });
         } else {
-            $story = Story::query()->with('feature', 'tasks:id,story_id')->find($storyId);
+            $story = Story::query()->with('feature', 'tasks:id,story_id,plan_id')->find($storyId);
             if (! $story) {
                 return Response::error('Story not found.');
             }

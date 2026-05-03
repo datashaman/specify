@@ -25,7 +25,7 @@ final class ConflictResolutionPrompt
         $subtask->loadMissing('task.story', 'task.acceptanceCriterion');
         $task = $subtask->task;
         $story = $task?->story;
-        $criterion = $task?->acceptanceCriterion?->criterion;
+        $criterion = $task?->acceptanceCriterion?->statement;
 
         $criterionBlock = $criterion ? "Acceptance Criterion: {$criterion}\n\n" : '';
         $taskBlock = $task ? "Parent Task #{$task->position}: {$task->name}\n" : '';

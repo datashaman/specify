@@ -211,7 +211,7 @@ class CliExecutor implements Executor
         $subtask->loadMissing('task.story', 'task.acceptanceCriterion');
         $task = $subtask->task;
         $story = $task?->story;
-        $criterion = $task?->acceptanceCriterion?->criterion;
+        $criterion = $task?->acceptanceCriterion?->statement;
 
         $repoLine = $repo
             ? "Repository: {$repo->url} (branch: ".($workingBranch ?? $repo->default_branch).')'

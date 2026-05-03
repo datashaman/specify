@@ -34,7 +34,7 @@ class TasksGenerator implements Agent, HasStructuredOutput
         $criteria = $story->acceptanceCriteria
             ->sortBy('position')
             ->values()
-            ->map(fn ($ac, $i) => "{$ac->position}. {$ac->criterion}")
+            ->map(fn ($ac, $i) => "{$ac->position}. {$ac->statement}")
             ->implode("\n");
 
         return <<<PROMPT

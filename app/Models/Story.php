@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Enums\AgentRunKind;
 use App\Enums\RepoProvider;
+use App\Enums\StoryKind;
 use App\Enums\StoryStatus;
 use App\Models\Concerns\HasSlug;
 use App\Services\ApprovalService;
@@ -20,13 +21,12 @@ use Illuminate\Support\Collection;
 use InvalidArgumentException;
 
 /**
- * Product owner's unit of value within a Feature.
+ * Product contract under a Feature.
  *
- * Carries acceptance criteria, an immutable `revision` counter (auto-bumped
- * on plan replacement), and the only approval gate in the system
- * (see ADR-0001). Tasks attach directly to the Story (ADR-0002).
+ * Holds structured story framing, acceptance criteria, scenarios, and one or
+ * more implementation plans. `current_plan_id` identifies the active plan.
  */
-#[Fillable(['feature_id', 'created_by_id', 'name', 'slug', 'description', 'notes', 'status', 'revision', 'position'])]
+#[Fillable(['feature_id', 'created_by_id', 'name', 'slug', 'kind', 'actor', 'intent', 'outcome', 'description', 'notes', 'status', 'revision', 'position', 'current_plan_id'])]
 class Story extends Model
 {
     /** @use HasFactory<StoryFactory> */
@@ -68,7 +68,7 @@ class Story extends Model
             if (self::$suppressRevisionBump) {
                 return;
             }
-            $watched = ['name', 'description'];
+            $watched = ['name', 'kind', 'actor', 'intent', 'outcome', 'description', 'notes'];
             if (! collect($watched)->contains(fn ($key) => $story->isDirty($key))) {
                 return;
             }
@@ -85,6 +85,12 @@ class Story extends Model
             if (! $story->wasChanged('revision')) {
                 return;
             }
+
+            $currentPlan = $story->currentPlan()->first();
+            if ($currentPlan) {
+                $currentPlan->reopenForApproval();
+            }
+
             if (in_array($story->status, [StoryStatus::Draft, StoryStatus::Rejected, StoryStatus::Done, StoryStatus::Cancelled], true)) {
                 return;
             }
@@ -100,6 +106,7 @@ class Story extends Model
     protected function casts(): array
     {
         return [
+            'kind' => StoryKind::class,
             'status' => StoryStatus::class,
             'revision' => 'integer',
             'position' => 'integer',
@@ -111,9 +118,23 @@ class Story extends Model
         return $this->belongsTo(Feature::class);
     }
 
+    public function plans(): HasMany
+    {
+        return $this->hasMany(Plan::class)->orderByDesc('version');
+    }
+
+    public function currentPlan(): BelongsTo
+    {
+        return $this->belongsTo(Plan::class, 'current_plan_id');
+    }
+
     public function tasks(): HasMany
     {
-        return $this->hasMany(Task::class)->orderBy('position');
+        return $this->hasMany(Task::class)
+            ->join('stories as story_task_scope', 'story_task_scope.id', '=', 'tasks.story_id')
+            ->whereColumn('tasks.plan_id', 'story_task_scope.current_plan_id')
+            ->select('tasks.*')
+            ->orderBy('tasks.position');
     }
 
     /**
@@ -126,7 +147,7 @@ class Story extends Model
         return AgentRun::query()
             ->where('runnable_type', Subtask::class)
             ->whereIn('runnable_id', Subtask::query()
-                ->whereIn('task_id', Task::query()->where('story_id', $this->getKey())->select('id'))
+                ->whereIn('task_id', $this->tasks()->select('tasks.id'))
                 ->select('id'))
             ->active()
             ->exists();
@@ -140,7 +161,7 @@ class Story extends Model
         return AgentRun::query()
             ->where('runnable_type', Subtask::class)
             ->whereIn('runnable_id', Subtask::query()
-                ->whereIn('task_id', Task::query()->where('story_id', $this->getKey())->select('id'))
+                ->whereIn('task_id', $this->tasks()->select('tasks.id'))
                 ->select('id'))
             ->where('kind', AgentRunKind::ResolveConflicts->value)
             ->active()
@@ -346,6 +367,11 @@ class Story extends Model
     public function acceptanceCriteria(): HasMany
     {
         return $this->hasMany(AcceptanceCriterion::class)->orderBy('position');
+    }
+
+    public function scenarios(): HasMany
+    {
+        return $this->hasMany(Scenario::class)->orderBy('position');
     }
 
     public function dependencies(): BelongsToMany

@@ -91,7 +91,7 @@ class ReviewResponder implements Agent, HasStructuredOutput, HasTools
         $subtask = $this->subtask->loadMissing('task.story.feature.project', 'task.acceptanceCriterion');
         $task = $subtask->task;
         $story = $task?->story;
-        $criterion = $task?->acceptanceCriterion?->criterion;
+        $criterion = $task?->acceptanceCriterion?->statement;
 
         $criterionBlock = $criterion ? "Acceptance Criterion: {$criterion}\n\n" : '';
         $taskBlock = $task ? "Parent Task #{$task->position}: {$task->name}\n" : '';

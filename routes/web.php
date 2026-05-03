@@ -30,6 +30,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::livewire('projects/{project}/features/{feature}', 'pages::features.show')->name('features.show');
     Route::livewire('projects/{project}/stories', 'pages::stories.index')->name('stories.index');
     Route::livewire('projects/{project}/stories/create', 'pages::stories.create')->name('stories.create');
+    Route::livewire('projects/{project}/plans', 'pages::plans.index')->name('plans.index');
+    Route::livewire('projects/{project}/plans/{plan}', 'pages::plans.show')->name('plans.show');
+    Route::livewire('projects/{project}/approvals', 'pages::approvals.index')->name('approvals.index');
     Route::livewire('projects/{project}/runs', 'pages::runs.index')->name('runs.index');
     Route::livewire('projects/{project}/repos', 'pages::repos.index')->name('repos.index');
     Route::livewire('projects/{project}/stories/{story}', 'pages::stories.show')->name('stories.show');
@@ -99,7 +102,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
             ? (int) $pinned
             : null;
     };
-    foreach (['stories' => 'stories.index', 'runs' => 'runs.index', 'repos' => 'repos.index'] as $legacy => $named) {
+    foreach (['stories' => 'stories.index', 'plans' => 'plans.index', 'approvals' => 'approvals.index', 'runs' => 'runs.index', 'repos' => 'repos.index'] as $legacy => $named) {
         Route::get($legacy, function () use ($named, $resolveActiveProjectId) {
             $projectId = $resolveActiveProjectId();
 

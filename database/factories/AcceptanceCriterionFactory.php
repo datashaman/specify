@@ -21,7 +21,7 @@ class AcceptanceCriterionFactory extends Factory
         return [
             'story_id' => Story::factory(),
             'position' => 1,
-            'criterion' => fake()->sentence(),
+            'statement' => fake()->sentence(),
         ];
     }
 }

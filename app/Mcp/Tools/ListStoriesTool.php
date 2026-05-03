@@ -41,8 +41,8 @@ class ListStoriesTool extends Tool
         }
 
         $stories = $feature->stories()
-            ->orderByDesc('id')
-            ->get(['id', 'feature_id', 'name', 'description', 'status', 'revision']);
+            ->orderBy('position')
+            ->get(['id', 'feature_id', 'name', 'kind', 'actor', 'intent', 'outcome', 'description', 'status', 'revision', 'position']);
 
         return Response::json([
             'feature_id' => $feature->id,
@@ -50,9 +50,14 @@ class ListStoriesTool extends Tool
             'stories' => $stories->map(fn (Story $s) => [
                 'id' => $s->id,
                 'name' => $s->name,
+                'kind' => $s->kind?->value,
+                'actor' => $s->actor,
+                'intent' => $s->intent,
+                'outcome' => $s->outcome,
                 'description' => $s->description,
                 'status' => $s->status?->value,
                 'revision' => $s->revision,
+                'position' => $s->position,
             ])->all(),
         ]);
     }

@@ -41,6 +41,9 @@ new #[Title('Subtask')] class extends Component {
             ->whereHas('task.story', fn ($q) => $q->where('id', $this->story_id))
             ->with([
                 'task.story.feature.project',
+                'task.plan',
+                'task.acceptanceCriterion',
+                'task.scenario',
                 'task.dependencies',
                 'agentRuns.repo',
                 'proposedByRun',
@@ -99,6 +102,9 @@ new #[Title('Subtask')] class extends Component {
                     <flux:badge size="sm">T{{ $task->position }}.{{ $subtask->position }}</flux:badge>
                     <flux:badge size="sm">{{ $subtask->status->value }}</flux:badge>
                     <flux:badge size="sm">T{{ $task->position }}: {{ $task->name }}</flux:badge>
+                    @if ($task->plan)
+                        <flux:badge size="sm">{{ __('plan') }} v{{ $task->plan->version }}</flux:badge>
+                    @endif
                     @if ($subtask->proposed_by_run_id)
                         <flux:badge color="amber" size="sm" title="{{ __('Appended mid-run by') }} #{{ $subtask->proposed_by_run_id }} (ADR-0005)">{{ __('appended') }}</flux:badge>
                     @endif
@@ -106,6 +112,31 @@ new #[Title('Subtask')] class extends Component {
                 <flux:heading size="xl" class="mt-2">{{ $subtask->name }}</flux:heading>
                 @if ($subtask->description)
                     <x-markdown :content="$subtask->description" class="mt-2" />
+                @endif
+                @if ($task->acceptanceCriterion || $task->scenario)
+                    <div class="mt-3 flex flex-col gap-2">
+                        @if ($task->acceptanceCriterion)
+                            <div class="rounded-md border border-zinc-200 bg-zinc-50 p-3 text-sm dark:border-zinc-700 dark:bg-zinc-900/40">
+                                <div class="text-xs uppercase tracking-wide text-zinc-500">{{ __('Acceptance criterion') }} AC{{ $task->acceptanceCriterion->position }}</div>
+                                <div class="mt-1">{{ $task->acceptanceCriterion->statement }}</div>
+                            </div>
+                        @endif
+                        @if ($task->scenario)
+                            <div class="rounded-md border border-zinc-200 bg-zinc-50 p-3 text-sm dark:border-zinc-700 dark:bg-zinc-900/40">
+                                <div class="text-xs uppercase tracking-wide text-zinc-500">{{ __('Scenario') }} {{ $task->scenario->position }}</div>
+                                <div class="mt-1 font-medium">{{ $task->scenario->name }}</div>
+                                @if ($task->scenario->given_text)
+                                    <div class="mt-1"><span class="font-medium">{{ __('Given') }}</span> {{ $task->scenario->given_text }}</div>
+                                @endif
+                                @if ($task->scenario->when_text)
+                                    <div class="mt-1"><span class="font-medium">{{ __('When') }}</span> {{ $task->scenario->when_text }}</div>
+                                @endif
+                                @if ($task->scenario->then_text)
+                                    <div class="mt-1"><span class="font-medium">{{ __('Then') }}</span> {{ $task->scenario->then_text }}</div>
+                                @endif
+                            </div>
+                        @endif
+                    </div>
                 @endif
             </div>
 

@@ -7,6 +7,9 @@
     <div class="flex flex-wrap items-center gap-2 text-xs">
         <flux:badge size="sm">T{{ $task->position }}</flux:badge>
         <flux:badge size="sm">{{ $task->status->value }}</flux:badge>
+        @if ($task->plan)
+            <flux:badge size="sm">{{ __('plan') }} v{{ $task->plan->version }}</flux:badge>
+        @endif
         @if ($deps->isNotEmpty())
             <flux:badge size="sm">{{ __('depends on') }} {{ $deps->implode(', ') }}</flux:badge>
         @endif
@@ -22,6 +25,12 @@
 
     @if ($task->description)
         <x-markdown :content="$task->description" class="mt-1 text-sm text-zinc-600 dark:text-zinc-400" />
+    @endif
+
+    @if ($task->scenario)
+        <div class="mt-2 flex flex-wrap gap-2 text-xs text-zinc-500">
+            <flux:badge size="sm">{{ __('Scenario') }} {{ $task->scenario->position }} · {{ $task->scenario->name }}</flux:badge>
+        </div>
     @endif
 
     @if ($task->subtasks->isNotEmpty())

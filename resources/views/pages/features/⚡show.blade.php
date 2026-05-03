@@ -94,7 +94,7 @@ new #[Title('Feature')] class extends Component {
     {
         return $this->feature
             ? $this->feature->stories()
-                ->with('creator', 'tasks:id,story_id,status')
+                ->with('creator', 'tasks', 'currentPlan:id,story_id,version,name,status')
                 ->orderBy('position')
                 ->orderBy('id')
                 ->get()

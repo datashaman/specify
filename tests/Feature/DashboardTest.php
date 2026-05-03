@@ -1,6 +1,7 @@
 <?php
 
 use App\Enums\AgentRunStatus;
+use App\Enums\PlanStatus;
 use App\Enums\StoryStatus;
 use App\Enums\TaskStatus;
 use App\Enums\TeamRole;
@@ -29,7 +30,7 @@ test('authenticated users can visit the dashboard', function () {
     $response->assertOk();
 });
 
-test('dashboard counts pending stories, executing stories, and failed runs in scope', function () {
+test('dashboard counts pending stories, pending plans, executing stories, and failed runs in scope', function () {
     $workspace = Workspace::factory()->create();
     $team = Team::factory()->for($workspace)->create();
     $user = User::factory()->create();
@@ -41,10 +42,16 @@ test('dashboard counts pending stories, executing stories, and failed runs in sc
     Story::factory()->count(2)->for($feature)->create(['status' => StoryStatus::PendingApproval]);
     $approved = Story::factory()->for($feature)->create(['status' => StoryStatus::Approved]);
     $task = Task::factory()->for($approved)->create();
+    $task->plan->forceFill(['status' => PlanStatus::Approved->value])->save();
+
+    $planPendingStory = Story::factory()->for($feature)->create(['status' => StoryStatus::Approved]);
+    $planPendingTask = Task::factory()->for($planPendingStory)->create();
+    $planPendingTask->plan->forceFill(['status' => PlanStatus::PendingApproval->value])->save();
     Subtask::factory()->for($task)->create(['status' => TaskStatus::InProgress]);
 
     $approved2 = Story::factory()->for($feature)->create(['status' => StoryStatus::Approved]);
     $taskWithFailedRun = Task::factory()->for($approved2)->create();
+    $taskWithFailedRun->plan->forceFill(['status' => PlanStatus::Approved->value])->save();
     $subtaskWithFailedRun = Subtask::factory()->for($taskWithFailedRun)->create();
     AgentRun::factory()->create([
         'runnable_type' => Subtask::class,
@@ -56,6 +63,7 @@ test('dashboard counts pending stories, executing stories, and failed runs in sc
 
     Livewire::test('pages::dashboard')
         ->assertSet('pendingStoryCount', 2)
+        ->assertSet('pendingPlanCount', 1)
         ->assertSet('executingStoryCount', 2)
         ->assertSet('failedRunCount', 1)
         ->assertSee('Specify');
@@ -93,7 +101,7 @@ test('dashboard surfaces repos missing an access_token', function () {
     Livewire::test('pages::dashboard')->assertSet('reposNeedingToken', 1);
 });
 
-test('awaiting your approval lists pending stories the user can approve', function () {
+test('awaiting your approval lists pending stories and pending current plans the user can approve', function () {
     $ws = Workspace::factory()->create();
     $team = Team::factory()->for($ws)->create();
     $user = User::factory()->create();
@@ -106,12 +114,20 @@ test('awaiting your approval lists pending stories the user can approve', functi
         'name' => 'Approve me',
         'status' => StoryStatus::PendingApproval,
     ]);
+    $planStory = Story::factory()->for($feature)->create([
+        'name' => 'Approve my plan',
+        'status' => StoryStatus::Approved,
+    ]);
+    $planTask = Task::factory()->for($planStory)->create();
+    $planTask->plan->forceFill(['status' => PlanStatus::PendingApproval->value])->save();
 
     $this->actingAs($user);
 
     Livewire::test('pages::dashboard')
-        ->assertSee('Awaiting your approval')
+        ->assertSee('Story contracts awaiting your approval')
+        ->assertSee('Current plans awaiting your approval')
         ->assertSee('Approve me')
+        ->assertSee('Approve my plan')
         ->assertSeeHtml(route('stories.show', ['project' => $project->id, 'story' => $story->id]));
 });
 

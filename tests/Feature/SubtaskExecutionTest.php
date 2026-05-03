@@ -8,7 +8,6 @@ use App\Models\AcceptanceCriterion;
 use App\Models\AgentRun;
 use App\Models\ApprovalPolicy;
 use App\Models\Repo;
-use App\Models\Story;
 use App\Models\Subtask;
 use App\Models\Task;
 use App\Services\ExecutionService;
@@ -25,30 +24,6 @@ beforeEach(function () {
         'commit_message' => 'noop',
     ]);
 });
-
-function approvedStoryInProjectWithRepo(): Story
-{
-    $story = makeStory();
-    $project = $story->feature->project;
-    $workspace = $project->team->workspace;
-    $repo = Repo::factory()->for($workspace)->create();
-    $project->attachRepo($repo);
-
-    ApprovalPolicy::create([
-        'scope_type' => ApprovalPolicy::SCOPE_PROJECT,
-        'scope_id' => $project->id,
-        'required_approvals' => 0,
-    ]);
-
-    $ac = $story->acceptanceCriteria()->first() ?? AcceptanceCriterion::factory()->for($story)->create();
-    $task = Task::factory()->for($story)->create(['acceptance_criterion_id' => $ac->id, 'position' => 0]);
-    Subtask::factory()->for($task)->create(['position' => 0, 'name' => 'only-sub']);
-
-    $story->forceFill(['status' => StoryStatus::Draft->value])->save();
-    $story->fresh()->submitForApproval();
-
-    return $story->fresh();
-}
 
 test('subtask execution job runs the agent and marks subtask Done', function () {
     $story = approvedStoryInProjectWithRepo();
@@ -151,6 +126,7 @@ test('full story execution: subtasks succeed and story flips to Done', function 
 
     $story->forceFill(['status' => StoryStatus::Draft->value])->save();
     $story->fresh()->submitForApproval();
+    $taskA->plan->submitForApproval();
     expect($story->fresh()->status)->toBe(StoryStatus::Approved);
 
     app(ExecutionService::class)->startStoryExecution($story->fresh());

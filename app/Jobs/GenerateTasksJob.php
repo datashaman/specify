@@ -3,6 +3,7 @@
 namespace App\Jobs;
 
 use App\Ai\Agents\TasksGenerator;
+use App\Enums\PlanSource;
 use App\Models\AgentRun;
 use App\Models\Story;
 use App\Services\ExecutionService;
@@ -13,11 +14,11 @@ use Illuminate\Support\Facades\Log;
 use Throwable;
 
 /**
- * Queue job that asks the `TasksGenerator` agent to produce a Story's task plan.
+ * Queue job that asks the `TasksGenerator` agent to produce a Story's implementation plan.
  *
  * The agent returns structured tasks + subtasks; this job normalises them into
- * the `PlanWriter::replacePlan()` shape and persists in one transaction. The
- * write resets approval (per ADR-0001) so reviewers re-approve the new plan.
+ * the `PlanWriter::replacePlan()` shape and persists a new current plan in one
+ * transaction. The write resets approval so reviewers re-approve the new plan.
  */
 class GenerateTasksJob implements ShouldQueue
 {
@@ -45,10 +46,16 @@ class GenerateTasksJob implements ShouldQueue
             $output = $response->toArray();
 
             $tasks = $this->normalizeTasks($story, $output['tasks'] ?? []);
-            $result = $planWriter->replacePlan($story, $tasks);
+            $result = $planWriter->replacePlan($story, $tasks, [
+                'name' => 'AI plan v'.(((int) $story->plans()->max('version')) + 1),
+                'summary' => $output['summary'] ?? null,
+                'source' => PlanSource::Ai,
+                'source_label' => 'TasksGenerator',
+            ]);
 
             $execution->markSucceeded($run, [
                 'summary' => $output['summary'] ?? null,
+                'plan_id' => $result['plan_id'],
                 'task_count' => $result['task_count'],
                 'subtask_count' => $result['subtask_count'],
             ]);

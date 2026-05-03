@@ -78,7 +78,7 @@ class SubtaskExecutor implements Agent, HasStructuredOutput, HasTools
         $subtask = $this->subtask->loadMissing('task.story.feature.project', 'task.acceptanceCriterion');
         $task = $subtask->task;
         $story = $task?->story;
-        $criterion = $task?->acceptanceCriterion?->criterion;
+        $criterion = $task?->acceptanceCriterion?->statement;
 
         $repoBlock = $this->repo
             ? "Repository: {$this->repo->name}\nURL: {$this->repo->url}\nDefault branch: {$this->repo->default_branch}\nWorking branch: {$this->workingBranch}"

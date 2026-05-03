@@ -3,6 +3,7 @@
 use App\Ai\Agents\TasksGenerator;
 use App\Enums\AgentRunStatus;
 use App\Enums\ApprovalDecision;
+use App\Enums\PlanStatus;
 use App\Enums\StoryStatus;
 use App\Models\AcceptanceCriterion;
 use App\Models\AgentRun;
@@ -10,7 +11,6 @@ use App\Models\ApprovalPolicy;
 use App\Models\Story;
 use App\Models\StoryApproval;
 use App\Models\User;
-use App\Services\ApprovalService;
 use App\Services\ExecutionService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
@@ -111,7 +111,7 @@ test('agent failure marks the AgentRun failed with error message', function () {
         ->and($run->error_message)->toContain('agent down');
 });
 
-test('regeneration on an Approved story invalidates prior approvals (revision bump)', function () {
+test('regeneration on an Approved story keeps story approval intact but reopens current plan approval', function () {
     $story = Story::factory()->create(['status' => StoryStatus::Approved, 'revision' => 1]);
     AcceptanceCriterion::factory()->for($story)->create(['position' => 0]);
     $story = $story->fresh();
@@ -140,10 +140,10 @@ test('regeneration on an Approved story invalidates prior approvals (revision bu
 
     app(ExecutionService::class)->dispatchTaskGeneration($story);
 
-    $fresh = $story->fresh();
-    expect($fresh->status)->toBe(StoryStatus::PendingApproval)
-        ->and($fresh->revision)->toBeGreaterThan($revisionBefore);
-
-    app(ApprovalService::class)->recompute($fresh);
-    expect($story->fresh()->status)->toBe(StoryStatus::PendingApproval);
+    $fresh = $story->fresh()->load('currentPlan');
+    expect($fresh->status)->toBe(StoryStatus::Approved)
+        ->and($fresh->revision)->toBe($revisionBefore)
+        ->and($fresh->currentPlan)->not->toBeNull()
+        ->and($fresh->currentPlan->status)->toBe(PlanStatus::PendingApproval)
+        ->and($fresh->currentPlan->revision)->toBe(1);
 });

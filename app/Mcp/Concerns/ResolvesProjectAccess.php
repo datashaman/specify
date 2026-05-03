@@ -4,7 +4,9 @@ namespace App\Mcp\Concerns;
 
 use App\Mcp\Auth;
 use App\Models\Feature;
+use App\Models\Plan;
 use App\Models\Project;
+use App\Models\Scenario;
 use App\Models\Story;
 use App\Models\User;
 use Laravel\Mcp\Request;
@@ -73,6 +75,40 @@ trait ResolvesProjectAccess
         }
 
         return $project;
+    }
+
+    protected function resolveAccessibleScenario(
+        int $scenarioId,
+        User $user,
+        string $notFoundMessage = 'Scenario not found.',
+        string $forbiddenMessage = 'Scenario not accessible.',
+    ): Scenario|Response {
+        $scenario = Scenario::query()->with('story.feature')->find($scenarioId);
+        if (! $scenario) {
+            return Response::error($notFoundMessage);
+        }
+        if (! $this->canAccessProject($user, (int) $scenario->story->feature->project_id)) {
+            return Response::error($forbiddenMessage);
+        }
+
+        return $scenario;
+    }
+
+    protected function resolveAccessiblePlan(
+        int $planId,
+        User $user,
+        string $notFoundMessage = 'Plan not found.',
+        string $forbiddenMessage = 'Plan not accessible.',
+    ): Plan|Response {
+        $plan = Plan::query()->with('story.feature')->find($planId);
+        if (! $plan) {
+            return Response::error($notFoundMessage);
+        }
+        if (! $this->canAccessProject($user, (int) $plan->story->feature->project_id)) {
+            return Response::error($forbiddenMessage);
+        }
+
+        return $plan;
     }
 
     protected function canAccessProject(User $user, int $projectId): bool

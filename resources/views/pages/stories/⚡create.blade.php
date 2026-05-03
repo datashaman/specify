@@ -1,5 +1,6 @@
 <?php
 
+use App\Enums\StoryKind;
 use App\Enums\StoryStatus;
 use App\Models\AcceptanceCriterion;
 use App\Models\Feature;
@@ -18,6 +19,14 @@ new #[Title('New story')] class extends Component {
 
     #[Validate('required|string|max:255')]
     public string $name = '';
+
+    public string $kind = 'user_story';
+
+    public string $actor = '';
+
+    public string $intent = '';
+
+    public string $outcome = '';
 
     #[Validate('required|string')]
     public string $description = '';
@@ -91,6 +100,10 @@ new #[Title('New story')] class extends Component {
                 'feature_id' => $feature->id,
                 'created_by_id' => Auth::id(),
                 'name' => $this->name,
+                'kind' => StoryKind::from($this->kind),
+                'actor' => $this->actor ?: null,
+                'intent' => $this->intent ?: null,
+                'outcome' => $this->outcome ?: null,
                 'description' => $this->description,
                 'status' => StoryStatus::Draft,
             ]);
@@ -99,8 +112,7 @@ new #[Title('New story')] class extends Component {
                 AcceptanceCriterion::create([
                     'story_id' => $story->id,
                     'position' => $i,
-                    'criterion' => $statement,
-                    'met' => false,
+                    'statement' => $statement,
                 ]);
             }
 
@@ -127,13 +139,21 @@ new #[Title('New story')] class extends Component {
         </flux:select>
 
         <flux:input wire:model="name" :label="__('Name')" required />
-        <flux:textarea wire:model="description" :label="__('Description')" rows="4" required />
+        <flux:select wire:model="kind" :label="__('Story kind')">
+            @foreach (StoryKind::cases() as $storyKind)
+                <flux:select.option value="{{ $storyKind->value }}">{{ $storyKind->value }}</flux:select.option>
+            @endforeach
+        </flux:select>
+        <flux:input wire:model="actor" :label="__('As a …')" />
+        <flux:input wire:model="intent" :label="__('I want …')" />
+        <flux:input wire:model="outcome" :label="__('So that …')" />
+        <flux:textarea wire:model="description" :label="__('Description / context')" rows="4" required />
 
         <div class="flex flex-col gap-2">
             <flux:heading size="md">{{ __('Acceptance criteria') }}</flux:heading>
             @foreach ($criteria as $i => $statement)
                 <div class="flex gap-2">
-                    <flux:input class="flex-1" wire:model="criteria.{{ $i }}" :placeholder="__('Criterion')" />
+                    <flux:input class="flex-1" wire:model="criteria.{{ $i }}" :placeholder="__('Atomic rule statement')" />
                     <flux:button type="button" variant="ghost" wire:click="removeCriterion({{ $i }})">{{ __('Remove') }}</flux:button>
                 </div>
             @endforeach

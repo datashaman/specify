@@ -2,11 +2,9 @@
 
 namespace App\Mcp\Tools;
 
-use App\Enums\StoryStatus;
 use App\Enums\TaskStatus;
 use App\Mcp\Concerns\ResolvesProjectAccess;
 use App\Models\Subtask;
-use App\Services\ApprovalService;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Laravel\Mcp\Request;
 use Laravel\Mcp\Response;
@@ -16,7 +14,7 @@ use Laravel\Mcp\Server\Tool;
 /**
  * MCP tool: update-subtask
  */
-#[Description('Update a single subtask. Any of: name, description (markdown), status, position. Editing structural fields (name/description/position) on an Approved story resets it to PendingApproval.')]
+#[Description('Update a single subtask. Any of: name, description (markdown), status, position. Editing structural fields (name/description/position) on the current plan reopens plan approval.')]
 class UpdateSubtaskTool extends Tool
 {
     use ResolvesProjectAccess;
@@ -82,17 +80,8 @@ class UpdateSubtaskTool extends Tool
             $subtask->forceFill($updates)->save();
         }
 
-        if ($structuralChange) {
-            if ($story->status === StoryStatus::Approved) {
-                $story->silentlyForceFill([
-                    'status' => StoryStatus::PendingApproval->value,
-                    'revision' => ($story->revision ?? 1) + 1,
-                ]);
-            } elseif ($story->status === StoryStatus::ChangesRequested) {
-                $story->silentlyForceFill(['status' => StoryStatus::PendingApproval->value]);
-            }
-
-            app(ApprovalService::class)->recompute($story->fresh());
+        if ($structuralChange && $subtask->task?->plan) {
+            $subtask->task->plan->reopenForApproval();
         }
 
         $subtask->refresh();
