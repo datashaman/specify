@@ -40,7 +40,9 @@ new #[Title('Task')] class extends Component {
             ->whereHas('story', fn ($q) => $q->where('id', $this->story_id))
             ->with([
                 'story.feature.project',
+                'plan',
                 'acceptanceCriterion',
+                'scenario',
                 'dependencies',
                 'subtasks.agentRuns.repo',
                 'subtasks.proposedByRun',
@@ -90,6 +92,9 @@ new #[Title('Task')] class extends Component {
                     @if ($subtaskTotal > 0)
                         <flux:badge>{{ $subtaskDone }}/{{ $subtaskTotal }} {{ __('subtasks') }}</flux:badge>
                     @endif
+                    @if ($task->plan)
+                        <flux:badge size="sm">{{ __('plan') }} v{{ $task->plan->version }}</flux:badge>
+                    @endif
                     @if ($deps->isNotEmpty())
                         <flux:badge size="sm">{{ __('depends on') }} {{ $deps->implode(', ') }}</flux:badge>
                     @endif
@@ -101,7 +106,22 @@ new #[Title('Task')] class extends Component {
                 @if ($ac)
                     <div class="mt-3 rounded-md border border-zinc-200 bg-zinc-50 p-3 dark:border-zinc-700 dark:bg-zinc-900/40">
                         <flux:text class="text-xs uppercase tracking-wide text-zinc-500">{{ __('Acceptance criterion') }} AC{{ $ac->position }}</flux:text>
-                        <flux:text class="mt-1 text-sm">{{ $ac->criterion }}</flux:text>
+                        <flux:text class="mt-1 text-sm">{{ $ac->statement }}</flux:text>
+                    </div>
+                @endif
+                @if ($task->scenario)
+                    <div class="mt-3 rounded-md border border-zinc-200 bg-zinc-50 p-3 dark:border-zinc-700 dark:bg-zinc-900/40">
+                        <flux:text class="text-xs uppercase tracking-wide text-zinc-500">{{ __('Scenario') }} {{ $task->scenario->position }}</flux:text>
+                        <flux:text class="mt-1 text-sm font-medium">{{ $task->scenario->name }}</flux:text>
+                        @if ($task->scenario->given_text)
+                            <flux:text class="mt-1 text-sm"><span class="font-medium">{{ __('Given') }}</span> {{ $task->scenario->given_text }}</flux:text>
+                        @endif
+                        @if ($task->scenario->when_text)
+                            <flux:text class="mt-1 text-sm"><span class="font-medium">{{ __('When') }}</span> {{ $task->scenario->when_text }}</flux:text>
+                        @endif
+                        @if ($task->scenario->then_text)
+                            <flux:text class="mt-1 text-sm"><span class="font-medium">{{ __('Then') }}</span> {{ $task->scenario->then_text }}</flux:text>
+                        @endif
                     </div>
                 @endif
             </div>

@@ -31,7 +31,7 @@ new #[Title('Story')] class extends Component {
     #[Validate('required|string')]
     public string $editDescription = '';
 
-    /** @var array<int, array{id: ?int, criterion: string}> */
+    /** @var array<int, array{id: ?int, statement: string}> */
     public array $editCriteria = [];
 
     public function mount(int $story, ?int $project = null): void
@@ -60,17 +60,17 @@ new #[Title('Story')] class extends Component {
         $this->editCriteria = $story->acceptanceCriteria
             ->sortBy('position')
             ->values()
-            ->map(fn (AcceptanceCriterion $ac) => ['id' => $ac->id, 'criterion' => (string) $ac->criterion])
+            ->map(fn (AcceptanceCriterion $ac) => ['id' => $ac->id, 'statement' => (string) $ac->statement])
             ->all();
         if ($this->editCriteria === []) {
-            $this->editCriteria = [['id' => null, 'criterion' => '']];
+            $this->editCriteria = [['id' => null, 'statement' => '']];
         }
         $this->editing = true;
     }
 
     public function addCriterion(): void
     {
-        $this->editCriteria[] = ['id' => null, 'criterion' => ''];
+        $this->editCriteria[] = ['id' => null, 'statement' => ''];
     }
 
     public function removeCriterion(int $index): void
@@ -102,7 +102,7 @@ new #[Title('Story')] class extends Component {
             'editName' => 'required|string|max:255',
             'editDescription' => 'required|string',
             'editCriteria' => 'array|min:1',
-            'editCriteria.*.criterion' => 'required|string|max:1000',
+            'editCriteria.*.statement' => 'required|string|max:1000',
         ]);
 
         $criteriaChanged = $this->syncCriteria($story);
@@ -133,13 +133,13 @@ new #[Title('Story')] class extends Component {
         return DB::transaction(function () use ($story, $existing, &$kept, &$changed) {
             foreach ($this->editCriteria as $i => $row) {
                 $position = $i + 1;
-                $text = trim((string) ($row['criterion'] ?? ''));
+                $text = trim((string) ($row['statement'] ?? $row['criterion'] ?? ''));
                 $id = $row['id'] ?? null;
 
                 if ($id !== null && $existing->has($id)) {
                     $ac = $existing[$id];
-                    if ($ac->criterion !== $text || $ac->position !== $position) {
-                        $ac->update(['criterion' => $text, 'position' => $position]);
+                    if ($ac->statement !== $text || $ac->position !== $position) {
+                        $ac->update(['statement' => $text, 'position' => $position]);
                         $changed = true;
                     }
                     $kept[] = $id;
@@ -147,7 +147,7 @@ new #[Title('Story')] class extends Component {
                     AcceptanceCriterion::create([
                         'story_id' => $story->id,
                         'position' => $position,
-                        'criterion' => $text,
+                        'statement' => $text,
                     ]);
                     $changed = true;
                 }
@@ -421,7 +421,7 @@ new #[Title('Story')] class extends Component {
         $kept = [];
         foreach ($this->editCriteria as $row) {
             $id = $row['id'] ?? null;
-            $text = trim((string) ($row['criterion'] ?? ''));
+            $text = trim((string) ($row['statement'] ?? $row['criterion'] ?? ''));
             if ($id === null) {
                 if ($text !== '') {
                     $added++;
@@ -432,7 +432,7 @@ new #[Title('Story')] class extends Component {
                 continue;
             }
             $kept[] = $id;
-            if (trim((string) $existing[$id]->criterion) !== $text) {
+            if (trim((string) $existing[$id]->statement) !== $text) {
                 $edited++;
             }
         }
@@ -493,7 +493,11 @@ new #[Title('Story')] class extends Component {
                 'feature.project',
                 'creator',
                 'acceptanceCriteria',
+                'scenarios.acceptanceCriterion',
+                'currentPlan',
+                'tasks.plan',
                 'tasks.acceptanceCriterion',
+                'tasks.scenario',
                 'tasks.dependencies',
                 'tasks.subtasks.agentRuns.repo',
                 'approvals.approver',
@@ -676,7 +680,7 @@ new #[Title('Story')] class extends Component {
                         @foreach ($editCriteria as $i => $row)
                             <div wire:key="ac-{{ $i }}" class="flex items-start gap-2">
                                 <flux:badge class="mt-2" size="sm">AC{{ $i + 1 }}</flux:badge>
-                                <flux:textarea wire:model="editCriteria.{{ $i }}.criterion" rows="2" class="flex-1" />
+                                <flux:textarea wire:model="editCriteria.{{ $i }}.statement" rows="2" class="flex-1" />
                                 <flux:button wire:click="removeCriterion({{ $i }})" variant="ghost" size="sm" class="mt-1">{{ __('Remove') }}</flux:button>
                             </div>
                         @endforeach
@@ -704,9 +708,59 @@ new #[Title('Story')] class extends Component {
         </div>
 
         @unless ($editing)
-            {{-- ── Story body: description + notes (ACs lead the plan section below) ── --}}
+            {{-- ── Story body: framing + description + notes ── --}}
             <section class="flex flex-col gap-3">
+                @if ($story->kind || $story->actor || $story->intent || $story->outcome || $story->currentPlan)
+                    <div class="flex flex-wrap gap-2 text-xs text-zinc-500">
+                        @if ($story->kind)
+                            <flux:badge size="sm">{{ $story->kind->value }}</flux:badge>
+                        @endif
+                        @if ($story->currentPlan)
+                            <flux:badge size="sm">{{ __('current plan') }} v{{ $story->currentPlan->version }}</flux:badge>
+                        @endif
+                    </div>
+                    @if ($story->actor || $story->intent || $story->outcome)
+                        <div class="rounded-md border border-zinc-200 bg-zinc-50 p-3 text-sm dark:border-zinc-700 dark:bg-zinc-900/40">
+                            @if ($story->actor)
+                                <div><span class="font-medium">{{ __('As a') }}</span> {{ $story->actor }}</div>
+                            @endif
+                            @if ($story->intent)
+                                <div class="mt-1"><span class="font-medium">{{ __('I want') }}</span> {{ $story->intent }}</div>
+                            @endif
+                            @if ($story->outcome)
+                                <div class="mt-1"><span class="font-medium">{{ __('So that') }}</span> {{ $story->outcome }}</div>
+                            @endif
+                        </div>
+                    @endif
+                @endif
+
                 <x-markdown :content="$story->description" />
+
+                @if ($story->scenarios->isNotEmpty())
+                    <div class="flex flex-col gap-2">
+                        <flux:heading size="sm">{{ __('Scenarios') }}</flux:heading>
+                        @foreach ($story->scenarios->sortBy('position') as $scenario)
+                            <div class="rounded-md border border-zinc-200 bg-zinc-50 p-3 text-sm dark:border-zinc-700 dark:bg-zinc-900/40">
+                                <div class="flex flex-wrap items-center gap-2 text-xs text-zinc-500">
+                                    <flux:badge size="sm">{{ __('Scenario') }} {{ $scenario->position }}</flux:badge>
+                                    @if ($scenario->acceptanceCriterion)
+                                        <flux:badge size="sm">{{ __('AC') }}{{ $scenario->acceptanceCriterion->position }}</flux:badge>
+                                    @endif
+                                </div>
+                                <div class="mt-1 font-medium">{{ $scenario->name }}</div>
+                                @if ($scenario->given_text)
+                                    <div class="mt-1"><span class="font-medium">{{ __('Given') }}</span> {{ $scenario->given_text }}</div>
+                                @endif
+                                @if ($scenario->when_text)
+                                    <div class="mt-1"><span class="font-medium">{{ __('When') }}</span> {{ $scenario->when_text }}</div>
+                                @endif
+                                @if ($scenario->then_text)
+                                    <div class="mt-1"><span class="font-medium">{{ __('Then') }}</span> {{ $scenario->then_text }}</div>
+                                @endif
+                            </div>
+                        @endforeach
+                    </div>
+                @endif
 
                 @if ($story->notes)
                     <details>

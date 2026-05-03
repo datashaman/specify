@@ -1,5 +1,13 @@
 <?php
 
+use App\Ai\Agents\SubtaskExecutor;
+use App\Enums\StoryStatus;
+use App\Models\AcceptanceCriterion;
+use App\Models\ApprovalPolicy;
+use App\Models\Repo;
+use App\Models\Story;
+use App\Models\Subtask;
+use App\Models\Task;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -53,7 +61,42 @@ expect()->extend('toBeOne', function () {
 |
 */
 
-function something()
+function approvedStoryInProjectWithRepo(): Story
 {
-    // ..
+    config(['queue.default' => 'sync']);
+    SubtaskExecutor::fake(fn () => [
+        'summary' => 'noop',
+        'files_changed' => [],
+        'commit_message' => 'noop',
+    ]);
+
+    $story = Story::factory()->create();
+    AcceptanceCriterion::factory()->for($story)->create([
+        'position' => 1,
+        'statement' => 'Demo acceptance criterion.',
+    ]);
+
+    $project = $story->feature->project;
+    $workspace = $project->team->workspace;
+    $repo = Repo::factory()->for($workspace)->create();
+    $project->attachRepo($repo);
+
+    ApprovalPolicy::create([
+        'scope_type' => ApprovalPolicy::SCOPE_PROJECT,
+        'scope_id' => $project->id,
+        'required_approvals' => 0,
+    ]);
+
+    $ac = $story->acceptanceCriteria()->first();
+    $task = Task::factory()->create([
+        'story_id' => $story->id,
+        'acceptance_criterion_id' => $ac?->id,
+        'position' => 1,
+    ]);
+    Subtask::factory()->for($task)->create(['position' => 1, 'name' => 'only-sub']);
+
+    $story->forceFill(['status' => StoryStatus::Draft->value])->save();
+    $story->fresh()->submitForApproval();
+
+    return $story->fresh();
 }

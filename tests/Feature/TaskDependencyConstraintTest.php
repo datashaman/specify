@@ -6,7 +6,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);
 
-test('task dependencies must live in the same story', function () {
+test('task dependencies must live in the same plan', function () {
     $storyA = Story::factory()->create();
     $storyB = Story::factory()->create();
 
@@ -14,7 +14,7 @@ test('task dependencies must live in the same story', function () {
     $b = Task::factory()->for($storyB)->create();
 
     expect(fn () => $b->addDependency($a))
-        ->toThrow(InvalidArgumentException::class, 'same story');
+        ->toThrow(InvalidArgumentException::class, 'same plan');
 });
 
 test('task dependencies within the same story are allowed', function () {

@@ -134,7 +134,7 @@ new #[Title('Run')] class extends Component {
                     ->whereIn('project_id', $accessible)
                 )
             )
-            ->with(['runnable.task.story.feature.project', 'repo'])
+            ->with(['runnable.task.plan', 'runnable.task.acceptanceCriterion', 'runnable.task.scenario', 'runnable.task.story.feature.project', 'repo'])
             ->first();
     }
 
@@ -238,6 +238,9 @@ new #[Title('Run')] class extends Component {
                     @if ($run->executor_driver)
                         <flux:badge size="sm" icon="cpu-chip">{{ $run->executor_driver }}</flux:badge>
                     @endif
+                    @if ($task->plan)
+                        <flux:badge size="sm">{{ __('plan') }} v{{ $task->plan->version }}</flux:badge>
+                    @endif
                     @if ($run->repo)
                         <flux:badge size="sm" icon="folder">{{ $run->repo->name }}</flux:badge>
                     @endif
@@ -260,6 +263,39 @@ new #[Title('Run')] class extends Component {
                     </div>
                 @endif
             </div>
+
+            @if ($task->plan || $task->acceptanceCriterion || $task->scenario)
+                <div class="grid gap-3 lg:grid-cols-3">
+                    @if ($task->plan)
+                        <div class="rounded-md border border-zinc-200 bg-zinc-50 p-3 text-sm dark:border-zinc-700 dark:bg-zinc-900/40">
+                            <div class="text-xs uppercase tracking-wide text-zinc-500">{{ __('Plan') }}</div>
+                            <div class="mt-1 font-medium">{{ $task->plan->name ?? ('v'.$task->plan->version) }}</div>
+                            <div class="mt-1 text-zinc-500">{{ __('Version') }} {{ $task->plan->version }}</div>
+                        </div>
+                    @endif
+                    @if ($task->acceptanceCriterion)
+                        <div class="rounded-md border border-zinc-200 bg-zinc-50 p-3 text-sm dark:border-zinc-700 dark:bg-zinc-900/40">
+                            <div class="text-xs uppercase tracking-wide text-zinc-500">{{ __('Acceptance criterion') }} AC{{ $task->acceptanceCriterion->position }}</div>
+                            <div class="mt-1">{{ $task->acceptanceCriterion->statement }}</div>
+                        </div>
+                    @endif
+                    @if ($task->scenario)
+                        <div class="rounded-md border border-zinc-200 bg-zinc-50 p-3 text-sm dark:border-zinc-700 dark:bg-zinc-900/40">
+                            <div class="text-xs uppercase tracking-wide text-zinc-500">{{ __('Scenario') }} {{ $task->scenario->position }}</div>
+                            <div class="mt-1 font-medium">{{ $task->scenario->name }}</div>
+                            @if ($task->scenario->given_text)
+                                <div class="mt-1"><span class="font-medium">{{ __('Given') }}</span> {{ $task->scenario->given_text }}</div>
+                            @endif
+                            @if ($task->scenario->when_text)
+                                <div class="mt-1"><span class="font-medium">{{ __('When') }}</span> {{ $task->scenario->when_text }}</div>
+                            @endif
+                            @if ($task->scenario->then_text)
+                                <div class="mt-1"><span class="font-medium">{{ __('Then') }}</span> {{ $task->scenario->then_text }}</div>
+                            @endif
+                        </div>
+                    @endif
+                </div>
+            @endif
 
             @if (session('retry_error'))
                 <flux:callout icon="exclamation-triangle" color="rose">

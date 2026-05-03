@@ -87,7 +87,11 @@ new #[Title('Triage')] class extends Component {
                 $isAuthor = $story->created_by_id === $user->id;
                 $blockedBySelfApproval = $isAuthor && ! $policy->allow_self_approval;
             @endphp
-            <x-story.summary-card :story="$story" card-class="">
+            <x-story.summary-card
+                :story="$story"
+                :href="route('stories.show', ['project' => $story->feature->project_id, 'story' => $story->id])"
+                card-class=""
+            >
                 <x-slot:meta>
                     <div class="flex items-center gap-2">
                         <flux:badge variant="solid">{{ $project->name }}</flux:badge>
@@ -103,7 +107,7 @@ new #[Title('Triage')] class extends Component {
                 @if ($story->acceptanceCriteria->isNotEmpty())
                     <ul class="mt-3 list-disc pl-5 text-sm">
                         @foreach ($story->acceptanceCriteria as $ac)
-                            <li>{{ $ac->criterion }}</li>
+                            <li>{{ $ac->statement }}</li>
                         @endforeach
                     </ul>
                 @endif

@@ -41,7 +41,7 @@ new #[Title('Runs')] class extends Component {
                 });
             })
             ->when($this->status, fn ($q, $s) => $q->where('status', $s))
-            ->with('runnable', 'repo')
+            ->with('runnable.task.plan', 'runnable.task.story.feature.project', 'repo')
             ->latest('id')
             ->paginate(25);
     }

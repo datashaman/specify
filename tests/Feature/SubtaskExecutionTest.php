@@ -26,30 +26,6 @@ beforeEach(function () {
     ]);
 });
 
-function approvedStoryInProjectWithRepo(): Story
-{
-    $story = makeStory();
-    $project = $story->feature->project;
-    $workspace = $project->team->workspace;
-    $repo = Repo::factory()->for($workspace)->create();
-    $project->attachRepo($repo);
-
-    ApprovalPolicy::create([
-        'scope_type' => ApprovalPolicy::SCOPE_PROJECT,
-        'scope_id' => $project->id,
-        'required_approvals' => 0,
-    ]);
-
-    $ac = $story->acceptanceCriteria()->first() ?? AcceptanceCriterion::factory()->for($story)->create();
-    $task = Task::factory()->for($story)->create(['acceptance_criterion_id' => $ac->id, 'position' => 0]);
-    Subtask::factory()->for($task)->create(['position' => 0, 'name' => 'only-sub']);
-
-    $story->forceFill(['status' => StoryStatus::Draft->value])->save();
-    $story->fresh()->submitForApproval();
-
-    return $story->fresh();
-}
-
 test('subtask execution job runs the agent and marks subtask Done', function () {
     $story = approvedStoryInProjectWithRepo();
     $subtask = $story->tasks()->first()->subtasks()->first();

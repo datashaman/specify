@@ -35,7 +35,14 @@ new #[Title('Dashboard')] class extends Component {
         return Story::query()
             ->where('status', StoryStatus::Approved)
             ->whereHas('feature', fn ($q) => $q->whereIn('project_id', $this->projectIds))
-            ->whereHas('tasks.subtasks', fn ($q) => $q->whereIn('status', [TaskStatus::InProgress, TaskStatus::Pending]))
+            ->whereExists(function ($q) {
+                $q->selectRaw('1')
+                    ->from('tasks')
+                    ->join('subtasks', 'subtasks.task_id', '=', 'tasks.id')
+                    ->whereColumn('tasks.story_id', 'stories.id')
+                    ->whereColumn('tasks.plan_id', 'stories.current_plan_id')
+                    ->whereIn('subtasks.status', [TaskStatus::InProgress->value, TaskStatus::Pending->value]);
+            })
             ->count();
     }
 
@@ -57,7 +64,7 @@ new #[Title('Dashboard')] class extends Component {
             ->whereHasMorph('runnable', [Subtask::class], function ($q) {
                 $q->whereHas('task.story.feature', fn ($qq) => $qq->whereIn('project_id', $this->projectIds));
             })
-            ->with('runnable.task.story.feature.project', 'repo')
+            ->with('runnable.task.plan', 'runnable.task.story.feature.project', 'repo')
             ->latest('id')
             ->limit(5)
             ->get();

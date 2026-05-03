@@ -12,7 +12,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);
 
-test('task can depend on another task in the same story', function () {
+test('task can depend on another task in the same current plan', function () {
     $story = Story::factory()->create();
     $a = Task::factory()->for($story)->create(['name' => 'a']);
     $b = Task::factory()->for($story)->create(['name' => 'b']);
@@ -23,12 +23,12 @@ test('task can depend on another task in the same story', function () {
         ->and($a->dependents->pluck('name')->all())->toBe(['b']);
 });
 
-test('task dependencies are rejected across stories', function () {
+test('task dependencies are rejected across plans', function () {
     $a = Task::factory()->create();
     $b = Task::factory()->create();
 
     expect(fn () => $b->addDependency($a))
-        ->toThrow(InvalidArgumentException::class, 'same story');
+        ->toThrow(InvalidArgumentException::class, 'same plan');
 });
 
 test('task self-dependency is rejected', function () {

@@ -4,6 +4,9 @@
             <flux:heading size="lg">{{ __('Plan') }}</flux:heading>
             <flux:text class="text-xs text-zinc-500">
                 {{ $acs->count() }} {{ __('ACs') }} · {{ $subtaskCount }} {{ __('subtasks') }}
+                @if ($story->currentPlan)
+                    · {{ __('current') }} {{ $story->currentPlan->name ?? ('v'.$story->currentPlan->version) }}
+                @endif
             </flux:text>
             @if ($repo)
                 <flux:badge size="sm" icon="folder">{{ $repo->name }}</flux:badge>
@@ -59,7 +62,7 @@
                 <summary class="flex cursor-pointer list-none flex-wrap items-baseline gap-2 text-sm [&::-webkit-details-marker]:hidden">
                     <span class="text-zinc-400 transition-transform group-open:rotate-90" aria-hidden="true">▸</span>
                     <flux:badge size="sm">AC{{ $loop->iteration }}</flux:badge>
-                    <span class="font-medium">{{ $ac->criterion }}</span>
+                    <span class="font-medium">{{ $ac->statement }}</span>
                 </summary>
 
                 @if ($acTasks->isEmpty())

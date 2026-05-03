@@ -35,7 +35,7 @@ new #[Title('Stories')] class extends Component {
         return Story::query()
             ->whereHas('feature', fn ($q) => $q->whereIn('project_id', $projectIds))
             ->when($this->status, fn ($q, $s) => $q->where('status', $s))
-            ->with(['feature.project', 'creator', 'tasks:id,story_id,status'])
+            ->with(['feature.project', 'creator', 'tasks', 'currentPlan:id,story_id,version,name,status'])
             ->latest('updated_at')
             ->paginate(25);
     }
