@@ -76,6 +76,16 @@ class AcceptanceCriterion extends Model
 
     protected function met(): Attribute
     {
-        return Attribute::get(fn () => $this->tasks()->where('status', TaskStatus::Done->value)->exists());
+        return Attribute::get(function () {
+            $currentPlanId = $this->story?->current_plan_id;
+            if (! $currentPlanId) {
+                return false;
+            }
+
+            return $this->tasks()
+                ->where('plan_id', $currentPlanId)
+                ->where('status', TaskStatus::Done->value)
+                ->exists();
+        });
     }
 }

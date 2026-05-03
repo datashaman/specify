@@ -101,6 +101,14 @@ test('editing the current plan invalidates prior plan approvals but leaves story
         ->and($story->fresh()->status)->toBe(StoryStatus::Approved);
 });
 
+test('draft plans cannot be pre-approved before submission', function () {
+    $plan = makePlan();
+    $approver = User::factory()->create();
+
+    expect(fn () => app(ApprovalService::class)->recordPlanDecision($plan->fresh(), $approver, ApprovalDecision::Approve))
+        ->toThrow(RuntimeException::class, 'submitted');
+});
+
 test('plan approval rows are immutable', function () {
     $plan = makePlan();
     policyForPlan(ApprovalPolicy::SCOPE_PROJECT, $plan->story->feature->project_id, ['required_approvals' => 1]);

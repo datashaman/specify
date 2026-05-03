@@ -31,7 +31,8 @@ class AddAcceptanceCriterionTool extends Tool
 
         $validated = $request->validate([
             'story_id' => ['required', 'integer'],
-            'criterion' => ['required', 'string'],
+            'criterion' => ['nullable', 'string'],
+            'statement' => ['nullable', 'string'],
             'position' => ['nullable', 'integer'],
         ]);
 
@@ -40,11 +41,16 @@ class AddAcceptanceCriterionTool extends Tool
             return $story;
         }
 
+        $statement = $validated['statement'] ?? $validated['criterion'] ?? null;
+        if (! is_string($statement) || trim($statement) === '') {
+            return Response::error('statement is required.');
+        }
+
         $position = $validated['position']
             ?? (int) ($story->acceptanceCriteria()->max('position') ?? 0) + 1;
 
         $ac = $story->acceptanceCriteria()->create([
-            'statement' => $validated['criterion'],
+            'statement' => $statement,
             'position' => $position,
         ]);
 
@@ -64,7 +70,8 @@ class AddAcceptanceCriterionTool extends Tool
     {
         return [
             'story_id' => $schema->integer()->description('Story to add the criterion to.')->required(),
-            'criterion' => $schema->string()->description('Observable behaviour the story must satisfy. Use one atomic rule statement, not a full Given/When/Then scenario.')->required(),
+            'criterion' => $schema->string()->description('Deprecated alias for statement. Observable behaviour the story must satisfy as one atomic rule statement.'),
+            'statement' => $schema->string()->description('Observable behaviour the story must satisfy. Use one atomic rule statement, not a full Given/When/Then scenario.'),
             'position' => $schema->integer()->description('Position in the list. Defaults to last + 1.'),
         ];
     }

@@ -3,6 +3,7 @@
 namespace App\Jobs;
 
 use App\Ai\Agents\TasksGenerator;
+use App\Enums\PlanSource;
 use App\Models\AgentRun;
 use App\Models\Story;
 use App\Services\ExecutionService;
@@ -45,7 +46,12 @@ class GenerateTasksJob implements ShouldQueue
             $output = $response->toArray();
 
             $tasks = $this->normalizeTasks($story, $output['tasks'] ?? []);
-            $result = $planWriter->replacePlan($story, $tasks);
+            $result = $planWriter->replacePlan($story, $tasks, [
+                'name' => 'AI plan v'.(((int) $story->plans()->max('version')) + 1),
+                'summary' => $output['summary'] ?? null,
+                'source' => PlanSource::Ai,
+                'source_label' => 'TasksGenerator',
+            ]);
 
             $execution->markSucceeded($run, [
                 'summary' => $output['summary'] ?? null,

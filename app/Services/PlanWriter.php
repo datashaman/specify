@@ -36,9 +36,10 @@ class PlanWriter
      *     depends_on_positions?: list<int>,
      *     subtasks: list<array{position: int, name: string, description?: ?string}>,
      * }>  $tasks
+     * @param  array{name?: ?string, summary?: ?string, source?: ?PlanSource, source_label?: ?string, status?: ?PlanStatus}  $attributes
      * @return array{plan_id: int, task_count: int, subtask_count: int}
      */
-    public function replacePlan(Story $story, array $tasks): array
+    public function replacePlan(Story $story, array $tasks, array $attributes = []): array
     {
         $this->validate($story, $tasks);
 
@@ -55,12 +56,13 @@ class PlanWriter
                 'story_id' => $story->getKey(),
                 'version' => $nextVersion,
                 'revision' => 1,
-                'name' => 'Plan v'.$nextVersion,
-                'summary' => null,
-                'source' => PlanSource::Human,
-                'status' => $story->status === StoryStatus::Approved
+                'name' => $attributes['name'] ?? 'Plan v'.$nextVersion,
+                'summary' => $attributes['summary'] ?? null,
+                'source' => $attributes['source'] ?? PlanSource::Human,
+                'source_label' => $attributes['source_label'] ?? null,
+                'status' => $attributes['status'] ?? ($story->status === StoryStatus::Approved
                     ? PlanStatus::PendingApproval
-                    : PlanStatus::Draft,
+                    : PlanStatus::Draft),
             ]);
 
             $tasksByPosition = [];

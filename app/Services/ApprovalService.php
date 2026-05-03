@@ -69,6 +69,9 @@ class ApprovalService
         ApprovalDecision $decision,
         ?string $notes = null,
     ): PlanApproval {
+        if ($target->status === PlanStatus::Draft) {
+            throw new RuntimeException('Plan must be submitted before review decisions can be recorded.');
+        }
         if ($target->status === PlanStatus::Rejected) {
             throw new RuntimeException('Plan is rejected; no further decisions accepted.');
         }

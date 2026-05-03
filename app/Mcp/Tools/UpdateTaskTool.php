@@ -43,7 +43,7 @@ class UpdateTaskTool extends Tool
             'depends_on_positions.*' => ['integer', 'min:1'],
         ]);
 
-        $task = Task::query()->with('story.feature', 'story.acceptanceCriteria:id,story_id', 'story.scenarios:id,story_id', 'story.tasks:id,story_id,plan_id,position')->find($validated['task_id']);
+        $task = Task::query()->with('story.feature', 'story.acceptanceCriteria:id,story_id', 'story.scenarios:id,story_id')->find($validated['task_id']);
         if (! $task) {
             return Response::error('Task not found.');
         }
@@ -94,7 +94,11 @@ class UpdateTaskTool extends Tool
             }
 
             if (array_key_exists('depends_on_positions', $validated) && is_array($validated['depends_on_positions'])) {
-                $byPosition = $task->story->tasks->where('plan_id', $task->plan_id)->keyBy('position');
+                $byPosition = Task::query()
+                    ->where('story_id', $task->story_id)
+                    ->where('plan_id', $task->plan_id)
+                    ->get(['id', 'position'])
+                    ->keyBy('position');
                 $depIds = [];
                 foreach ($validated['depends_on_positions'] as $pos) {
                     if ((int) $pos === (int) $task->position) {

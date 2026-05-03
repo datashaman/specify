@@ -23,6 +23,7 @@ use App\Mcp\Tools\GetStoryTool;
 use App\Mcp\Tools\GetTaskTool;
 use App\Mcp\Tools\ListEventsTool;
 use App\Mcp\Tools\ListFeaturesTool;
+use App\Mcp\Tools\ListPlansTool;
 use App\Mcp\Tools\ListProjectsTool;
 use App\Mcp\Tools\ListReposTool;
 use App\Mcp\Tools\ListRunsTool;
@@ -100,6 +101,7 @@ class SpecifyServer extends Server
         UpdateScenarioTool::class,
         CreatePlanTool::class,
         GetPlanTool::class,
+        ListPlansTool::class,
         UpdatePlanTool::class,
         SetCurrentPlanTool::class,
         SubmitPlanTool::class,

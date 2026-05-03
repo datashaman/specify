@@ -42,10 +42,14 @@ class GetStoryTool extends Tool
         $story->load([
             'feature',
             'currentPlan',
-            'acceptanceCriteria.tasks',
+            'acceptanceCriteria',
             'scenarios:id,story_id,acceptance_criterion_id,position,name,given_text,when_text,then_text,notes',
             'tasks',
         ]);
+
+        $taskIdsByCriterion = $story->tasks
+            ->groupBy('acceptance_criterion_id')
+            ->map(fn ($tasks) => $tasks->pluck('id')->values()->all());
 
         $tasksTotal = $story->tasks->count();
         $tasksDone = $story->tasks->filter(fn ($t) => $t->status === TaskStatus::Done)->count();
@@ -78,7 +82,7 @@ class GetStoryTool extends Tool
                 'position' => $ac->position,
                 'statement' => $ac->statement,
                 'met' => (bool) $ac->met,
-                'task_ids' => $ac->tasks->pluck('id')->all(),
+                'task_ids' => $taskIdsByCriterion->get($ac->id, []),
             ])->all(),
             'scenarios' => $story->scenarios->map(fn ($scenario) => [
                 'id' => $scenario->id,

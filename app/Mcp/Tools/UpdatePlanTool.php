@@ -43,6 +43,7 @@ class UpdatePlanTool extends Tool
             return $plan;
         }
 
+        $project = $plan->story?->feature?->project;
         $changes = [];
         $structuralChange = false;
 
@@ -58,6 +59,9 @@ class UpdatePlanTool extends Tool
             $structuralChange = true;
         }
         if (isset($validated['status'])) {
+            if (! $project || ! $user->canApproveInProject($project)) {
+                return Response::error('You do not have approver rights to set plan status directly.');
+            }
             $changes['status'] = PlanStatus::from($validated['status']);
         }
 
