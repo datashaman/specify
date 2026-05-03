@@ -114,7 +114,7 @@ test('shows repo name and tokens on the run card', function () {
 
     Livewire::test('pages::runs.index', ['project' => $project->id])
         ->assertSee('backend')
-        ->assertSee('1234/567 tok');
+        ->assertSee('1234↓ 567↑');
 });
 
 test('status filter narrows the list', function () {
