@@ -104,75 +104,54 @@ new #[Title('Repositories')] class extends Component {
     }
 
     /**
-     * Repos the authenticated user can access on github.com. Cached 5 minutes.
-     *
-     * @return array<int, array{full_name:string, name:string, html_url:string, default_branch:string, private:bool}>
-     */
-    public function githubRepos(): array
-    {
-        $user = Auth::user();
-        $token = $user?->github_token;
-        if (! $token) {
-            return [];
-        }
-
-        return Cache::remember("user:{$user->id}:github-repos", now()->addMinutes(5), function () use ($token) {
-            $repos = [];
-            for ($page = 1; $page <= 5; $page++) {
-                $response = Http::withToken($token)
-                    ->withHeaders(['Accept' => 'application/vnd.github+json'])
-                    ->get('https://api.github.com/user/repos', [
-                        'per_page' => 100,
-                        'page' => $page,
-                        'sort' => 'pushed',
-                        'affiliation' => 'owner,collaborator,organization_member',
-                    ]);
-
-                if (! $response->ok()) {
-                    break;
-                }
-
-                $batch = (array) $response->json();
-                if (empty($batch)) {
-                    break;
-                }
-
-                foreach ($batch as $r) {
-                    $repos[] = [
-                        'full_name' => (string) data_get($r, 'full_name'),
-                        'name' => (string) data_get($r, 'name'),
-                        'html_url' => (string) data_get($r, 'html_url'),
-                        'default_branch' => (string) (data_get($r, 'default_branch') ?: 'main'),
-                        'private' => (bool) data_get($r, 'private'),
-                    ];
-                }
-
-                if (count($batch) < 100) {
-                    break;
-                }
-            }
-
-            return $repos;
-        });
-    }
-
-    /**
-     * Filtered GitHub repo options, excluding ones already attached to this project.
+     * GitHub repos matching the current search needle. Uses the GitHub search
+     * API so we never download every repo the user has access to. Empty
+     * needle returns nothing — show a hint instead. Cached 60s per (user,
+     * needle) so debounced typing doesn't burn rate-limit.
      *
      * @return array<int, array{full_name:string, name:string, html_url:string, default_branch:string, private:bool}>
      */
     public function githubRepoOptions(): array
     {
+        $user = Auth::user();
+        $token = $user?->github_token;
+        $needle = trim($this->githubRepoSearch);
+        if (! $token || $needle === '' || mb_strlen($needle) < 2) {
+            return [];
+        }
+
         $existingSlugs = $this->repos()
             ->map(fn ($r) => trim(preg_replace('/\.git$/', '', (string) parse_url($r->url, PHP_URL_PATH)), '/'))
             ->filter()
             ->all();
 
-        $needle = strtolower(trim($this->githubRepoSearch));
+        $cacheKey = "user:{$user->id}:github-repo-search:".sha1(mb_strtolower($needle));
+        $matches = Cache::remember($cacheKey, now()->addSeconds(60), function () use ($token, $needle) {
+            $response = Http::withToken($token)
+                ->withHeaders(['Accept' => 'application/vnd.github+json'])
+                ->get('https://api.github.com/search/repositories', [
+                    'q' => $needle.' user:@me fork:true',
+                    'per_page' => 20,
+                    'sort' => 'updated',
+                ]);
 
-        return collect($this->githubRepos())
+            if (! $response->ok()) {
+                return [];
+            }
+
+            return collect((array) data_get($response->json(), 'items', []))
+                ->map(fn ($r) => [
+                    'full_name' => (string) data_get($r, 'full_name'),
+                    'name' => (string) data_get($r, 'name'),
+                    'html_url' => (string) data_get($r, 'html_url'),
+                    'default_branch' => (string) (data_get($r, 'default_branch') ?: 'main'),
+                    'private' => (bool) data_get($r, 'private'),
+                ])
+                ->all();
+        });
+
+        return collect($matches)
             ->reject(fn ($r) => in_array($r['full_name'], $existingSlugs, true))
-            ->when($needle !== '', fn ($c) => $c->filter(fn ($r) => str_contains(strtolower($r['full_name']), $needle)))
             ->take(10)
             ->values()
             ->all();
@@ -186,8 +165,19 @@ new #[Title('Repositories')] class extends Component {
         $token = Auth::user()->github_token;
         abort_unless($token, 422);
 
-        $match = collect($this->githubRepos())->firstWhere('full_name', $fullName);
-        abort_unless($match, 404);
+        $response = Http::withToken($token)
+            ->withHeaders(['Accept' => 'application/vnd.github+json'])
+            ->get('https://api.github.com/repos/'.$fullName);
+        abort_unless($response->ok(), 404);
+        $payload = (array) $response->json();
+
+        $match = [
+            'full_name' => (string) data_get($payload, 'full_name'),
+            'name' => (string) data_get($payload, 'name'),
+            'html_url' => (string) data_get($payload, 'html_url'),
+            'default_branch' => (string) (data_get($payload, 'default_branch') ?: 'main'),
+        ];
+        abort_unless($match['html_url'] !== '' && $match['name'] !== '', 404);
 
         $workspaceId = $this->project->team?->workspace_id;
         abort_unless($workspaceId, 422);
@@ -215,10 +205,29 @@ new #[Title('Repositories')] class extends Component {
 
         $this->reset(['githubRepoSearch']);
     }
+
+    public ?int $confirmingRemoveId = null;
+
+    public function confirmRemove(int $repoId): void
+    {
+        $this->confirmingRemoveId = $repoId;
+    }
+
+    public function cancelRemove(): void
+    {
+        $this->confirmingRemoveId = null;
+    }
 }; ?>
 
 <div class="flex flex-col gap-6 p-6">
-    <flux:heading size="xl">{{ __('Repos') }}</flux:heading>
+    <div class="flex items-center justify-between gap-2">
+        <flux:heading size="xl">{{ __('Repos') }}</flux:heading>
+        @if ($this->project && $this->canManage)
+            <flux:modal.trigger name="add-repo-modal">
+                <flux:button variant="primary">{{ __('+ Add repository') }}</flux:button>
+            </flux:modal.trigger>
+        @endif
+    </div>
 
     @if (! $this->project)
         <flux:text class="text-sm text-zinc-500">{{ __('Select a project to manage its repositories.') }}</flux:text>
@@ -244,9 +253,13 @@ new #[Title('Repositories')] class extends Component {
                                     <flux:badge color="green">{{ __('primary') }}</flux:badge>
                                 @endif
                                 @if ($repo->webhook_secret)
-                                    <flux:badge color="green">{{ __('webhook installed') }}</flux:badge>
+                                    <flux:tooltip :content="__('Webhook installed')">
+                                        <flux:icon name="bolt" class="size-4 text-emerald-500" />
+                                    </flux:tooltip>
                                 @else
-                                    <flux:badge>{{ __('no webhook') }}</flux:badge>
+                                    <flux:tooltip :content="__('No webhook installed')">
+                                        <flux:icon name="bolt-slash" class="size-4 text-zinc-400" />
+                                    </flux:tooltip>
                                 @endif
                                 @if ($commit)
                                     @if ($commit['html_url'] ?? null)
@@ -273,40 +286,62 @@ new #[Title('Repositories')] class extends Component {
                                 @if (! $repo->webhook_secret && $repo->provider === RepoProvider::Github && $repo->access_token)
                                     <flux:button wire:click="installWebhook({{ $repo->id }})">{{ __('Install webhook') }}</flux:button>
                                 @endif
-                                <flux:button
-                                    variant="danger"
-                                    wire:click="remove({{ $repo->id }})"
-                                    wire:confirm="{{ __('Remove :name from this project?', ['name' => $repo->name]) }}"
-                                >
-                                    {{ __('Remove') }}
-                                </flux:button>
+                                <flux:modal.trigger name="remove-repo-modal">
+                                    <flux:button variant="danger" wire:click="confirmRemove({{ $repo->id }})">
+                                        {{ __('Remove') }}
+                                    </flux:button>
+                                </flux:modal.trigger>
                             </div>
                         @endif
                     </div>
                 </flux:card>
             @empty
-                <flux:text class="text-zinc-500">{{ __('No repositories yet. Add one below.') }}</flux:text>
+                <flux:text class="text-zinc-500">{{ __('No repositories yet.') }}</flux:text>
             @endforelse
         </section>
 
         @if ($this->canManage)
-            <section class="flex flex-col gap-3">
-                <flux:heading size="lg">{{ __('Add a repository') }}</flux:heading>
+            @php($confirmingRepo = $confirmingRemoveId ? $projectRepos->firstWhere('id', $confirmingRemoveId) : null)
+            <flux:modal name="remove-repo-modal" class="md:w-96" @close="$wire.cancelRemove()">
+                <div class="flex flex-col gap-4">
+                    <flux:heading size="lg">{{ __('Remove repository?') }}</flux:heading>
+                    <flux:text>
+                        @if ($confirmingRepo)
+                            {{ __('Detach :name from :project. The repository remains in the workspace if attached to other projects.', ['name' => $confirmingRepo->name, 'project' => $this->project->name]) }}
+                        @else
+                            {{ __('Detach this repository from the project.') }}
+                        @endif
+                    </flux:text>
+                    <div class="flex justify-end gap-2">
+                        <flux:modal.close>
+                            <flux:button type="button" variant="ghost" wire:click="cancelRemove">{{ __('Cancel') }}</flux:button>
+                        </flux:modal.close>
+                        <flux:modal.close>
+                            <flux:button variant="danger" icon="trash" wire:click="remove({{ $confirmingRemoveId ?? 0 }})">{{ __('Remove') }}</flux:button>
+                        </flux:modal.close>
+                    </div>
+                </div>
+            </flux:modal>
 
-                @if (auth()->user()->github_token)
-                    @php($options = $this->githubRepoOptions())
-                    <div class="flex flex-col gap-2">
+            <flux:modal name="add-repo-modal" class="md:w-[32rem]">
+                <div class="flex flex-col gap-4">
+                    <flux:heading size="lg">{{ __('Add a repository') }}</flux:heading>
+
+                    @if (auth()->user()->github_token)
+                        @php($options = $this->githubRepoOptions())
                         <flux:input
                             wire:model.live.debounce.200ms="githubRepoSearch"
                             icon="magnifying-glass"
                             :placeholder="__('Search your GitHub repositories…')"
                         />
-                        <div class="flex flex-col gap-1">
+                        <div class="flex max-h-72 flex-col gap-1 overflow-y-auto" wire:loading.class="opacity-60" wire:target="githubRepoSearch,addGithubRepo">
                             @forelse ($options as $option)
                                 <button
                                     type="button"
                                     wire:click="addGithubRepo('{{ $option['full_name'] }}')"
-                                    class="flex cursor-pointer items-center justify-between gap-3 rounded-md border border-zinc-200 px-3 py-2 text-left text-sm hover:bg-zinc-50 dark:border-zinc-700 dark:hover:bg-zinc-800"
+                                    wire:loading.attr="disabled"
+                                    wire:target="addGithubRepo"
+                                    class="flex cursor-pointer items-center justify-between gap-3 rounded-md border border-zinc-200 px-3 py-2 text-left text-sm hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-zinc-700 dark:hover:bg-zinc-800"
                                 >
                                     <span class="flex items-center gap-2">
                                         <flux:icon name="folder" class="size-4 text-zinc-500" />
@@ -315,21 +350,37 @@ new #[Title('Repositories')] class extends Component {
                                             <flux:badge size="sm">{{ __('private') }}</flux:badge>
                                         @endif
                                     </span>
-                                    <flux:text class="text-xs text-zinc-500">{{ $option['default_branch'] }}</flux:text>
+                                    <span class="flex items-center gap-2">
+                                        <flux:text class="text-xs text-zinc-500">{{ $option['default_branch'] }}</flux:text>
+                                        <flux:icon
+                                            name="arrow-path"
+                                            class="size-4 hidden text-zinc-400 motion-safe:animate-spin"
+                                            wire:loading.class.remove="hidden"
+                                            wire:target="addGithubRepo('{{ $option['full_name'] }}')"
+                                        />
+                                    </span>
                                 </button>
                             @empty
                                 <flux:text class="text-sm text-zinc-500">
-                                    {{ $githubRepoSearch !== '' ? __('No matching repositories.') : __('All your GitHub repositories are already added.') }}
+                                    {{ $githubRepoSearch === '' || mb_strlen(trim($githubRepoSearch)) < 2
+                                        ? __('Type at least 2 characters to search your GitHub repositories.')
+                                        : __('No matching repositories.') }}
                                 </flux:text>
                             @endforelse
                         </div>
+                    @else
+                        <flux:text class="text-sm text-zinc-500">
+                            {{ __('Connect your GitHub account from Settings to add repositories.') }}
+                        </flux:text>
+                    @endif
+
+                    <div class="flex justify-end gap-2">
+                        <flux:modal.close>
+                            <flux:button type="button" variant="ghost">{{ __('Close') }}</flux:button>
+                        </flux:modal.close>
                     </div>
-                @else
-                    <flux:text class="text-sm text-zinc-500">
-                        {{ __('Connect your GitHub account from Settings to add repositories.') }}
-                    </flux:text>
-                @endif
-            </section>
+                </div>
+            </flux:modal>
         @endif
     @endif
 </div>

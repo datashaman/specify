@@ -125,6 +125,8 @@ new #[Title('Project')] class extends Component {
     @if (! $this->project)
         <flux:text class="text-zinc-500">{{ __('Project not found.') }}</flux:text>
     @else
+        @php $canManageFeatures = Auth::user()->canApproveInProject($this->project); @endphp
+
         <section data-section="project-header" class="flex flex-col gap-2">
             @if ($editing)
                 <flux:input wire:model="editName" :label="__('Name')" required />
@@ -147,7 +149,15 @@ new #[Title('Project')] class extends Component {
         </section>
 
         <section class="flex flex-col gap-3">
-            <flux:heading size="xl">{{ __('Features') }}</flux:heading>
+            <div class="flex items-center justify-between gap-2">
+                <flux:heading size="lg">{{ __('Features') }}</flux:heading>
+                @if ($canManageFeatures)
+                    <flux:modal.trigger name="new-feature-modal">
+                        <flux:button variant="primary">{{ __('+ New feature') }}</flux:button>
+                    </flux:modal.trigger>
+                @endif
+            </div>
+
             @forelse ($this->features as $feature)
                 <flux:card>
                     <div class="flex items-center justify-between gap-2">
@@ -163,17 +173,24 @@ new #[Title('Project')] class extends Component {
                     </div>
                 </flux:card>
             @empty
-                <flux:text class="text-zinc-500">{{ __('No features yet. Create one below.') }}</flux:text>
+                <flux:text class="text-zinc-500">{{ __('No features yet.') }}</flux:text>
             @endforelse
         </section>
 
-        <section class="flex flex-col gap-3">
-            <flux:heading size="lg">{{ __('New feature') }}</flux:heading>
-            <form wire:submit.prevent="createFeature" class="flex flex-col gap-3">
-                <flux:input wire:model="newFeatureName" :label="__('Name')" required />
-                <flux:textarea wire:model="newFeatureDescription" :label="__('Description (optional)')" rows="2" />
-                <flux:button type="submit" variant="primary">{{ __('Create feature') }}</flux:button>
-            </form>
-        </section>
+        @if ($canManageFeatures)
+            <flux:modal name="new-feature-modal" class="md:w-96">
+                <form wire:submit.prevent="createFeature" class="flex flex-col gap-4">
+                    <flux:heading size="lg">{{ __('New feature') }}</flux:heading>
+                    <flux:input wire:model="newFeatureName" :label="__('Name')" required />
+                    <flux:textarea wire:model="newFeatureDescription" :label="__('Description (optional)')" rows="2" />
+                    <div class="flex justify-end gap-2">
+                        <flux:modal.close>
+                            <flux:button type="button" variant="ghost">{{ __('Cancel') }}</flux:button>
+                        </flux:modal.close>
+                        <flux:button type="submit" variant="primary">{{ __('Create feature') }}</flux:button>
+                    </div>
+                </form>
+            </flux:modal>
+        @endif
     @endif
 </div>
