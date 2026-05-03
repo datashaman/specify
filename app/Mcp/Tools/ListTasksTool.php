@@ -42,7 +42,7 @@ class ListTasksTool extends Tool
         }
 
         $tasks = $story->tasks()
-            ->with(['acceptanceCriterion:id,position,criterion', 'subtasks:id,task_id,status', 'dependencies:id,position'])
+            ->with(['acceptanceCriterion:id,position,statement', 'scenario:id,position,name', 'subtasks:id,task_id,status', 'dependencies:id,position'])
             ->orderBy('position')
             ->get();
 
@@ -58,7 +58,12 @@ class ListTasksTool extends Tool
                 'acceptance_criterion' => $task->acceptanceCriterion ? [
                     'id' => $task->acceptanceCriterion->id,
                     'position' => $task->acceptanceCriterion->position,
-                    'criterion' => $task->acceptanceCriterion->criterion,
+                    'statement' => $task->acceptanceCriterion->statement,
+                ] : null,
+                'scenario' => $task->scenario ? [
+                    'id' => $task->scenario->id,
+                    'position' => $task->scenario->position,
+                    'name' => $task->scenario->name,
                 ] : null,
                 'depends_on_positions' => $task->dependencies->pluck('position')->all(),
                 'subtasks_total' => $task->subtasks->count(),

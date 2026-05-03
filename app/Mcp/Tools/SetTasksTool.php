@@ -38,6 +38,7 @@ class SetTasksTool extends Tool
             'tasks.*.name' => ['required', 'string', 'max:255'],
             'tasks.*.description' => ['nullable', 'string'],
             'tasks.*.acceptance_criterion_id' => ['nullable', 'integer'],
+            'tasks.*.scenario_id' => ['nullable', 'integer'],
             'tasks.*.depends_on_positions' => ['nullable', 'array'],
             'tasks.*.depends_on_positions.*' => ['integer', 'min:1'],
             'tasks.*.subtasks' => ['required', 'array', 'min:1'],
@@ -59,6 +60,7 @@ class SetTasksTool extends Tool
 
         return Response::json([
             'story_id' => $story->id,
+            'plan_id' => $result['plan_id'],
             'task_count' => $result['task_count'],
             'subtask_count' => $result['subtask_count'],
             'story_status' => $story->fresh()->status?->value,
@@ -73,7 +75,7 @@ class SetTasksTool extends Tool
         return [
             'story_id' => $schema->integer()->description('Story whose task list to replace.')->required(),
             'tasks' => $schema->array()
-                ->description('Ordered list. Each item: {position:int (>=1), name:string, description?:string (markdown), acceptance_criterion_id?:int, depends_on_positions?:int[], subtasks: [{position:int (>=1), name:string, description?:string (markdown)}]}. Each task must have at least one subtask. Position values must be unique within their parent.')
+                ->description('Ordered list. Each item: {position:int (>=1), name:string, description?:string (markdown), acceptance_criterion_id?:int, scenario_id?:int, depends_on_positions?:int[], subtasks: [{position:int (>=1), name:string, description?:string (markdown)}]}. Each task must have at least one subtask. Position values must be unique within their parent.')
                 ->required(),
         ];
     }

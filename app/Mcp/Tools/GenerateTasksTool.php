@@ -14,10 +14,10 @@ use Laravel\Mcp\Server\Tool;
 /**
  * MCP tool: generate-tasks
  *
- * Drives the planning agent for an Approved story. Aligned with the
- * Story → Task → Subtask hierarchy (ADR-0002).
+ * Drives the planning agent for an Approved story. Generates a new current
+ * plan containing tasks and subtasks.
  */
-#[Description('Generate the task list (tasks + subtasks) for an Approved story using the planning agent. One task per acceptance criterion, each with one or more subtasks. The story must be Approved and have no existing tasks. Generated tasks reopen approval — the story flips back to PendingApproval (revision bumped) so a human can review the breakdown before execution.')]
+#[Description('Generate a new implementation plan (tasks + subtasks) for an Approved story using the planning agent. The story must be Approved and have no current-plan tasks. Generated tasks reopen approval so a human can review the breakdown before execution.')]
 class GenerateTasksTool extends Tool
 {
     use ResolvesProjectAccess;
@@ -49,7 +49,7 @@ class GenerateTasksTool extends Tool
         }
 
         if ($story->tasks()->exists()) {
-            return Response::error('Story already has tasks. Use set-tasks / update-task to edit them.');
+            return Response::error('Story already has current-plan tasks. Use set-tasks / update-task to edit them.');
         }
 
         $run = $execution->dispatchTaskGeneration($story);
@@ -67,7 +67,7 @@ class GenerateTasksTool extends Tool
     public function schema(JsonSchema $schema): array
     {
         return [
-            'story_id' => $schema->integer()->description('Approved story to generate tasks for. Must have no existing tasks.')->required(),
+            'story_id' => $schema->integer()->description('Approved story to generate tasks for. Must have no current-plan tasks.')->required(),
         ];
     }
 }

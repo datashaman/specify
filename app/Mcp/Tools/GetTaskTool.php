@@ -36,7 +36,7 @@ class GetTaskTool extends Tool
         }
 
         $task = Task::query()
-            ->with(['story.feature', 'acceptanceCriterion', 'subtasks', 'dependencies:id,position'])
+            ->with(['story.feature', 'plan', 'acceptanceCriterion', 'scenario', 'subtasks', 'dependencies:id,position'])
             ->find($taskId);
 
         if (! $task) {
@@ -50,6 +50,7 @@ class GetTaskTool extends Tool
         return Response::json([
             'id' => $task->id,
             'story_id' => $task->story_id,
+            'plan_id' => $task->plan_id,
             'position' => $task->position,
             'name' => $task->name,
             'description' => $task->description,
@@ -57,7 +58,12 @@ class GetTaskTool extends Tool
             'acceptance_criterion' => $task->acceptanceCriterion ? [
                 'id' => $task->acceptanceCriterion->id,
                 'position' => $task->acceptanceCriterion->position,
-                'criterion' => $task->acceptanceCriterion->criterion,
+                'statement' => $task->acceptanceCriterion->statement,
+            ] : null,
+            'scenario' => $task->scenario ? [
+                'id' => $task->scenario->id,
+                'position' => $task->scenario->position,
+                'name' => $task->scenario->name,
             ] : null,
             'depends_on_positions' => $task->dependencies->pluck('position')->all(),
             'subtasks' => $task->subtasks->sortBy('position')->values()->map(fn ($s) => [

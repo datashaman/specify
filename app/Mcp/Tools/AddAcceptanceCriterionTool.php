@@ -44,7 +44,7 @@ class AddAcceptanceCriterionTool extends Tool
             ?? (int) ($story->acceptanceCriteria()->max('position') ?? 0) + 1;
 
         $ac = $story->acceptanceCriteria()->create([
-            'criterion' => $validated['criterion'],
+            'statement' => $validated['criterion'],
             'position' => $position,
         ]);
 
@@ -52,7 +52,7 @@ class AddAcceptanceCriterionTool extends Tool
             'id' => $ac->id,
             'story_id' => $ac->story_id,
             'position' => $ac->position,
-            'criterion' => $ac->criterion,
+            'statement' => $ac->statement,
             'met' => (bool) $ac->met,
         ]);
     }
@@ -64,7 +64,7 @@ class AddAcceptanceCriterionTool extends Tool
     {
         return [
             'story_id' => $schema->integer()->description('Story to add the criterion to.')->required(),
-            'criterion' => $schema->string()->description('Observable behaviour the story must satisfy. Phrase as a "given/when/then" or plain "the system X when Y." Not an implementation step.')->required(),
+            'criterion' => $schema->string()->description('Observable behaviour the story must satisfy. Use one atomic rule statement, not a full Given/When/Then scenario.')->required(),
             'position' => $schema->integer()->description('Position in the list. Defaults to last + 1.'),
         ];
     }

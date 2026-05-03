@@ -13,7 +13,7 @@ use Laravel\Mcp\Server\Tool;
 /**
  * MCP tool: start-run
  */
-#[Description('Start (or resume) execution of an Approved story. Dispatches agent runs for the next actionable subtasks (parent task dependencies satisfied AND lower-position siblings done). The story must already be Approved.')]
+#[Description('Start (or resume) execution of an Approved story. Dispatches agent runs for the next actionable subtasks in the story\'s current plan (parent task dependencies satisfied AND lower-position siblings done). The story must already be Approved.')]
 class StartRunTool extends Tool
 {
     use ResolvesProjectAccess;
