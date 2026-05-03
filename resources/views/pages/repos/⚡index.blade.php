@@ -325,9 +325,14 @@ new #[Title('Repositories')] class extends Component {
                             @endforelse
                         </div>
                     @else
-                        <flux:text class="text-sm text-zinc-500">
-                            {{ __('Connect your GitHub account from Settings to add repositories.') }}
-                        </flux:text>
+                        <div class="flex flex-col gap-2">
+                            <flux:text class="text-sm text-zinc-500">
+                                {{ __('GitHub repository search is only available for accounts linked through GitHub sign-in.') }}
+                            </flux:text>
+                            <flux:text class="text-sm text-zinc-500">
+                                {{ __('There is currently no GitHub connection flow in Settings.') }}
+                            </flux:text>
+                        </div>
                     @endif
 
                     <div class="flex justify-end gap-2">
