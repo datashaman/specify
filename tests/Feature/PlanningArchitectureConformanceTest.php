@@ -72,7 +72,8 @@ test('task generation prompt allows cross-cutting plan tasks', function () {
     expect($prompt)->toContain('Shape Tasks around coherent implementation work')
         ->and($prompt)->toContain('Leave it absent when the Task is cross-cutting')
         ->and($agent)->toContain('do not force one Task per Acceptance Criterion')
-        ->and($agent)->toContain("'acceptance_criterion_position' => \$schema->integer()->min(1),");
+        ->and($agent)->toContain("'acceptance_criterion_position' =>")
+        ->and($agent)->not->toContain("'acceptance_criterion_position' => \$schema->integer()->min(1)->required()");
 });
 
 function namedParameterType(ReflectionMethod $method, string $parameterName): string

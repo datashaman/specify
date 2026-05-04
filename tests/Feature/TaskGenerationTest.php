@@ -94,15 +94,15 @@ test('regeneration replaces the prior task list', function () {
 
 test('task generation allows cross-cutting tasks without a single acceptance criterion', function () {
     $story = Story::factory()->create();
-    AcceptanceCriterion::factory()->for($story)->create(['position' => 0, 'statement' => 'AC one']);
+    AcceptanceCriterion::factory()->for($story)->create(['position' => 1, 'statement' => 'AC one']);
 
     TasksGenerator::fake(fn () => [
         'summary' => 'plan it',
         'tasks' => [[
             'name' => 'shared setup',
             'description' => 'Prepare shared infrastructure for multiple criteria.',
-            'position' => 0,
-            'subtasks' => [['name' => 'set up shared pieces', 'description' => 'Do the shared setup.', 'position' => 0]],
+            'position' => 1,
+            'subtasks' => [['name' => 'set up shared pieces', 'description' => 'Do the shared setup.', 'position' => 1]],
         ]],
     ]);
 
