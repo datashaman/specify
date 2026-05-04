@@ -179,6 +179,34 @@ test('story decision action records approval with note through the story page wo
         ->and($s['story']->fresh()->status)->toBe(StoryStatus::Approved);
 });
 
+test('story decision action rejects crafted calls outside review states', function () {
+    $s = showPageScene(['status' => StoryStatus::Draft]);
+    attachPolicy($s['ws'], required: 1, allowSelf: true);
+
+    $this->actingAs($s['user']);
+
+    Livewire::test('pages::stories.show', ['story' => $s['story']->id])
+        ->call('decide', ApprovalDecision::Approve->value)
+        ->assertStatus(422);
+
+    expect(StoryApproval::query()->where('story_id', $s['story']->id)->count())->toBe(0)
+        ->and($s['story']->fresh()->status)->toBe(StoryStatus::Draft);
+});
+
+test('story change-request and reject decisions require notes', function () {
+    $s = showPageScene(['status' => StoryStatus::PendingApproval]);
+    attachPolicy($s['ws'], required: 1, allowSelf: true);
+
+    $this->actingAs($s['user']);
+
+    Livewire::test('pages::stories.show', ['story' => $s['story']->id])
+        ->call('decide', ApprovalDecision::ChangesRequested->value)
+        ->assertStatus(422);
+
+    expect(StoryApproval::query()->where('story_id', $s['story']->id)->count())->toBe(0)
+        ->and($s['story']->fresh()->status)->toBe(StoryStatus::PendingApproval);
+});
+
 test('eligible-approvers section renders only when threshold > 1', function () {
     $other = User::factory()->create(['name' => 'second-eligible']);
     $s = showPageScene(['status' => StoryStatus::PendingApproval]);
@@ -258,6 +286,40 @@ test('plan decision action records approval with note through the story page wor
     expect($approval->decision)->toBe(ApprovalDecision::Approve)
         ->and($approval->notes)->toBe('plan is executable')
         ->and($task->plan->fresh()->status)->toBe(PlanStatus::Approved);
+});
+
+test('plan decision action rejects crafted calls when current plan is not pending approval', function () {
+    $s = showPageScene(['status' => StoryStatus::Approved]);
+    attachPolicy($s['ws'], required: 1, allowSelf: true);
+
+    $task = Task::factory()->forCurrentPlanOf($s['story'])->create();
+    $task->plan->forceFill(['status' => PlanStatus::Done->value])->save();
+
+    $this->actingAs($s['user']);
+
+    Livewire::test('pages::stories.show', ['story' => $s['story']->id])
+        ->call('decidePlan', ApprovalDecision::Approve->value)
+        ->assertStatus(422);
+
+    expect(PlanApproval::query()->where('plan_id', $task->plan_id)->count())->toBe(0)
+        ->and($task->plan->fresh()->status)->toBe(PlanStatus::Done);
+});
+
+test('plan change-request and reject decisions require notes', function () {
+    $s = showPageScene(['status' => StoryStatus::Approved]);
+    attachPolicy($s['ws'], required: 1, allowSelf: true);
+
+    $task = Task::factory()->forCurrentPlanOf($s['story'])->create();
+    $task->plan->forceFill(['status' => PlanStatus::PendingApproval->value])->save();
+
+    $this->actingAs($s['user']);
+
+    Livewire::test('pages::stories.show', ['story' => $s['story']->id])
+        ->call('decidePlan', ApprovalDecision::Reject->value)
+        ->assertStatus(422);
+
+    expect(PlanApproval::query()->where('plan_id', $task->plan_id)->count())->toBe(0)
+        ->and($task->plan->fresh()->status)->toBe(PlanStatus::PendingApproval);
 });
 
 test('plan section is AC-led: AC text leads, Task name follows', function () {

@@ -4,6 +4,7 @@ namespace App\Services\Stories;
 
 use App\Enums\AgentRunStatus;
 use App\Enums\ApprovalDecision;
+use App\Enums\PlanStatus;
 use App\Enums\StoryStatus;
 use App\Enums\TaskStatus;
 use App\Models\AgentRun;
@@ -35,7 +36,9 @@ class StoryPageWorkflow
 
     public function recordStoryDecision(Story $story, User $user, ApprovalDecision $decision, ?string $note = null): void
     {
+        abort_unless(in_array($story->status, [StoryStatus::PendingApproval, StoryStatus::ChangesRequested], true), 422, 'Story is not awaiting a decision.');
         abort_unless($user->canApproveInProject($story->feature->project), 403);
+        $this->guardDecisionNote($decision, $note);
 
         $this->approvals->recordDecision($story, $user, $decision, $note);
     }
@@ -51,7 +54,9 @@ class StoryPageWorkflow
     public function recordPlanDecision(Story $story, User $user, ApprovalDecision $decision, ?string $note = null): void
     {
         abort_unless($story->currentPlan, 404);
+        abort_unless($story->currentPlan->status === PlanStatus::PendingApproval, 422, 'Plan is not awaiting a decision.');
         abort_unless($user->canApproveInProject($story->feature->project), 403);
+        $this->guardDecisionNote($decision, $note);
 
         $this->approvals->recordPlanDecision($story->currentPlan, $user, $decision, $note);
     }
@@ -108,5 +113,14 @@ class StoryPageWorkflow
         abort_unless($user->canApproveInProject($story->feature->project), 403);
 
         $this->approvals->recompute($story);
+    }
+
+    private function guardDecisionNote(ApprovalDecision $decision, ?string $note): void
+    {
+        if (! in_array($decision, [ApprovalDecision::ChangesRequested, ApprovalDecision::Reject], true)) {
+            return;
+        }
+
+        abort_if(trim((string) $note) === '', 422, 'Notes are required for this decision.');
     }
 }
