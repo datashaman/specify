@@ -14,7 +14,7 @@ use Laravel\Mcp\Server\Tool;
 /**
  * MCP tool: list-tasks
  */
-#[Description('List the tasks attached to a story, in position order. Each entry includes subtask counts and the linked acceptance criterion text.')]
+#[Description('List the Tasks in a story\'s current Plan, in position order. Each entry includes plan_id, optional acceptance criterion/scenario links, dependency positions, and Subtask counts.')]
 class ListTasksTool extends Tool
 {
     use ResolvesProjectAccess;
@@ -48,9 +48,11 @@ class ListTasksTool extends Tool
 
         return Response::json([
             'story_id' => $story->id,
+            'current_plan_id' => $story->current_plan_id,
             'count' => $tasks->count(),
             'tasks' => $tasks->map(fn (Task $task) => [
                 'id' => $task->id,
+                'plan_id' => $task->plan_id,
                 'position' => $task->position,
                 'name' => $task->name,
                 'description' => $task->description,
@@ -78,7 +80,7 @@ class ListTasksTool extends Tool
     public function schema(JsonSchema $schema): array
     {
         return [
-            'story_id' => $schema->integer()->description('Story whose tasks to list.')->required(),
+            'story_id' => $schema->integer()->description('Story whose current-Plan Tasks should be listed.')->required(),
         ];
     }
 }

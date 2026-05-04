@@ -13,7 +13,7 @@ use Laravel\Mcp\Server\Tool;
 /**
  * MCP tool: get-task
  */
-#[Description('Get a task in detail, including its subtasks (positions, statuses) and dependency positions.')]
+#[Description('Get a Plan-owned Task in detail, including story_id, plan_id, optional acceptance criterion/scenario links, Subtasks, and dependency positions.')]
 class GetTaskTool extends Tool
 {
     use ResolvesProjectAccess;

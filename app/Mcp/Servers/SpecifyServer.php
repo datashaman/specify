@@ -56,7 +56,7 @@ use Laravel\Mcp\Server\Attributes\Version;
 #[Name('Specify Server')]
 #[Version('0.1.0')]
 #[Instructions(<<<'TXT'
-Tools for managing Specify projects, features, stories, scenarios, and plans. The hierarchy is project → feature → story. A story owns product framing plus acceptance criteria and scenarios. A story may also have one or more implementation plans; the current plan owns tasks, and tasks own subtasks. A story must belong to a feature, so call create-feature before create-story when no matching feature exists. Most tools default to the authenticated user's current project when project_id is omitted.
+Tools for managing Specify projects, features, stories, scenarios, and plans. The hierarchy is Project → Feature → Story → AcceptanceCriterion / Scenario → Plan → Task → Subtask. A story owns product framing plus acceptance criteria and scenarios. A story may also have one or more implementation plans; the current plan owns tasks, and tasks own subtasks. A story must belong to a feature, so call create-feature before create-story when no matching feature exists. Most tools default to the authenticated user's current project when project_id is omitted.
 
 Voice and scope, very important:
 

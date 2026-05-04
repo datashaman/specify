@@ -14,7 +14,7 @@ use Laravel\Mcp\Server\Tool;
 /**
  * MCP tool: set-tasks
  */
-#[Description('Replace the entire task list for a story in one transaction. Each task gets 1+ ordered subtasks; tasks may declare task-level dependencies via positions; each task may link to one acceptance_criterion_id belonging to the story. Replacing tasks creates a fresh current plan and reopens plan approval. Markdown is supported in description fields.')]
+#[Description('Replace the story\'s current implementation Plan in one transaction by writing a fresh ordered Task/Subtask breakdown. Each Task belongs to the new Plan, may link to an optional acceptance_criterion_id and/or scenario_id from the same Story, and may declare task-level dependencies via positions. For Approved stories, the fresh Plan starts PendingApproval; for non-Approved stories, it stays Draft until the Story is approved/submitted. Markdown is supported in description fields.')]
 class SetTasksTool extends Tool
 {
     use ResolvesProjectAccess;
@@ -73,9 +73,9 @@ class SetTasksTool extends Tool
     public function schema(JsonSchema $schema): array
     {
         return [
-            'story_id' => $schema->integer()->description('Story whose task list to replace.')->required(),
+            'story_id' => $schema->integer()->description('Story whose current implementation Plan should be replaced.')->required(),
             'tasks' => $schema->array()
-                ->description('Ordered list. Each item: {position:int (>=1), name:string, description?:string (markdown), acceptance_criterion_id?:int, scenario_id?:int, depends_on_positions?:int[], subtasks: [{position:int (>=1), name:string, description?:string (markdown)}]}. Each task must have at least one subtask. Position values must be unique within their parent.')
+                ->description('Ordered Tasks for the fresh current Plan. Each item: {position:int (>=1), name:string, description?:string (markdown), acceptance_criterion_id?:int, scenario_id?:int, depends_on_positions?:int[], subtasks: [{position:int (>=1), name:string, description?:string (markdown)}]}. Criterion/scenario links are optional; use them only when a Task directly supports that product artifact. Each Task must have at least one Subtask. Position values must be unique within their parent. For Approved stories this replacement creates a PendingApproval Plan; otherwise it creates a Draft Plan.')
                 ->required(),
         ];
     }
