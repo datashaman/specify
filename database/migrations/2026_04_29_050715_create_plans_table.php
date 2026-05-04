@@ -17,6 +17,7 @@ return new class extends Migration
             $table->unsignedInteger('version')->default(1);
             $table->text('summary')->nullable();
             $table->timestamps();
+            $table->unique(['story_id', 'version']);
         });
 
         Schema::table('stories', function (Blueprint $table) {

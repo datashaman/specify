@@ -14,7 +14,7 @@ test('story run projection detects active subtask runs under the current plan', 
     $task = Task::factory()->forCurrentPlanOf($story)->create();
     $subtask = Subtask::factory()->for($task)->create();
 
-    $oldPlan = Plan::factory()->for($story)->create(['version' => 1]);
+    $oldPlan = Plan::factory()->for($story)->create(['version' => 2]);
     $oldTask = Task::factory()->for($oldPlan)->create();
     $oldSubtask = Subtask::factory()->for($oldTask)->create();
 

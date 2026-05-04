@@ -23,6 +23,7 @@ test('acceptance criterion met only reflects done tasks in the current plan', fu
 
     $newPlan = Plan::factory()->create([
         'story_id' => $story->id,
+        'version' => 2,
         'status' => PlanStatus::PendingApproval,
     ]);
     $newTask = Task::factory()->create([

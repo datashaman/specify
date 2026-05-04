@@ -5,7 +5,9 @@ namespace App\Mcp\Tools;
 use App\Enums\PlanSource;
 use App\Enums\PlanStatus;
 use App\Mcp\Concerns\ResolvesProjectAccess;
+use App\Models\Story;
 use App\Services\Plans\CurrentPlanSelector;
+use App\Services\Plans\PlanVersionAllocator;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Laravel\Mcp\Request;
 use Laravel\Mcp\Response;
@@ -19,7 +21,7 @@ class CreatePlanTool extends Tool
 
     protected string $name = 'create-plan';
 
-    public function handle(Request $request, CurrentPlanSelector $currentPlans): Response
+    public function handle(Request $request, CurrentPlanSelector $currentPlans, PlanVersionAllocator $planVersions): Response
     {
         $user = $this->resolveUser($request);
         if ($user instanceof Response) {
@@ -45,23 +47,27 @@ class CreatePlanTool extends Tool
             return $story;
         }
 
-        $plan = $story->plans()->create([
-            'version' => ((int) $story->plans()->max('version')) + 1,
-            'revision' => 1,
-            'name' => $validated['name'],
-            'summary' => $validated['summary'] ?? null,
-            'design_notes' => $validated['design_notes'] ?? null,
-            'implementation_notes' => $validated['implementation_notes'] ?? null,
-            'risks' => $validated['risks'] ?? null,
-            'assumptions' => $validated['assumptions'] ?? null,
-            'source' => isset($validated['source']) ? PlanSource::from($validated['source']) : PlanSource::Human,
-            'source_label' => $validated['source_label'] ?? null,
-            'status' => isset($validated['status']) ? PlanStatus::from($validated['status']) : PlanStatus::Draft,
-        ]);
+        $plan = $planVersions->withNextVersion($story, function (int $nextVersion, Story $story) use ($validated, $currentPlans) {
+            $plan = $story->plans()->create([
+                'version' => $nextVersion,
+                'revision' => 1,
+                'name' => $validated['name'],
+                'summary' => $validated['summary'] ?? null,
+                'design_notes' => $validated['design_notes'] ?? null,
+                'implementation_notes' => $validated['implementation_notes'] ?? null,
+                'risks' => $validated['risks'] ?? null,
+                'assumptions' => $validated['assumptions'] ?? null,
+                'source' => isset($validated['source']) ? PlanSource::from($validated['source']) : PlanSource::Human,
+                'source_label' => $validated['source_label'] ?? null,
+                'status' => isset($validated['status']) ? PlanStatus::from($validated['status']) : PlanStatus::Draft,
+            ]);
 
-        if (($validated['set_current'] ?? false) === true) {
-            $currentPlans->setCurrent($story, $plan);
-        }
+            if (($validated['set_current'] ?? false) === true) {
+                $currentPlans->setCurrent($story, $plan);
+            }
+
+            return $plan;
+        });
 
         return Response::json([
             'id' => $plan->id,

@@ -12,6 +12,7 @@ use App\Models\Subtask;
 use App\Models\Task;
 use App\Services\Executors\ProposedSubtask;
 use App\Services\Plans\PlanInputNormalizer;
+use App\Services\Plans\PlanVersionAllocator;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use InvalidArgumentException;
@@ -25,7 +26,10 @@ use InvalidArgumentException;
  */
 class PlanWriter
 {
-    public function __construct(private PlanInputNormalizer $planInputs) {}
+    public function __construct(
+        private PlanInputNormalizer $planInputs,
+        private PlanVersionAllocator $planVersions,
+    ) {}
 
     /**
      * @param  list<array{
@@ -46,20 +50,18 @@ class PlanWriter
 
         $this->validate($story, $tasks);
 
-        $result = DB::transaction(function () use ($story, $tasks, $attributes) {
+        $result = $this->planVersions->withNextVersion($story, function (int $nextVersion, Story $story) use ($tasks, $attributes) {
             $previousPlan = $story->currentPlan;
 
             if ($previousPlan) {
                 $previousPlan->forceFill(['status' => PlanStatus::Superseded])->save();
             }
 
-            $nextVersion = ((int) $story->plans()->max('version')) + 1;
-
             $plan = Plan::create([
                 'story_id' => $story->getKey(),
                 'version' => $nextVersion,
                 'revision' => 1,
-                'name' => $attributes['name'] ?? 'Plan v'.$nextVersion,
+                'name' => $attributes['name'] ?? $this->defaultPlanName($attributes['source'] ?? PlanSource::Human, $nextVersion),
                 'summary' => $attributes['summary'] ?? null,
                 'source' => $attributes['source'] ?? PlanSource::Human,
                 'source_label' => $attributes['source_label'] ?? null,
@@ -113,6 +115,14 @@ class PlanWriter
         });
 
         return $result;
+    }
+
+    private function defaultPlanName(PlanSource $source, int $version): string
+    {
+        return match ($source) {
+            PlanSource::Ai => 'AI plan v'.$version,
+            default => 'Plan v'.$version,
+        };
     }
 
     /**

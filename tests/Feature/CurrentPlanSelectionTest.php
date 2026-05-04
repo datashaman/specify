@@ -10,6 +10,7 @@ use App\Models\Team;
 use App\Models\User;
 use App\Models\Workspace;
 use App\Services\Plans\CurrentPlanSelector;
+use App\Services\Plans\PlanVersionAllocator;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Mcp\Request;
 
@@ -36,13 +37,30 @@ test('create plan tool can set the new plan as current', function () {
         'story_id' => $story->getKey(),
         'name' => 'Implementation option A',
         'set_current' => true,
-    ]), app(CurrentPlanSelector::class));
+    ]), app(CurrentPlanSelector::class), app(PlanVersionAllocator::class));
 
     $payload = json_decode((string) $response->content(), true, flags: JSON_THROW_ON_ERROR);
 
     expect($response->isError())->toBeFalse()
         ->and($payload['is_current'])->toBeTrue()
+        ->and($payload['version'])->toBe(1)
         ->and($story->fresh()->current_plan_id)->toBe($payload['id']);
+});
+
+test('create plan tool assigns the next story plan version', function () {
+    ['user' => $user, 'story' => $story] = currentPlanScene();
+    Plan::factory()->for($story)->create(['version' => 1]);
+    $this->actingAs($user);
+
+    $response = app(CreatePlanTool::class)->handle(new Request([
+        'story_id' => $story->getKey(),
+        'name' => 'Implementation option B',
+    ]), app(CurrentPlanSelector::class), app(PlanVersionAllocator::class));
+
+    $payload = json_decode((string) $response->content(), true, flags: JSON_THROW_ON_ERROR);
+
+    expect($response->isError())->toBeFalse()
+        ->and($payload['version'])->toBe(2);
 });
 
 test('set current plan tool rejects a plan from another story', function () {
