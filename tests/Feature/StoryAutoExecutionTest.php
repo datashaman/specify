@@ -34,7 +34,7 @@ function approvedStoryScene(): array
     $project->attachRepo($repo);
 
     $ac = $story->acceptanceCriteria()->first();
-    $task = Task::factory()->forStory($story)->create(['position' => 0, 'acceptance_criterion_id' => $ac->id]);
+    $task = Task::factory()->forCurrentPlanOf($story)->create(['position' => 0, 'acceptance_criterion_id' => $ac->id]);
     Subtask::factory()->for($task)->create(['position' => 0]);
 
     return ['story' => $story->fresh(), 'project' => $project, 'task' => $task, 'plan' => Plan::query()->findOrFail($task->plan_id)];

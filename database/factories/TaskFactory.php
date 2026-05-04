@@ -25,7 +25,7 @@ class TaskFactory extends Factory
         });
     }
 
-    public function forStory(Story $story): static
+    public function forCurrentPlanOf(Story $story): static
     {
         return $this->state(function () use ($story) {
             $planId = $story->fresh()?->current_plan_id;

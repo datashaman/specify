@@ -31,7 +31,7 @@ function makeApprovedTask(): Task
     $story = Story::factory()->create(['status' => StoryStatus::Approved, 'revision' => 1]);
     $ac = AcceptanceCriterion::factory()->for($story)->create(['position' => 1]);
 
-    return Task::factory()->forStory($story)->create([
+    return Task::factory()->forCurrentPlanOf($story)->create([
         'name' => 'wire CSV export',
         'position' => 1,
         'acceptance_criterion_id' => $ac->id,

@@ -192,7 +192,7 @@ test('approval tracks render separately for story contract and current plan', fu
         'position' => 1,
         'statement' => 'AC-text-must-lead',
     ]);
-    $task = Task::factory()->forStory($s['story'])->create([
+    $task = Task::factory()->forCurrentPlanOf($s['story'])->create([
         'name' => 'task-name-secondary',
         'position' => 1,
         'acceptance_criterion_id' => $ac->id,
@@ -220,7 +220,7 @@ test('plan section is AC-led: AC text leads, Task name follows', function () {
         'position' => 1,
         'statement' => 'AC-text-must-lead',
     ]);
-    Task::factory()->forStory($s['story'])->create([
+    Task::factory()->forCurrentPlanOf($s['story'])->create([
         'name' => 'task-name-secondary',
         'position' => 1,
         'acceptance_criterion_id' => $ac->id,
@@ -260,7 +260,7 @@ test('task missing acceptance_criterion_id renders under current-plan unmapped t
     $s = showPageScene(['status' => StoryStatus::Approved]);
     attachPolicy($s['ws'], required: 1);
 
-    Task::factory()->forStory($s['story'])->create([
+    Task::factory()->forCurrentPlanOf($s['story'])->create([
         'name' => 'orphan-task',
         'position' => 1,
         'acceptance_criterion_id' => null,
@@ -281,7 +281,7 @@ test('appended subtask renders provenance glyph and tooltip referencing originat
     $ac = AcceptanceCriterion::create([
         'story_id' => $s['story']->id, 'position' => 1, 'statement' => 'ac',
     ]);
-    $task = Task::factory()->forStory($s['story'])->create([
+    $task = Task::factory()->forCurrentPlanOf($s['story'])->create([
         'position' => 1,
         'acceptance_criterion_id' => $ac->id,
     ]);

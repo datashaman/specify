@@ -14,8 +14,8 @@ uses(RefreshDatabase::class);
 
 test('task can depend on another task in the same current plan', function () {
     $story = Story::factory()->create();
-    $a = Task::factory()->forStory($story)->create(['name' => 'a']);
-    $b = Task::factory()->forStory($story)->create(['name' => 'b']);
+    $a = Task::factory()->forCurrentPlanOf($story)->create(['name' => 'a']);
+    $b = Task::factory()->forCurrentPlanOf($story)->create(['name' => 'b']);
 
     $b->addDependency($a);
 
@@ -40,9 +40,9 @@ test('task self-dependency is rejected', function () {
 
 test('task dependency cycle is prevented', function () {
     $story = Story::factory()->create();
-    $a = Task::factory()->forStory($story)->create();
-    $b = Task::factory()->forStory($story)->create();
-    $c = Task::factory()->forStory($story)->create();
+    $a = Task::factory()->forCurrentPlanOf($story)->create();
+    $b = Task::factory()->forCurrentPlanOf($story)->create();
+    $c = Task::factory()->forCurrentPlanOf($story)->create();
 
     $b->addDependency($a);
     $c->addDependency($b);
@@ -53,8 +53,8 @@ test('task dependency cycle is prevented', function () {
 
 test('task isReady reflects dependency status', function () {
     $story = Story::factory()->create();
-    $a = Task::factory()->forStory($story)->create(['status' => TaskStatus::Pending]);
-    $b = Task::factory()->forStory($story)->create(['status' => TaskStatus::Pending]);
+    $a = Task::factory()->forCurrentPlanOf($story)->create(['status' => TaskStatus::Pending]);
+    $b = Task::factory()->forCurrentPlanOf($story)->create(['status' => TaskStatus::Pending]);
     $b->addDependency($a);
 
     expect($b->isReady())->toBeFalse();

@@ -129,7 +129,7 @@ test('/runs/{id} 301-redirects to nested run console for subtask runs', function
     $project = Project::factory()->for($team)->create();
     $feature = Feature::factory()->for($project)->create();
     $story = Story::factory()->for($feature)->create();
-    $task = Task::factory()->forStory($story)->create();
+    $task = Task::factory()->forCurrentPlanOf($story)->create();
     $subtask = Subtask::factory()->for($task)->create();
     $run = AgentRun::factory()->create([
         'runnable_type' => Subtask::class,

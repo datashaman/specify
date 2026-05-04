@@ -16,7 +16,7 @@ function makeSubtaskWithCriterion(int $acPosition = 3, ?string $criterion = 'Use
         'position' => $acPosition,
         'statement' => $criterion,
     ]);
-    $task = Task::factory()->forStory($story)->create([
+    $task = Task::factory()->forCurrentPlanOf($story)->create([
         'name' => 'Wire export endpoint',
         'position' => 1,
         'acceptance_criterion_id' => $ac->id,
@@ -44,7 +44,7 @@ test('title renders AC#0 instead of dropping the AC tag (regression: truthiness 
 
 test('title falls back to Story tag when AC position is null', function () {
     $story = Story::factory()->create();
-    $task = Task::factory()->forStory($story)->create([
+    $task = Task::factory()->forCurrentPlanOf($story)->create([
         'name' => 'task',
         'position' => 1,
         'acceptance_criterion_id' => null,

@@ -118,8 +118,8 @@ test('full story execution: subtasks succeed and story flips to Done', function 
     $ac1 = $story->acceptanceCriteria()->first();
     $ac2 = AcceptanceCriterion::factory()->for($story)->create(['position' => 2]);
 
-    $taskA = Task::factory()->forStory($story)->create(['name' => 'a', 'position' => 0, 'acceptance_criterion_id' => $ac1->id]);
-    $taskB = Task::factory()->forStory($story)->create(['name' => 'b', 'position' => 1, 'acceptance_criterion_id' => $ac2->id]);
+    $taskA = Task::factory()->forCurrentPlanOf($story)->create(['name' => 'a', 'position' => 0, 'acceptance_criterion_id' => $ac1->id]);
+    $taskB = Task::factory()->forCurrentPlanOf($story)->create(['name' => 'b', 'position' => 1, 'acceptance_criterion_id' => $ac2->id]);
     Subtask::factory()->for($taskA)->create(['position' => 0]);
     Subtask::factory()->for($taskB)->create(['position' => 0]);
     $taskB->addDependency($taskA);
