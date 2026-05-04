@@ -7,6 +7,7 @@ use App\Enums\StoryStatus;
 use App\Models\Concerns\HasSlug;
 use App\Services\Approvals\ApprovalPolicyResolver;
 use App\Services\ApprovalService;
+use App\Services\Stories\StoryApprovalSubmission;
 use App\Services\Stories\StoryDependencyGraph;
 use App\Services\Stories\StoryPullRequestProjection;
 use App\Services\Stories\StoryRunProjection;
@@ -221,15 +222,7 @@ class Story extends Model
 
     public function submitForApproval(): void
     {
-        if ($this->status === StoryStatus::Rejected) {
-            throw new \RuntimeException('Cannot submit a rejected story.');
-        }
-        if ($this->acceptanceCriteria()->count() === 0) {
-            throw new \RuntimeException('Add at least one acceptance criterion before submitting.');
-        }
-        $this->status = StoryStatus::PendingApproval;
-        $this->save();
-        app(ApprovalService::class)->recompute($this);
+        app(StoryApprovalSubmission::class)->submit($this);
     }
 
     public function acceptanceCriteria(): HasMany
