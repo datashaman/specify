@@ -11,6 +11,8 @@ use Illuminate\Support\Collection;
 
 class StoryRunProjection
 {
+    private const PLAN_GENERATION_RUN_LIMIT = 25;
+
     public function hasActiveSubtaskRun(Story $story): bool
     {
         return AgentRun::query()
@@ -43,16 +45,18 @@ class StoryRunProjection
             ->where('runnable_type', Story::class)
             ->where('runnable_id', $story->getKey())
             ->latest('id')
-            ->get();
+            ->limit(self::PLAN_GENERATION_RUN_LIMIT)
+            ->get(['id', 'runnable_type', 'runnable_id', 'status', 'finished_at', 'error_message']);
     }
 
     public function latestCurrentPlanRun(Story $story): ?AgentRun
     {
-        return $story->currentPlanTasks
-            ->flatMap->subtasks
-            ->flatMap->agentRuns
-            ->sortByDesc('id')
-            ->first();
+        return AgentRun::query()
+            ->where('runnable_type', Subtask::class)
+            ->whereIn('runnable_id', $this->subtaskIdQueryFor($story))
+            ->with('repo')
+            ->latest('id')
+            ->first(['id', 'runnable_type', 'runnable_id', 'repo_id', 'working_branch']);
     }
 
     /**
@@ -60,6 +64,14 @@ class StoryRunProjection
      */
     public function currentPlanViewData(Story $story): array
     {
+        $story->loadMissing([
+            'acceptanceCriteria',
+            'currentPlanTasks.acceptanceCriterion',
+            'currentPlanTasks.scenario',
+            'currentPlanTasks.dependencies',
+            'currentPlanTasks.subtasks.agentRuns.repo',
+        ]);
+
         $tasksByAc = $story->currentPlanTasks->groupBy('acceptance_criterion_id');
         $latestRun = $this->latestCurrentPlanRun($story);
 

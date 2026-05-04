@@ -99,3 +99,23 @@ test('story run projection prepares current plan activity view data', function (
         ->and($data['planGenRuns']->pluck('id')->all())->toBe([$planRun->id])
         ->and($older->id)->toBeLessThan($latest->id);
 });
+
+test('story run projection limits plan generation run payload', function () {
+    $story = Story::factory()->create();
+
+    foreach (range(1, 30) as $i) {
+        AgentRun::factory()->create([
+            'runnable_type' => Story::class,
+            'runnable_id' => $story->id,
+            'status' => AgentRunStatus::Succeeded,
+            'output' => ['large' => str_repeat('x', 100)],
+            'diff' => str_repeat('y', 100),
+        ]);
+    }
+
+    $runs = app(StoryRunProjection::class)->planGenerationRuns($story);
+
+    expect($runs)->toHaveCount(25)
+        ->and($runs->first()->getAttributes())->toHaveKeys(['id', 'status', 'finished_at', 'error_message'])
+        ->and($runs->first()->getAttributes())->not->toHaveKeys(['output', 'diff']);
+});
