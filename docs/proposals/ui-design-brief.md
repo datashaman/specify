@@ -223,9 +223,11 @@ Extended in place at `pages/stories/⚡show.blade.php` (already wires `Acceptanc
 
 - Inline edit on click for AC text and Story body. No modal.
 - **Plan editing** (adding/editing/removing ACs, Tasks, or Subtasks) opens an in-page editor with a persistent banner:
-  > **Saving will reset this Story to Pending Approval.** Current state: Approved · 2/2 · v7.
+  > **Saving will reopen current Plan approval.** Story: Approved · 2/2 · v7. Plan: Approved · 2/2 · p3.
   >
   > Plan delta: +2 subtasks, ~1 edited, −0 removed. [View diff]
+- **Product contract editing** (Story body, AC text, scenarios) uses the same banner shape but says:
+  > **Saving will reopen Story approval and current Plan approval.** Story: Approved · 2/2 · v7. Plan: Approved · 2/2 · p3.
 - Save button label flips to **"Save & request re-approval"** when the change reopens approval. Cancel discards.
 - A `respond_to_review` run does *not* count as the kind of edit that reopens approval (ADR-0008).
 - While a run is executing the previous revision, edits queue as the next revision: banner says "Run #41 still executing against v7. Saving creates v8 and queues for re-approval."
@@ -269,7 +271,7 @@ Scoped to **one** AgentRun. Same shell for both `kind`s, parameterised.
 ```
 ┌─────────────────────────────────────────────────────────────────────────┐
 │ ← Subtask  [Run #41 · v7 · running · 6m 12s]                           │
-│ kind: execute · driver: claude-code · branch: specify/feature/story       │
+│ kind: execute · driver: claude-code · branch: specify/{feature-slug}/{story-slug} │
 │ Started 12:04 · subtask step 2/4                                        │
 └─────────────────────────────────────────────────────────────────────────┘
 ```

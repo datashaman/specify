@@ -9,12 +9,12 @@ use App\Models\Subtask;
  *
  * Extracted from SubtaskRunPipeline so it can be unit-tested without spinning
  * up the queue/git/HTTP harness. The output is the human-facing surface of
- * every Specify run; keep it scannable, plan-anchored, and bounded in size.
+ * every Specify run; keep it scannable and bounded in size.
  */
 class PrPayloadBuilder
 {
     /**
-     * Build a scannable PR title that locates the work in the Story/Plan tree.
+     * Build a scannable PR title that locates the work in the Story/AC context.
      *
      * Reviewers triaging a queue of agent PRs benefit from the story id and
      * AC position — the bare subtask name does not place the change.

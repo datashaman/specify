@@ -9,6 +9,8 @@ Related:
 
 Implemented by PR #49. This document is retained as historical implementation context; the canonical decisions now live in ADR-0001 and ADR-0002.
 
+The implementation checklist below is archived, not a live TODO list. Unchecked boxes preserve the original planning shape and should not be read as remaining work after PR #49.
+
 Important constraint:
 - Existing Specify data is **not sacred**.
 - We do **not** need backward compatibility.
@@ -297,7 +299,7 @@ This avoids mixing durable product structure with archived change history.
 
 ---
 
-## Implementation checklist
+## Archived implementation checklist
 
 ## 1. Reset the foundational schema
 
