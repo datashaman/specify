@@ -47,9 +47,9 @@ Title remains short but adds the AC position so reviewers can scan a queue: `'Sp
 
 **Before**: README says "GenerateTasksJob → PlanGenerator agent" but the actual class is `TasksGenerator`.
 
-**After**: README says "GenerateTasksJob → TasksGenerator agent". The MCP tool slug was also renamed from `generate-plan` to `generate-tasks`.
+**After**: README says "GenerateTasksJob → TasksGenerator agent". The MCP tool is `generate-tasks`.
 
-**Resolution**: greenfield codebase, no external callers to migrate. The legacy slug was deleted outright in the same change as the rename; `GenerateTasksTool` is the only entry point.
+**Resolution**: greenfield codebase, no external callers to migrate. `GenerateTasksTool` is the only entry point.
 
 **Files**: `README.md`, `app/Mcp/Tools/GenerateTasksTool.php`.
 
@@ -77,6 +77,6 @@ The three implemented items are all reversible and low-blast-radius:
 
 - The PR body change reverts to a one-liner with one commit.
 - The CLI executor stdout passthrough is additive — no removed fields.
-- The README / MCP tool rename is direct and intentionally greenfield — no legacy alias exists.
+- The README / MCP tool rename is direct and intentionally greenfield.
 
 The two deferred items are intentionally not implemented here. Each gets its own ADR or follow-up PR.

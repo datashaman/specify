@@ -16,7 +16,7 @@ function featureShowScene(TeamRole $role = TeamRole::Admin): array
     $user = User::factory()->create();
     $team->addMember($user, $role);
     $project = Project::factory()->for($team)->create();
-    $feature = Feature::factory()->for($project)->create(['name' => 'Approval inbox']);
+    $feature = Feature::factory()->for($project)->create(['name' => 'Approval queue']);
 
     return compact('user', 'project', 'feature');
 }
@@ -28,7 +28,7 @@ test('feature page lists its stories and links to a feature-prefilled create', f
     $this->actingAs($user);
 
     Livewire::test('pages::features.show', ['project' => $project->id, 'feature' => $feature->id])
-        ->assertSee('Approval inbox')
+        ->assertSee('Approval queue')
         ->assertSee('Inline-listed-story');
 });
 

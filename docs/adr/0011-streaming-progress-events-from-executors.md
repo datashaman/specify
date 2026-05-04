@@ -17,7 +17,7 @@ Two implementation shapes were considered:
 - **Tail the agent_run row.** Executor writes log lines to a `agent_run_events` table; the controller exposes a Reverb-bridged stream. Decouples the executor from broadcasting but doubles writes (DB + broadcast); growing event log inflates run row size.
 - **Broadcast directly from the executor.** Executor calls `broadcast()` per event; transport layer is Reverb private channels. No extra storage; events are ephemeral (a watcher who joins late sees no history beyond what's in the polling endpoint).
 
-We chose **broadcast-direct with HTTP-poll fallback** for late joiners. The poll endpoint stays as the source of truth for "what happened in this run"; the broadcast is the low-latency optimisation for connected watchers.
+We chose **broadcast-direct with HTTP polling** for late joiners. The poll endpoint stays as the source of truth for "what happened in this run"; the broadcast is the low-latency optimisation for connected watchers.
 
 ## Decision
 

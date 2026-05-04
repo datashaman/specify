@@ -13,8 +13,7 @@ The implementation checklist below is archived, not a live TODO list. Unchecked 
 
 Important constraint:
 - Existing Specify data is **not sacred**.
-- We do **not** need backward compatibility.
-- Prefer the **cleanest target model** over compatibility bridges or migration shims.
+- Prefer the **cleanest target model**.
 
 ---
 
@@ -31,7 +30,7 @@ Refactor Specify's product and planning model so that these concepts each have a
 - executable tasks and subtasks
 
 Greenfield cleanup constraint:
-- Do not preserve legacy names, compatibility aliases, duplicate ownership columns, or old traversal helpers.
+- Keep only the target model names, ownership columns, and traversal helpers.
 - The product layer is `Feature -> Story -> AcceptanceCriterion/Scenario`.
 - The delivery layer is `Story -> Plan -> Task -> Subtask`.
 - Cross-links are explicit: `Story.current_plan_id`, optional `Scenario.acceptance_criterion_id`, optional `Task.acceptance_criterion_id`, and optional `Task.scenario_id`.

@@ -71,5 +71,5 @@ test('story summary labels task progress as current-plan tasks', function () {
 });
 
 test('redirects guests', function () {
-    $this->get('/stories')->assertRedirect(route('login'));
+    $this->get(route('stories.index', ['project' => 1]))->assertRedirect(route('login'));
 });

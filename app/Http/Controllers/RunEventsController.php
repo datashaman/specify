@@ -13,7 +13,7 @@ use Illuminate\Http\Request;
 /**
  * ADR-0011 HTTP poll endpoint: clients advance a per-run cursor to fetch
  * progress events written by `ProgressEmitter`. Reverb broadcast (Phase C)
- * layers over the same rows; the poll is the always-available fallback.
+ * layers over the same rows; the poll endpoint is the durable source of truth.
  */
 class RunEventsController extends Controller
 {
