@@ -7,7 +7,7 @@ Related:
 
 ## Status
 
-Implemented by PR #49. This document is retained as historical implementation context; the canonical decisions now live in ADR-0001 and ADR-0002.
+Implemented by PR #49 and subsequent cleanup through PR #91. This document is retained as historical implementation context; the canonical decisions now live in ADR-0001 and ADR-0002, and the current implementation shape is documented in [`docs/architecture/story-planning-model.md`](../architecture/story-planning-model.md).
 
 The implementation checklist below is archived, not a live TODO list. Unchecked boxes preserve the original planning shape and should not be read as remaining work after PR #49.
 
