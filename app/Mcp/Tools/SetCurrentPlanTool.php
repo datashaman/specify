@@ -3,7 +3,9 @@
 namespace App\Mcp\Tools;
 
 use App\Mcp\Concerns\ResolvesProjectAccess;
+use App\Services\Plans\CurrentPlanSelector;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
+use InvalidArgumentException;
 use Laravel\Mcp\Request;
 use Laravel\Mcp\Response;
 use Laravel\Mcp\Server\Attributes\Description;
@@ -16,7 +18,7 @@ class SetCurrentPlanTool extends Tool
 
     protected string $name = 'set-current-plan';
 
-    public function handle(Request $request): Response
+    public function handle(Request $request, CurrentPlanSelector $currentPlans): Response
     {
         $user = $this->resolveUser($request);
         if ($user instanceof Response) {
@@ -38,11 +40,12 @@ class SetCurrentPlanTool extends Tool
             return $plan;
         }
 
-        if ((int) $plan->story_id !== (int) $story->id) {
-            return Response::error('Plan does not belong to this story.');
+        try {
+            $currentPlans->setCurrent($story, $plan);
+        } catch (InvalidArgumentException $e) {
+            return Response::error($e->getMessage());
         }
 
-        $story->forceFill(['current_plan_id' => $plan->id])->save();
         $story->refresh();
 
         return Response::json([
