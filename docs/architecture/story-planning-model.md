@@ -21,6 +21,7 @@ A Story is the product contract. It answers what should exist and why it matters
 
 Story-owned product fields:
 
+- `name`
 - `kind`
 - `actor`
 - `intent`
