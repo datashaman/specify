@@ -1,5 +1,7 @@
 <?php
 
+use App\Ai\Agents\ReviewResponder;
+use App\Ai\Agents\TasksGenerator;
 use App\Enums\PlanStatus;
 use App\Mcp\Servers\SpecifyServer;
 use App\Mcp\Tools\ApprovePlanTool;
@@ -21,6 +23,7 @@ use App\Models\Plan;
 use App\Models\PlanApproval;
 use App\Models\Project;
 use App\Models\Repo;
+use App\Models\Scenario;
 use App\Models\Story;
 use App\Models\StoryApproval;
 use App\Models\Subtask;
@@ -57,6 +60,7 @@ test('load-bearing docs describe the current planning model', function () {
         ->and($agents)->toContain('Resolve Story through `Task -> Plan -> Story`')
         ->and($adrIndex)->toContain('Story and current Plan are the approval gates')
         ->and($prompt)->toContain('Shape Tasks around coherent implementation work')
+        ->and(file_get_contents(base_path('prompts/README.md')))->toContain('review-responder.md')
         ->and($agent)->toContain('may span acceptance criteria, scenarios, or shared enabling work');
 });
 
@@ -84,6 +88,59 @@ test('agent prompts describe current plan ownership', function () {
         ->and($subtaskExecutor)->toContain('execute one Subtask from that Plan')
         ->and($reviewResponder)->toContain('parent Task and current Plan')
         ->and($subtaskExecutor)->not->toContain('task'.' list');
+});
+
+test('tasks generator prompt includes scenarios supplied to the planner', function () {
+    $story = makeStory();
+    $criterion = $story->acceptanceCriteria()->firstOrFail();
+    Scenario::factory()->forCriterion($criterion)->create([
+        'position' => 1,
+        'name' => 'Checkout happy path',
+        'given_text' => 'Given a cart with billable items',
+        'when_text' => 'When the customer checks out',
+        'then_text' => 'Then the payment is captured',
+        'notes' => 'Use the primary payment provider.',
+    ]);
+
+    $prompt = (new TasksGenerator($story))->buildPrompt();
+
+    expect($prompt)->toContain('Scenarios (position. Given / When / Then):')
+        ->and($prompt)->toContain('1. Checkout happy path (AC #1)')
+        ->and($prompt)->toContain('Given: Given a cart with billable items')
+        ->and($prompt)->toContain('Then: Then the payment is captured')
+        ->and($prompt)->toContain('acceptance criteria and scenarios above');
+});
+
+test('review responder prompt includes current plan context', function () {
+    $story = Story::factory()->create();
+    $plan = Plan::factory()->for($story)->create([
+        'version' => 2,
+        'name' => 'Reviewable implementation plan',
+        'summary' => 'Respond to review without changing the product contract.',
+    ]);
+    $story->forceFill(['current_plan_id' => $plan->getKey()])->save();
+    $task = Task::factory()->for($plan)->create([
+        'position' => 1,
+        'name' => 'Address review feedback',
+    ]);
+    $subtask = Subtask::factory()->for($task)->create([
+        'position' => 1,
+        'name' => 'Patch reviewed code',
+        'description' => 'Apply focused review fixes.',
+    ]);
+
+    $prompt = (new ReviewResponder(
+        subtask: $subtask,
+        pullRequestNumber: 86,
+        reviewSummary: '',
+        comments: [],
+        workingBranch: 'cleanup/mcp-prompt-contract',
+    ))->buildPrompt();
+
+    expect($prompt)->toContain("Current Plan #{$plan->getKey()} (version 2")
+        ->and($prompt)->toContain('Plan name: Reviewable implementation plan')
+        ->and($prompt)->toContain('Respond to review without changing the product contract.')
+        ->and($prompt)->toContain('Parent Task #1: Address review feedback');
 });
 
 test('mcp instructions and planning tool descriptions speak in current-plan terms', function () {
