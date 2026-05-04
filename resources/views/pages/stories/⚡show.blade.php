@@ -666,28 +666,6 @@ new #[Title('Story')] class extends Component {
         return $this->story?->currentPlan !== null && $this->blockedBySelfApproval;
     }
 
-    #[Computed]
-    public function isAuthoringStatus(): bool
-    {
-        $story = $this->story;
-
-        return $story !== null && in_array(
-            $story->status,
-            [StoryStatus::Draft, StoryStatus::PendingApproval, StoryStatus::ChangesRequested],
-            true,
-        );
-    }
-
-    #[Computed]
-    public function decisionPanelVisible(): bool
-    {
-        $story = $this->story;
-
-        return ! $this->editing
-            && $story !== null
-            && ! in_array($story->status, [StoryStatus::Done, StoryStatus::Cancelled, StoryStatus::Rejected], true);
-    }
-
     /**
      * Story-runnable AgentRuns: plan-generation runs, latest first.
      */
@@ -703,6 +681,124 @@ new #[Title('Story')] class extends Component {
             ->where('runnable_id', $this->story_id)
             ->latest('id')
             ->get();
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    #[Computed]
+    public function planViewData(): array
+    {
+        $story = $this->story;
+        if (! $story) {
+            return [];
+        }
+
+        $tasksByAc = $story->currentPlanTasks->groupBy('acceptance_criterion_id');
+        $latestRun = $story->currentPlanTasks->flatMap->subtasks->flatMap->agentRuns->sortByDesc('id')->first();
+
+        return [
+            'story' => $story,
+            'tasksByAc' => $tasksByAc,
+            'unmappedTasks' => $tasksByAc->get(null, collect())->sortBy('position')->values(),
+            'acs' => $story->acceptanceCriteria->sortBy('position')->values(),
+            'subtaskCount' => $story->currentPlanTasks->reduce(fn ($acc, $task) => $acc + $task->subtasks->count(), 0),
+            'shouldRunMode' => $this->hasActiveSubtaskRun,
+            'branch' => $latestRun?->working_branch,
+            'repo' => $latestRun?->repo,
+            'planGenRuns' => $this->planGenerationRuns,
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    #[Computed]
+    public function decisionRailViewData(): array
+    {
+        $story = $this->story;
+        if (! $story) {
+            return [];
+        }
+
+        $currentPlan = $story->currentPlan;
+        $policy = $this->effectivePolicy;
+        $canApprove = $this->canApproveStory;
+        $canApprovePlan = $currentPlan !== null && $canApprove;
+        $isAuthor = $this->isAuthor;
+        $blockedBySelfApproval = $this->blockedBySelfApproval;
+        $planBlockedBySelfApproval = $this->planBlockedBySelfApproval;
+        $autoPromotes = $this->autoPromotes;
+        $hasIncompleteWork = $story->status === StoryStatus::Approved
+            && $story->currentPlanTasks->isNotEmpty()
+            && $story->currentPlanTasks->flatMap->subtasks->contains(fn ($s) => $s->status !== TaskStatus::Done);
+        $needsApprovalNote = in_array($story->status, [StoryStatus::PendingApproval, StoryStatus::ChangesRequested], true)
+            && $canApprove
+            && ! $blockedBySelfApproval
+            && ! $autoPromotes;
+        $needsPlanApprovalNote = $currentPlan !== null
+            && in_array($currentPlan->status, [PlanStatus::PendingApproval], true)
+            && $canApprovePlan
+            && ! $planBlockedBySelfApproval
+            && ! $autoPromotes;
+        $hasDraftSubmit = $story->status === StoryStatus::Draft && ($isAuthor || $canApprove);
+        $hasAutoStart = $story->status === StoryStatus::PendingApproval && $story->currentPlanTasks->isNotEmpty() && $autoPromotes && $canApprove;
+        $hasApprovalActions = in_array($story->status, [StoryStatus::PendingApproval, StoryStatus::ChangesRequested], true) && $canApprove && ! $blockedBySelfApproval;
+        $hasPlanSubmit = $currentPlan !== null && $currentPlan->status === PlanStatus::Draft && $story->currentPlanTasks->isNotEmpty() && $canApprovePlan;
+        $hasPlanApprovalActions = $currentPlan !== null && $currentPlan->status === PlanStatus::PendingApproval && $canApprovePlan && ! $planBlockedBySelfApproval;
+        $hasResume = $hasIncompleteWork && $canApprove;
+        $hasStartExecution = $story->status === StoryStatus::Approved
+            && $currentPlan?->status === PlanStatus::Approved
+            && $story->currentPlanTasks->isNotEmpty()
+            && ! $this->hasActiveSubtaskRun
+            && $canApprove;
+        $hasAnyDecisionAction = $hasDraftSubmit || $hasAutoStart || $hasApprovalActions || $hasPlanSubmit || $hasPlanApprovalActions || $hasResume || $hasStartExecution;
+        $isTerminal = in_array($story->status, [StoryStatus::Done, StoryStatus::Cancelled, StoryStatus::Rejected], true);
+        $rrCurrent = $story->approvals->where('story_revision', $story->revision ?? 1)->sortBy('created_at')->values();
+        $rrPrior = $story->approvals->where('story_revision', '!=', $story->revision ?? 1)->sortByDesc('created_at')->values();
+        $planCurrent = $currentPlan?->approvals?->where('plan_revision', $currentPlan->revision ?? 1)?->sortBy('created_at')?->values() ?? collect();
+        $planPrior = $currentPlan?->approvals?->where('plan_revision', '!=', $currentPlan->revision ?? 1)?->sortByDesc('created_at')?->values() ?? collect();
+        $rrEligibleVisible = ! $isTerminal
+            && $policy
+            && ($policy->required_approvals ?? 0) > 1
+            && (in_array($story->status, [StoryStatus::PendingApproval, StoryStatus::ChangesRequested], true)
+                || ($currentPlan && in_array($currentPlan->status, [PlanStatus::PendingApproval], true)));
+        $rrEligible = $rrEligibleVisible ? $this->eligibleApprovers : collect();
+        $blockedNotice = $blockedBySelfApproval
+            && ! $autoPromotes
+            && in_array($story->status, [StoryStatus::PendingApproval, StoryStatus::ChangesRequested], true);
+        $planBlockedNotice = $planBlockedBySelfApproval
+            && ! $autoPromotes
+            && $currentPlan
+            && in_array($currentPlan->status, [PlanStatus::PendingApproval], true);
+        $decisionVisible = $hasAnyDecisionAction || $blockedNotice || $planBlockedNotice || $this->pendingPlanRun;
+
+        return [
+            'showRail' => $decisionVisible || $rrCurrent->isNotEmpty() || $rrPrior->isNotEmpty() || $planCurrent->isNotEmpty() || $planPrior->isNotEmpty() || $rrEligible->isNotEmpty(),
+            'decisionVisible' => $decisionVisible,
+            'hasDraftSubmit' => $hasDraftSubmit,
+            'autoPromotes' => $autoPromotes,
+            'hasAutoStart' => $hasAutoStart,
+            'hasApprovalActions' => $hasApprovalActions,
+            'hasPlanSubmit' => $hasPlanSubmit,
+            'hasPlanApprovalActions' => $hasPlanApprovalActions,
+            'hasStartExecution' => $hasStartExecution,
+            'userApproved' => $this->userApproved,
+            'userApprovedPlan' => $this->userApprovedPlan,
+            'hasResume' => $hasResume,
+            'needsApprovalNote' => $needsApprovalNote,
+            'needsPlanApprovalNote' => $needsPlanApprovalNote,
+            'blockedNotice' => $blockedNotice,
+            'planBlockedNotice' => $planBlockedNotice,
+            'rrCurrent' => $rrCurrent,
+            'rrPrior' => $rrPrior,
+            'planCurrent' => $planCurrent,
+            'planPrior' => $planPrior,
+            'rrEligible' => $rrEligible,
+            'pill' => $this->pill,
+            'planPill' => $this->planPill,
+            'currentPlan' => $currentPlan,
+        ];
     }
 }; ?>
 
@@ -750,124 +846,16 @@ new #[Title('Story')] class extends Component {
             @include('partials.story-show.contract', ['story' => $story, 'planPill' => $planPill])
         @endunless
 
-        @php
-            $policy = $this->effectivePolicy;
-            $userApproved = $this->userApproved;
-            $userApprovedPlan = $this->userApprovedPlan;
-            $canApprove = $this->canApproveStory;
-            $canApprovePlan = $story->currentPlan !== null && $canApprove;
-            $isAuthor = $this->isAuthor;
-            $blockedBySelfApproval = $this->blockedBySelfApproval;
-            $planBlockedBySelfApproval = $this->planBlockedBySelfApproval;
-            $autoPromotes = $this->autoPromotes;
-            $currentPlan = $story->currentPlan;
-            $hasIncompleteWork = $story->status === StoryStatus::Approved
-                && $story->currentPlanTasks->isNotEmpty()
-                && $story->currentPlanTasks->flatMap->subtasks->contains(fn ($s) => $s->status !== TaskStatus::Done);
-            $needsApprovalNote = in_array($story->status, [StoryStatus::PendingApproval, StoryStatus::ChangesRequested], true)
-                && $canApprove
-                && ! $blockedBySelfApproval
-                && ! $autoPromotes;
-            $needsPlanApprovalNote = $currentPlan !== null
-                && in_array($currentPlan->status, [PlanStatus::PendingApproval], true)
-                && $canApprovePlan
-                && ! $planBlockedBySelfApproval
-                && ! $autoPromotes;
-            $hasDraftSubmit = $story->status === StoryStatus::Draft && ($isAuthor || $canApprove);
-            $hasAutoStart = $story->status === StoryStatus::PendingApproval && $story->currentPlanTasks->isNotEmpty() && $autoPromotes && $canApprove;
-            $hasApprovalActions = in_array($story->status, [StoryStatus::PendingApproval, StoryStatus::ChangesRequested], true) && $canApprove && ! $blockedBySelfApproval;
-            $hasPlanSubmit = $currentPlan !== null && $currentPlan->status === PlanStatus::Draft && $story->currentPlanTasks->isNotEmpty() && $canApprovePlan;
-            $hasPlanApprovalActions = $currentPlan !== null && $currentPlan->status === PlanStatus::PendingApproval && $canApprovePlan && ! $planBlockedBySelfApproval;
-            $hasResume = $hasIncompleteWork && $canApprove;
-            $hasStartExecution = $story->status === StoryStatus::Approved
-                && $currentPlan?->status === PlanStatus::Approved
-                && $story->currentPlanTasks->isNotEmpty()
-                && ! $this->hasActiveSubtaskRun
-                && $canApprove;
-            $hasAnyDecisionAction = $hasDraftSubmit || $hasAutoStart || $hasApprovalActions || $hasPlanSubmit || $hasPlanApprovalActions || $hasResume || $hasStartExecution;
-            $isTerminal = in_array($story->status, [StoryStatus::Done, StoryStatus::Cancelled, StoryStatus::Rejected], true);
-        @endphp
-
         @unless ($editing)
             {{-- ── Plan: ACs → Tasks → Subtasks → runs (AC-led) ────────────── --}}
-            @php
-                $tasksByAc = $story->currentPlanTasks->groupBy('acceptance_criterion_id');
-                $unmappedTasks = $tasksByAc->get(null, collect())->sortBy('position')->values();
-                $acs = $story->acceptanceCriteria->sortBy('position')->values();
-                $subtaskCount = $story->currentPlanTasks->reduce(fn ($acc, $task) => $acc + $task->subtasks->count(), 0);
-                $shouldRunMode = $this->hasActiveSubtaskRun;
-                $latestRun = $story->currentPlanTasks->flatMap->subtasks->flatMap->agentRuns->sortByDesc('id')->first();
-                $branch = $latestRun?->working_branch;
-                $repo = $latestRun?->repo;
-                $planGenRuns = $this->planGenerationRuns;
-            @endphp
-
-            @include('partials.story-show.plan', [
-                'story' => $story,
-                'tasksByAc' => $tasksByAc,
-                'unmappedTasks' => $unmappedTasks,
-                'acs' => $acs,
-                'subtaskCount' => $subtaskCount,
-                'shouldRunMode' => $shouldRunMode,
-                'branch' => $branch,
-                'repo' => $repo,
-                'planGenRuns' => $planGenRuns,
-            ])
+            @include('partials.story-show.plan', $this->planViewData)
         @endunless
 
             </div>{{-- /center column --}}
 
             {{-- ── Right rail: decision actions + log + eligible approvers ──── --}}
             @unless ($editing)
-                @php
-                    $rrCurrent = $story->approvals->where('story_revision', $story->revision ?? 1)->sortBy('created_at')->values();
-                    $rrPrior = $story->approvals->where('story_revision', '!=', $story->revision ?? 1)->sortByDesc('created_at')->values();
-                    $planCurrent = $currentPlan?->approvals?->where('plan_revision', $currentPlan->revision ?? 1)?->sortBy('created_at')?->values() ?? collect();
-                    $planPrior = $currentPlan?->approvals?->where('plan_revision', '!=', $currentPlan->revision ?? 1)?->sortByDesc('created_at')?->values() ?? collect();
-                    $rrPolicy = $this->effectivePolicy;
-                    $rrEligibleVisible = ! $isTerminal
-                        && $rrPolicy
-                        && ($rrPolicy->required_approvals ?? 0) > 1
-                        && (in_array($story->status, [StoryStatus::PendingApproval, StoryStatus::ChangesRequested], true)
-                            || ($currentPlan && in_array($currentPlan->status, [PlanStatus::PendingApproval], true)));
-                    $rrEligible = $rrEligibleVisible ? $this->eligibleApprovers : collect();
-                    $blockedNotice = $blockedBySelfApproval
-                        && ! $autoPromotes
-                        && in_array($story->status, [StoryStatus::PendingApproval, StoryStatus::ChangesRequested], true);
-                    $planBlockedNotice = $planBlockedBySelfApproval
-                        && ! $autoPromotes
-                        && $currentPlan
-                        && in_array($currentPlan->status, [PlanStatus::PendingApproval], true);
-                    $decisionVisible = $hasAnyDecisionAction || $blockedNotice || $planBlockedNotice || $this->pendingPlanRun;
-                    $showRail = $decisionVisible || $rrCurrent->isNotEmpty() || $rrPrior->isNotEmpty() || $planCurrent->isNotEmpty() || $planPrior->isNotEmpty() || $rrEligible->isNotEmpty();
-                @endphp
-                @include('partials.story-show.decision-rail', [
-                    'showRail' => $showRail,
-                    'decisionVisible' => $decisionVisible,
-                    'hasAnyDecisionAction' => $hasAnyDecisionAction,
-                    'hasDraftSubmit' => $hasDraftSubmit,
-                    'autoPromotes' => $autoPromotes,
-                    'hasAutoStart' => $hasAutoStart,
-                    'hasApprovalActions' => $hasApprovalActions,
-                    'hasPlanSubmit' => $hasPlanSubmit,
-                    'hasPlanApprovalActions' => $hasPlanApprovalActions,
-                    'hasStartExecution' => $hasStartExecution,
-                    'userApproved' => $userApproved,
-                    'userApprovedPlan' => $userApprovedPlan,
-                    'hasResume' => $hasResume,
-                    'needsApprovalNote' => $needsApprovalNote,
-                    'needsPlanApprovalNote' => $needsPlanApprovalNote,
-                    'blockedNotice' => $blockedNotice,
-                    'planBlockedNotice' => $planBlockedNotice,
-                    'rrCurrent' => $rrCurrent,
-                    'rrPrior' => $rrPrior,
-                    'planCurrent' => $planCurrent,
-                    'planPrior' => $planPrior,
-                    'rrEligible' => $rrEligible,
-                    'pill' => $pill,
-                    'planPill' => $planPill,
-                    'currentPlan' => $currentPlan,
-                ])
+                @include('partials.story-show.decision-rail', $this->decisionRailViewData)
             @endunless
 
         </div>{{-- /two-column wrapper --}}
