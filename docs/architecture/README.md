@@ -5,4 +5,5 @@ These pages explain Specify's current architecture. ADRs in `docs/adr/` remain t
 | Page | Purpose |
 |---|---|
 | [AgentRun lifecycle](agent-run-lifecycle.md) | Explains AgentRun kinds and statuses, execution scheduling, executor selection, workspace handling, PR/review follow-ups, progress events, retry/cancel semantics, and cascade rules. |
+| [Project information architecture](project-information-architecture.md) | Explains Workspace, Team, Project, Feature, Repo, route, active-project, access-control, and MCP context rules. |
 | [Story planning model](story-planning-model.md) | Explains the current Product contract -> Plan -> Task -> Subtask structure, approval gates, execution flow, Story page seams, and MCP terminology. |
