@@ -5,8 +5,10 @@ namespace App\Mcp\Tools;
 use App\Enums\TaskStatus;
 use App\Mcp\Concerns\ResolvesProjectAccess;
 use App\Models\Task;
+use App\Services\Tasks\TaskDependencyGraph;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Illuminate\Support\Facades\DB;
+use InvalidArgumentException;
 use Laravel\Mcp\Request;
 use Laravel\Mcp\Response;
 use Laravel\Mcp\Server\Attributes\Description;
@@ -25,7 +27,7 @@ class UpdateTaskTool extends Tool
     /**
      * Handle the MCP tool invocation.
      */
-    public function handle(Request $request): Response
+    public function handle(Request $request, TaskDependencyGraph $dependencies): Response
     {
         $user = $this->resolveUser($request);
         if ($user instanceof Response) {
@@ -54,64 +56,65 @@ class UpdateTaskTool extends Tool
 
         $structuralChange = false;
 
-        DB::transaction(function () use ($task, $validated, &$structuralChange) {
-            $updates = [];
+        try {
+            DB::transaction(function () use ($task, $validated, $dependencies, &$structuralChange) {
+                $updates = [];
 
-            if (array_key_exists('name', $validated) && $validated['name'] !== null) {
-                $updates['name'] = $validated['name'];
-                $structuralChange = true;
-            }
-            if (array_key_exists('description', $validated)) {
-                $updates['description'] = $validated['description'];
-                $structuralChange = true;
-            }
-            if (array_key_exists('status', $validated) && $validated['status'] !== null) {
-                $status = TaskStatus::tryFrom($validated['status']);
-                if ($status === null) {
-                    throw new \RuntimeException("Unknown status '{$validated['status']}'.");
+                if (array_key_exists('name', $validated) && $validated['name'] !== null) {
+                    $updates['name'] = $validated['name'];
+                    $structuralChange = true;
                 }
-                $updates['status'] = $status->value;
-            }
-            if (array_key_exists('acceptance_criterion_id', $validated)) {
-                $acId = $validated['acceptance_criterion_id'];
-                if ($acId !== null && ! $task->plan->story->acceptanceCriteria->contains('id', $acId)) {
-                    throw new \RuntimeException("acceptance_criterion_id {$acId} does not belong to this story.");
+                if (array_key_exists('description', $validated)) {
+                    $updates['description'] = $validated['description'];
+                    $structuralChange = true;
                 }
-                $updates['acceptance_criterion_id'] = $acId;
-                $structuralChange = true;
-            }
-            if (array_key_exists('scenario_id', $validated)) {
-                $scenarioId = $validated['scenario_id'];
-                if ($scenarioId !== null && ! $task->plan->story->scenarios->contains('id', $scenarioId)) {
-                    throw new \RuntimeException("scenario_id {$scenarioId} does not belong to this story.");
-                }
-                $updates['scenario_id'] = $scenarioId;
-                $structuralChange = true;
-            }
-
-            if (! empty($updates)) {
-                $task->forceFill($updates)->save();
-            }
-
-            if (array_key_exists('depends_on_positions', $validated) && is_array($validated['depends_on_positions'])) {
-                $byPosition = Task::query()
-                    ->where('plan_id', $task->plan_id)
-                    ->get(['id', 'position'])
-                    ->keyBy('position');
-                $depIds = [];
-                foreach ($validated['depends_on_positions'] as $pos) {
-                    if ((int) $pos === (int) $task->position) {
-                        continue;
+                if (array_key_exists('status', $validated) && $validated['status'] !== null) {
+                    $status = TaskStatus::tryFrom($validated['status']);
+                    if ($status === null) {
+                        throw new \RuntimeException("Unknown status '{$validated['status']}'.");
                     }
-                    $dep = $byPosition[$pos] ?? null;
-                    if ($dep) {
-                        $depIds[] = $dep->id;
-                    }
+                    $updates['status'] = $status->value;
                 }
-                $task->dependencies()->sync($depIds);
-                $structuralChange = true;
-            }
-        });
+                if (array_key_exists('acceptance_criterion_id', $validated)) {
+                    $acId = $validated['acceptance_criterion_id'];
+                    if ($acId !== null && ! $task->plan->story->acceptanceCriteria->contains('id', $acId)) {
+                        throw new \RuntimeException("acceptance_criterion_id {$acId} does not belong to this story.");
+                    }
+                    $updates['acceptance_criterion_id'] = $acId;
+                    $structuralChange = true;
+                }
+                if (array_key_exists('scenario_id', $validated)) {
+                    $scenarioId = $validated['scenario_id'];
+                    if ($scenarioId !== null && ! $task->plan->story->scenarios->contains('id', $scenarioId)) {
+                        throw new \RuntimeException("scenario_id {$scenarioId} does not belong to this story.");
+                    }
+                    $updates['scenario_id'] = $scenarioId;
+                    $structuralChange = true;
+                }
+
+                if (! empty($updates)) {
+                    $task->forceFill($updates)->save();
+                }
+
+                if (array_key_exists('depends_on_positions', $validated) && is_array($validated['depends_on_positions'])) {
+                    $byPosition = Task::query()
+                        ->where('plan_id', $task->plan_id)
+                        ->get(['id', 'plan_id', 'position'])
+                        ->keyBy('position');
+                    $replacements = [];
+                    foreach ($validated['depends_on_positions'] as $pos) {
+                        $dep = $byPosition[$pos] ?? null;
+                        if ($dep) {
+                            $replacements[] = $dep;
+                        }
+                    }
+                    $dependencies->replaceDependencies($task, $replacements);
+                    $structuralChange = true;
+                }
+            });
+        } catch (InvalidArgumentException $e) {
+            return Response::error($e->getMessage());
+        }
 
         if ($structuralChange && $task->plan) {
             $task->plan->reopenForApproval();
