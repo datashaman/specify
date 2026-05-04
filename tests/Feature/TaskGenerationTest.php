@@ -52,7 +52,7 @@ test('dispatching task generation runs the job, creates Tasks linked to ACs with
     $run->refresh();
     expect($run->status)->toBe(AgentRunStatus::Succeeded);
 
-    $tasks = $story->fresh()->tasks()->orderBy('position')->get();
+    $tasks = $story->fresh()->currentPlanTasks()->orderBy('position')->get();
     expect($tasks)->toHaveCount(2)
         ->and($tasks[0]->acceptance_criterion_id)->toBe($ac1->id)
         ->and($tasks[1]->acceptance_criterion_id)->toBe($ac2->id)
@@ -75,7 +75,7 @@ test('regeneration replaces the prior task list', function () {
     ]);
 
     app(ExecutionService::class)->dispatchTaskGeneration($story);
-    expect($story->fresh()->tasks()->count())->toBe(1);
+    expect($story->fresh()->currentPlanTasks()->count())->toBe(1);
 
     TasksGenerator::fake(fn () => [
         'summary' => 'v2',
@@ -87,7 +87,7 @@ test('regeneration replaces the prior task list', function () {
     ]);
 
     app(ExecutionService::class)->dispatchTaskGeneration($story);
-    $tasks = $story->fresh()->tasks;
+    $tasks = $story->fresh()->currentPlanTasks;
     expect($tasks)->toHaveCount(1)
         ->and($tasks[0]->name)->toBe('task-v2')
         ->and($story->fresh()->currentPlan->version)->toBe(2)
@@ -110,7 +110,7 @@ test('task generation allows cross-cutting tasks without a single acceptance cri
 
     app(ExecutionService::class)->dispatchTaskGeneration($story);
 
-    $task = $story->fresh()->tasks()->sole();
+    $task = $story->fresh()->currentPlanTasks()->sole();
     expect($task->acceptance_criterion_id)->toBeNull()
         ->and($task->subtasks()->count())->toBe(1);
 });

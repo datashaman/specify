@@ -41,7 +41,7 @@ class ListTasksTool extends Tool
             return $story;
         }
 
-        $tasks = $story->tasks()
+        $tasks = $story->currentPlanTasks()
             ->with(['acceptanceCriterion:id,position,statement', 'scenario:id,position,name', 'subtasks:id,task_id,status', 'dependencies:id,position'])
             ->orderBy('position')
             ->get();

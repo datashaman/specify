@@ -28,7 +28,7 @@ beforeEach(function () {
 
 test('subtask execution job runs the agent and marks subtask Done', function () {
     $story = approvedStoryInProjectWithRepo();
-    $subtask = $story->tasks()->first()->subtasks()->first();
+    $subtask = $story->currentPlanTasks()->first()->subtasks()->first();
 
     SubtaskExecutor::fake(fn () => [
         'summary' => 'edited two files',
@@ -52,7 +52,7 @@ test('subtask execution job runs the agent and marks subtask Done', function () 
 
 test('dispatch picks the project primary repo by default and sets working_branch', function () {
     $story = approvedStoryInProjectWithRepo();
-    $task = $story->tasks()->first();
+    $task = $story->currentPlanTasks()->first();
     $subtask = $task->subtasks()->first();
     $primary = $story->feature->project->primaryRepo();
 
@@ -68,7 +68,7 @@ test('dispatch picks the project primary repo by default and sets working_branch
 
 test('dispatch accepts an explicit repo override', function () {
     $story = approvedStoryInProjectWithRepo();
-    $subtask = $story->tasks()->first()->subtasks()->first();
+    $subtask = $story->currentPlanTasks()->first()->subtasks()->first();
     $project = $story->feature->project;
     $workspace = $project->team->workspace;
     $other = Repo::factory()->for($workspace)->create();
@@ -84,7 +84,7 @@ test('dispatch accepts an explicit repo override', function () {
 
 test('agent failure marks subtask Blocked and run Failed', function () {
     $story = approvedStoryInProjectWithRepo();
-    $subtask = $story->tasks()->first()->subtasks()->first();
+    $subtask = $story->currentPlanTasks()->first()->subtasks()->first();
 
     SubtaskExecutor::fake(function () {
         throw new RuntimeException('rate limited');
@@ -140,7 +140,7 @@ test('full story execution: subtasks succeed and story flips to Done', function 
 
 test('agent prompt includes repo URL and working branch', function () {
     $story = approvedStoryInProjectWithRepo();
-    $subtask = $story->tasks()->first()->subtasks()->first();
+    $subtask = $story->currentPlanTasks()->first()->subtasks()->first();
 
     app(ExecutionService::class)->dispatchSubtaskExecution($subtask);
 

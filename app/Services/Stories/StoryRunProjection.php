@@ -34,7 +34,7 @@ class StoryRunProjection
     private function subtaskIdQueryFor(Story $story): Builder
     {
         return Subtask::query()
-            ->whereIn('task_id', $story->tasks()->select('tasks.id'))
+            ->whereIn('task_id', $story->currentPlanTasks()->select('tasks.id'))
             ->select('id');
     }
 }

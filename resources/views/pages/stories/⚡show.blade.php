@@ -229,7 +229,7 @@ new #[Title('Story')] class extends Component {
         $story->submitForApproval();
 
         $fresh = $story->fresh();
-        if ($fresh->status === StoryStatus::Approved && ! $fresh->tasks()->exists()) {
+        if ($fresh->status === StoryStatus::Approved && ! $fresh->currentPlanTasks()->exists()) {
             app(ExecutionService::class)->dispatchTaskGeneration($fresh);
         }
 
@@ -287,7 +287,7 @@ new #[Title('Story')] class extends Component {
         $story = $this->story;
         abort_unless($story, 404);
         abort_unless($story->status === StoryStatus::Approved, 422, 'Story must be Approved.');
-        abort_if($story->tasks()->exists(), 422, 'Plan already exists.');
+        abort_if($story->currentPlanTasks()->exists(), 422, 'Plan already exists.');
         abort_unless(Auth::user()->canApproveInProject($story->feature->project), 403);
 
         app(ExecutionService::class)->dispatchTaskGeneration($story);
@@ -319,7 +319,7 @@ new #[Title('Story')] class extends Component {
         abort_unless($story->status === StoryStatus::Approved, 422, 'Story must be Approved.');
         abort_unless(Auth::user()->canApproveInProject($story->feature->project), 403);
 
-        $subtaskIds = Subtask::whereIn('task_id', $story->tasks()->pluck('id'))->pluck('id');
+        $subtaskIds = Subtask::whereIn('task_id', $story->currentPlanTasks()->pluck('id'))->pluck('id');
 
         AgentRun::where('runnable_type', Subtask::class)
             ->whereIn('runnable_id', $subtaskIds)
@@ -343,7 +343,7 @@ new #[Title('Story')] class extends Component {
         $story = $this->story;
         abort_unless($story, 404);
         abort_unless($story->status === StoryStatus::PendingApproval, 422, 'Story is not awaiting approval.');
-        abort_unless($story->tasks()->exists(), 422, 'No plan to execute.');
+        abort_unless($story->currentPlanTasks()->exists(), 422, 'No plan to execute.');
 
         $policy = $story->effectivePolicy();
         abort_unless($policy->auto_approve || $policy->required_approvals === 0, 403, 'Policy requires explicit approvals.');
@@ -526,11 +526,11 @@ new #[Title('Story')] class extends Component {
                 'acceptanceCriteria',
                 'scenarios.acceptanceCriterion',
                 'currentPlan.approvals.approver',
-                'tasks.plan',
-                'tasks.acceptanceCriterion',
-                'tasks.scenario',
-                'tasks.dependencies',
-                'tasks.subtasks.agentRuns.repo',
+                'currentPlanTasks.plan',
+                'currentPlanTasks.acceptanceCriterion',
+                'currentPlanTasks.scenario',
+                'currentPlanTasks.dependencies',
+                'currentPlanTasks.subtasks.agentRuns.repo',
                 'approvals.approver',
             ])
             ->find($this->story_id);
@@ -879,8 +879,8 @@ new #[Title('Story')] class extends Component {
             $autoPromotes = $this->autoPromotes;
             $currentPlan = $story->currentPlan;
             $hasIncompleteWork = $story->status === StoryStatus::Approved
-                && $story->tasks->isNotEmpty()
-                && $story->tasks->flatMap->subtasks->contains(fn ($s) => $s->status !== TaskStatus::Done);
+                && $story->currentPlanTasks->isNotEmpty()
+                && $story->currentPlanTasks->flatMap->subtasks->contains(fn ($s) => $s->status !== TaskStatus::Done);
             $needsApprovalNote = in_array($story->status, [StoryStatus::PendingApproval, StoryStatus::ChangesRequested], true)
                 && $canApprove
                 && ! $blockedBySelfApproval
@@ -891,14 +891,14 @@ new #[Title('Story')] class extends Component {
                 && ! $planBlockedBySelfApproval
                 && ! $autoPromotes;
             $hasDraftSubmit = $story->status === StoryStatus::Draft && ($isAuthor || $canApprove);
-            $hasAutoStart = $story->status === StoryStatus::PendingApproval && $story->tasks->isNotEmpty() && $autoPromotes && $canApprove;
+            $hasAutoStart = $story->status === StoryStatus::PendingApproval && $story->currentPlanTasks->isNotEmpty() && $autoPromotes && $canApprove;
             $hasApprovalActions = in_array($story->status, [StoryStatus::PendingApproval, StoryStatus::ChangesRequested], true) && $canApprove && ! $blockedBySelfApproval;
-            $hasPlanSubmit = $currentPlan !== null && $currentPlan->status === PlanStatus::Draft && $story->tasks->isNotEmpty() && $canApprovePlan;
+            $hasPlanSubmit = $currentPlan !== null && $currentPlan->status === PlanStatus::Draft && $story->currentPlanTasks->isNotEmpty() && $canApprovePlan;
             $hasPlanApprovalActions = $currentPlan !== null && $currentPlan->status === PlanStatus::PendingApproval && $canApprovePlan && ! $planBlockedBySelfApproval;
             $hasResume = $hasIncompleteWork && $canApprove;
             $hasStartExecution = $story->status === StoryStatus::Approved
                 && $currentPlan?->status === PlanStatus::Approved
-                && $story->tasks->isNotEmpty()
+                && $story->currentPlanTasks->isNotEmpty()
                 && ! $this->hasActiveSubtaskRun
                 && $canApprove;
             $hasAnyDecisionAction = $hasDraftSubmit || $hasAutoStart || $hasApprovalActions || $hasPlanSubmit || $hasPlanApprovalActions || $hasResume || $hasStartExecution;
@@ -908,12 +908,12 @@ new #[Title('Story')] class extends Component {
         @unless ($editing)
             {{-- ── Plan: ACs → Tasks → Subtasks → runs (AC-led) ────────────── --}}
             @php
-                $tasksByAc = $story->tasks->groupBy('acceptance_criterion_id');
+                $tasksByAc = $story->currentPlanTasks->groupBy('acceptance_criterion_id');
                 $unmappedTasks = $tasksByAc->get(null, collect())->sortBy('position')->values();
                 $acs = $story->acceptanceCriteria->sortBy('position')->values();
-                $subtaskCount = $story->tasks->reduce(fn ($acc, $task) => $acc + $task->subtasks->count(), 0);
+                $subtaskCount = $story->currentPlanTasks->reduce(fn ($acc, $task) => $acc + $task->subtasks->count(), 0);
                 $shouldRunMode = $this->hasActiveSubtaskRun;
-                $latestRun = $story->tasks->flatMap->subtasks->flatMap->agentRuns->sortByDesc('id')->first();
+                $latestRun = $story->currentPlanTasks->flatMap->subtasks->flatMap->agentRuns->sortByDesc('id')->first();
                 $branch = $latestRun?->working_branch;
                 $repo = $latestRun?->repo;
                 $planGenRuns = $this->planGenerationRuns;

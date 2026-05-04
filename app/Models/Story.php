@@ -111,7 +111,7 @@ class Story extends Model
         return $this->belongsTo(Plan::class, 'current_plan_id');
     }
 
-    public function tasks(): HasMany
+    public function currentPlanTasks(): HasMany
     {
         return $this->hasMany(Task::class, 'plan_id', 'current_plan_id')
             ->orderBy('position');

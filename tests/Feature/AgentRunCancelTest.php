@@ -65,7 +65,7 @@ test('cancelRun on a terminal run is a no-op', function () {
 
 test('SubtaskRunPipeline observes cancel_requested mid-execute and marks the run Cancelled', function () {
     $story = approvedStoryInProjectWithRepo();
-    $subtask = $story->tasks()->first()->subtasks()->first();
+    $subtask = $story->currentPlanTasks()->first()->subtasks()->first();
 
     SubtaskExecutor::fake(function () use ($subtask) {
         AgentRun::query()
@@ -123,7 +123,7 @@ test('cancelSubtask cancels every still-open AgentRun on the Subtask', function 
 
 test('Run console exposes a Cancel button while the run is open', function () {
     $story = approvedStoryInProjectWithRepo();
-    $subtask = $story->tasks()->first()->subtasks()->first();
+    $subtask = $story->currentPlanTasks()->first()->subtasks()->first();
     $run = AgentRun::factory()->create([
         'runnable_type' => Subtask::class,
         'runnable_id' => $subtask->id,
@@ -142,7 +142,7 @@ test('Run console exposes a Cancel button while the run is open', function () {
 
 test('Run console hides the Cancel button on terminal runs', function () {
     $story = approvedStoryInProjectWithRepo();
-    $subtask = $story->tasks()->first()->subtasks()->first();
+    $subtask = $story->currentPlanTasks()->first()->subtasks()->first();
     $run = AgentRun::factory()->create([
         'runnable_type' => Subtask::class,
         'runnable_id' => $subtask->id,
@@ -161,7 +161,7 @@ test('Run console hides the Cancel button on terminal runs', function () {
 
 test('Queued run cancelled before the worker picks up the job stays Cancelled', function () {
     $story = approvedStoryInProjectWithRepo();
-    $subtask = $story->tasks()->first()->subtasks()->first();
+    $subtask = $story->currentPlanTasks()->first()->subtasks()->first();
 
     // Construct a Queued run as if dispatch happened on a queued worker that
     // hasn't picked it up. Cancel before invoking the job manually.

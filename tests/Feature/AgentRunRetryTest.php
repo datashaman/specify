@@ -23,7 +23,7 @@ beforeEach(function () {
 
 test('retrySubtaskExecution dispatches a fresh AgentRun pointing at the prior run', function () {
     $story = approvedStoryInProjectWithRepo();
-    $subtask = $story->tasks()->first()->subtasks()->first();
+    $subtask = $story->currentPlanTasks()->first()->subtasks()->first();
 
     $first = AgentRun::factory()->create([
         'runnable_type' => Subtask::class,
@@ -48,7 +48,7 @@ test('retrySubtaskExecution dispatches a fresh AgentRun pointing at the prior ru
 
 test('retry refuses an in-flight run', function () {
     $story = approvedStoryInProjectWithRepo();
-    $subtask = $story->tasks()->first()->subtasks()->first();
+    $subtask = $story->currentPlanTasks()->first()->subtasks()->first();
     $running = AgentRun::factory()->create([
         'runnable_type' => Subtask::class,
         'runnable_id' => $subtask->id,
@@ -61,7 +61,7 @@ test('retry refuses an in-flight run', function () {
 
 test('retry refuses when the Story is no longer Approved', function () {
     $story = approvedStoryInProjectWithRepo();
-    $subtask = $story->tasks()->first()->subtasks()->first();
+    $subtask = $story->currentPlanTasks()->first()->subtasks()->first();
     $failed = AgentRun::factory()->create([
         'runnable_type' => Subtask::class,
         'runnable_id' => $subtask->id,
@@ -76,7 +76,7 @@ test('retry refuses when the Story is no longer Approved', function () {
 
 test('Run console exposes a Retry button on terminal failure runs', function () {
     $story = approvedStoryInProjectWithRepo();
-    $subtask = $story->tasks()->first()->subtasks()->first();
+    $subtask = $story->currentPlanTasks()->first()->subtasks()->first();
     $run = AgentRun::factory()->create([
         'runnable_type' => Subtask::class,
         'runnable_id' => $subtask->id,
@@ -96,7 +96,7 @@ test('Run console exposes a Retry button on terminal failure runs', function () 
 
 test('Run console hides Retry on Succeeded runs', function () {
     $story = approvedStoryInProjectWithRepo();
-    $subtask = $story->tasks()->first()->subtasks()->first();
+    $subtask = $story->currentPlanTasks()->first()->subtasks()->first();
     $run = AgentRun::factory()->create([
         'runnable_type' => Subtask::class,
         'runnable_id' => $subtask->id,
@@ -115,7 +115,7 @@ test('Run console hides Retry on Succeeded runs', function () {
 
 test('Run console hides Retry on RespondToReview runs (re-fires automatically)', function () {
     $story = approvedStoryInProjectWithRepo();
-    $subtask = $story->tasks()->first()->subtasks()->first();
+    $subtask = $story->currentPlanTasks()->first()->subtasks()->first();
     $run = AgentRun::factory()->create([
         'runnable_type' => Subtask::class,
         'runnable_id' => $subtask->id,
@@ -135,7 +135,7 @@ test('Run console hides Retry on RespondToReview runs (re-fires automatically)',
 
 test('retry on a RespondToReview run is rejected by the service', function () {
     $story = approvedStoryInProjectWithRepo();
-    $subtask = $story->tasks()->first()->subtasks()->first();
+    $subtask = $story->currentPlanTasks()->first()->subtasks()->first();
     $run = AgentRun::factory()->create([
         'runnable_type' => Subtask::class,
         'runnable_id' => $subtask->id,
@@ -154,7 +154,7 @@ test('retrySubtaskExecution rejects Succeeded runs at the service layer', functi
     // Subtask and double-open PRs.
     $story = approvedStoryInProjectWithRepo();
     $story->forceFill(['status' => StoryStatus::Approved->value])->save();
-    $subtask = $story->fresh()->tasks()->first()->subtasks()->first();
+    $subtask = $story->fresh()->currentPlanTasks()->first()->subtasks()->first();
     $run = AgentRun::factory()->create([
         'runnable_type' => Subtask::class,
         'runnable_id' => $subtask->id,
@@ -167,7 +167,7 @@ test('retrySubtaskExecution rejects Succeeded runs at the service layer', functi
 
 test('Run console links a retry back to its origin run', function () {
     $story = approvedStoryInProjectWithRepo();
-    $subtask = $story->tasks()->first()->subtasks()->first();
+    $subtask = $story->currentPlanTasks()->first()->subtasks()->first();
     $origin = AgentRun::factory()->create([
         'runnable_type' => Subtask::class,
         'runnable_id' => $subtask->id,

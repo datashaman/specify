@@ -94,7 +94,7 @@ new #[Title('Feature')] class extends Component {
     {
         return $this->feature
             ? $this->feature->stories()
-                ->with('creator', 'tasks', 'currentPlan:id,story_id,version,name,status')
+                ->with('creator', 'currentPlanTasks', 'currentPlan:id,story_id,version,name,status')
                 ->orderBy('position')
                 ->orderBy('id')
                 ->get()
@@ -160,9 +160,9 @@ new #[Title('Feature')] class extends Component {
         }
 
         $hasActiveRun = $this->stories->contains(function ($story) {
-            return $story->tasks->isNotEmpty()
+            return $story->currentPlanTasks->isNotEmpty()
                 && $story->status === StoryStatus::Approved
-                && $story->tasks->contains(fn ($t) => $t->status === TaskStatus::InProgress || $t->status === TaskStatus::Pending);
+                && $story->currentPlanTasks->contains(fn ($t) => $t->status === TaskStatus::InProgress || $t->status === TaskStatus::Pending);
         });
         if ($hasActiveRun) {
             return 'running';

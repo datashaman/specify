@@ -74,14 +74,14 @@ class ListRunsTool extends Tool
                 }
             });
         } else {
-            $story = Story::query()->with('feature', 'tasks:id,plan_id')->find($storyId);
+            $story = Story::query()->with('feature', 'currentPlanTasks:id,plan_id')->find($storyId);
             if (! $story) {
                 return Response::error('Story not found.');
             }
             if (! $this->canAccessProject($user, (int) $story->feature->project_id)) {
                 return Response::error('Story not accessible.');
             }
-            $taskIds = $story->tasks->pluck('id')->all();
+            $taskIds = $story->currentPlanTasks->pluck('id')->all();
             $subtaskIds = ! empty($taskIds) ? Subtask::query()->whereIn('task_id', $taskIds)->pluck('id')->all() : [];
             $query->where(function ($q) use ($story, $taskIds, $subtaskIds) {
                 $q->where(function ($q) use ($story) {

@@ -44,7 +44,7 @@ function approvedSubtaskForRace(): Subtask
     $story->forceFill(['status' => StoryStatus::Draft->value])->save();
     $story->fresh()->submitForApproval();
 
-    return $story->fresh()->tasks()->first()->subtasks()->first();
+    return $story->fresh()->currentPlanTasks()->first()->subtasks()->first();
 }
 
 beforeEach(function () {

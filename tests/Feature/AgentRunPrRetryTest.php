@@ -60,7 +60,7 @@ test('retryPullRequestOpen dispatches the OpenPullRequestJob end-to-end', functi
         'url' => 'https://github.com/o/r',
         'default_branch' => 'main',
     ])->save();
-    $subtask = $story->tasks()->first()->subtasks()->first();
+    $subtask = $story->currentPlanTasks()->first()->subtasks()->first();
 
     $run = AgentRun::factory()->create([
         'runnable_type' => Subtask::class,
@@ -96,7 +96,7 @@ test('OpenPullRequestJob bails inside the lock when a concurrent retry already s
         'url' => 'https://github.com/o/r',
         'default_branch' => 'main',
     ])->save();
-    $subtask = $story->tasks()->first()->subtasks()->first();
+    $subtask = $story->currentPlanTasks()->first()->subtasks()->first();
 
     $run = AgentRun::factory()->create([
         'runnable_type' => Subtask::class,
@@ -129,7 +129,7 @@ test('OpenPullRequestJob records find() exceptions as pull_request_error instead
         'url' => 'not-a-valid-url',
         'default_branch' => 'main',
     ])->save();
-    $subtask = $story->tasks()->first()->subtasks()->first();
+    $subtask = $story->currentPlanTasks()->first()->subtasks()->first();
 
     $run = AgentRun::factory()->create([
         'runnable_type' => Subtask::class,
@@ -170,7 +170,7 @@ test('OpenPullRequestJob opens a fresh PR and stamps the run output', function (
         'url' => 'https://github.com/o/r',
         'default_branch' => 'main',
     ])->save();
-    $subtask = $story->tasks()->first()->subtasks()->first();
+    $subtask = $story->currentPlanTasks()->first()->subtasks()->first();
 
     $run = AgentRun::factory()->create([
         'runnable_type' => Subtask::class,
@@ -211,7 +211,7 @@ test('OpenPullRequestJob adopts an existing open PR rather than opening a duplic
         'url' => 'https://github.com/o/r',
         'default_branch' => 'main',
     ])->save();
-    $subtask = $story->tasks()->first()->subtasks()->first();
+    $subtask = $story->currentPlanTasks()->first()->subtasks()->first();
 
     $run = AgentRun::factory()->create([
         'runnable_type' => Subtask::class,
@@ -245,7 +245,7 @@ test('OpenPullRequestJob records pull_request_error on provider failure', functi
         'url' => 'https://github.com/o/r',
         'default_branch' => 'main',
     ])->save();
-    $subtask = $story->tasks()->first()->subtasks()->first();
+    $subtask = $story->currentPlanTasks()->first()->subtasks()->first();
 
     $run = AgentRun::factory()->create([
         'runnable_type' => Subtask::class,
@@ -268,7 +268,7 @@ test('OpenPullRequestJob records pull_request_error on provider failure', functi
 
 test('Run console exposes Retry PR on Succeeded runs with pull_request_error', function () {
     $story = approvedStoryInProjectWithRepo();
-    $subtask = $story->tasks()->first()->subtasks()->first();
+    $subtask = $story->currentPlanTasks()->first()->subtasks()->first();
     $repo = $story->feature->project->primaryRepo();
     $run = AgentRun::factory()->create([
         'runnable_type' => Subtask::class,
@@ -332,7 +332,7 @@ test('GithubPullRequestProvider::findOpenPullRequest skips fork PRs whose head.r
         'url' => 'https://github.com/o/r',
         'default_branch' => 'main',
     ])->save();
-    $subtask = $story->tasks()->first()->subtasks()->first();
+    $subtask = $story->currentPlanTasks()->first()->subtasks()->first();
 
     $run = AgentRun::factory()->create([
         'runnable_type' => Subtask::class,
@@ -383,7 +383,7 @@ test('GithubPullRequestProvider::findOpenPullRequest follows Link rel="next" pag
         'url' => 'https://github.com/o/r',
         'default_branch' => 'main',
     ])->save();
-    $subtask = $story->tasks()->first()->subtasks()->first();
+    $subtask = $story->currentPlanTasks()->first()->subtasks()->first();
 
     $run = AgentRun::factory()->create([
         'runnable_type' => Subtask::class,
