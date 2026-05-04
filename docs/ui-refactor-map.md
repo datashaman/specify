@@ -31,11 +31,10 @@ Feature-scoped story row with status rail, revision, task tally, avatar, and opt
 #### `resources/views/components/run/summary-card.blade.php`
 Reusable run card with:
 - full mode for detailed run lists
-- compact mode for dashboard-style rows
+- compact mode for overview-style rows
 
 **Used in:**
 - `resources/views/pages/runs/⚡index.blade.php`
-- `resources/views/pages/⚡dashboard.blade.php`
 
 #### `resources/views/components/run/list-row.blade.php`
 Compact bordered run row for subtask pages.

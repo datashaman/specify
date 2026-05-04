@@ -6,7 +6,7 @@
     <body class="min-h-screen bg-white dark:bg-zinc-800">
         <flux:sidebar sticky collapsible="mobile" class="border-e border-zinc-200 bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-900">
             <flux:sidebar.header class="!pb-0 !mb-0">
-                <x-app-logo :sidebar="true" href="{{ route('dashboard') }}" wire:navigate />
+                <x-app-logo :sidebar="true" href="{{ route('projects.index') }}" wire:navigate />
                 <flux:sidebar.collapse class="lg:hidden" />
             </flux:sidebar.header>
 
@@ -27,7 +27,10 @@
 
                     @if ($currentProjectId)
                         <flux:sidebar.group :heading="__('Project')" class="grid">
-                            <flux:sidebar.item icon="rectangle-stack" :href="route('projects.show', $currentProjectId)" :current="request()->routeIs('projects.show') || request()->routeIs('features.show')" wire:navigate>
+                            <flux:sidebar.item icon="layout-grid" :href="route('projects.show', $currentProjectId)" :current="request()->routeIs('projects.show')" wire:navigate>
+                                {{ __('Overview') }}
+                            </flux:sidebar.item>
+                            <flux:sidebar.item icon="rectangle-stack" :href="route('projects.show', $currentProjectId).'#features'" :current="request()->routeIs('features.show')" wire:navigate>
                                 {{ __('Features') }}
                             </flux:sidebar.item>
                             <flux:sidebar.item icon="bookmark" :href="route('stories.index', ['project' => $currentProjectId])" :current="request()->routeIs('stories.*')" wire:navigate>
@@ -36,7 +39,7 @@
                             <flux:sidebar.item icon="document-duplicate" :href="route('plans.index', ['project' => $currentProjectId])" :current="request()->routeIs('plans.*')" wire:navigate>
                                 {{ __('Plans') }}
                             </flux:sidebar.item>
-                            <flux:sidebar.item icon="check-badge" :href="route('approvals.index', ['project' => $currentProjectId])" :current="request()->routeIs('approvals.*') || request()->routeIs('triage')" wire:navigate>
+                            <flux:sidebar.item icon="check-badge" :href="route('approvals.index', ['project' => $currentProjectId])" :current="request()->routeIs('approvals.*')" wire:navigate>
                                 {{ __('Approvals') }}
                             </flux:sidebar.item>
                             <flux:sidebar.item icon="clipboard-document-list" :href="route('runs.index', ['project' => $currentProjectId])" :current="request()->routeIs('runs.*')" wire:navigate>

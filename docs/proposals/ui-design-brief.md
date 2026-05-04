@@ -27,8 +27,8 @@ shipped match ADR-0012 — see that ADR for the load-bearing reference.
 Summary of the canonical routes:
 
 ```
-/triage                                            Cross-project approval queue (renamed from /inbox)
-/activity                                          Cross-project event stream (renamed from /events)
+/triage                                            Cross-project approval queue
+/activity                                          Cross-project event stream
 /projects                                          Projects index
 /projects/:project                                 Project landing (currently the features list; real Overview deferred)
 /projects/:project/features/:feature               Feature document
@@ -40,9 +40,8 @@ Summary of the canonical routes:
 /projects/:project/repos                           Repos for the project
 ```
 
-Legacy URLs (`/inbox`, `/events`, `/stories/:id`, `/runs/:id`, flat
-`/stories`, `/runs`, `/repos`, `/features`) all 301-redirect to the
-canonical project-scoped equivalents — see `routes/web.php`.
+Flat record URLs are intentionally absent. Story, Run, Plan, Repo, and
+approval pages require the canonical project-scoped routes above.
 
 **Workspace is ambient chrome, not a breadcrumb segment.** A switcher sits in the top-left of the global nav (Linear-style); cross-workspace navigation is a hard route change. Inside a workspace, the breadcrumb starts at Project: `Project › Feature › Story › Subtask › Run`.
 
@@ -113,12 +112,12 @@ Per-user sticky.
 ### 4.1 Workspace chrome (global)
 
 - Top-left **workspace switcher** with org icon + name. Click opens a popover listing the user's workspaces. Switching is a hard route change.
-- A workspace-scoped left nav sits below: Triage / Projects / Runs / Repos / Events.
-- Workspace landing (`/`) is the post-switch home: card grid of Projects + recent activity strip + workspace member count + active approval policy summary. Replaces the previous `⚡dashboard.blade.php`.
+- A workspace-scoped left nav sits below: Triage / Activity.
+- Project work starts at `/projects` or `/projects/:project`; the project owns Features, Stories, Plans, Approvals, Runs, and Repos.
 
 ### 4.2 Triage (`/triage`)
 
-Renamed from `/inbox`. Stories awaiting approval, color-railed.
+Stories awaiting approval, color-railed.
 
 **Row anatomy** (left → right):
 - Color rail (amber for Pending, rose if Changes requested)
@@ -146,9 +145,9 @@ Existing `pages/projects/⚡show.blade.php`, extended.
 
 - Hero: project name, blurb, primary repo (set via `set-primary-repo`), executor config summary (`single-driver: claude-code` or `race: [claude-code, codex, gemini]`).
 - **Features grid**: cards. Each card = feature title + story counts by state + open-runs count.
-- **Live activity strip**: last N events (run started, story approved, PR opened, review-response dispatched). Truncates; "View all" → `/events`.
+- **Live activity strip**: last N events (run started, story approved, PR opened, review-response dispatched). Truncates; "View all" → `/activity`.
 
-### 4.5 Feature document (`/features/:feature`)
+### 4.5 Feature document (`/projects/:project/features/:feature`)
 
 Existing `pages/features/⚡show.blade.php`, extended.
 
@@ -393,14 +392,13 @@ Stack: **Livewire Volt SFCs in Folio pages** (file convention `⚡name.blade.php
 ### 6.2 Volt SFC pages (Folio)
 
 Existing — extended in place:
-- `pages/⚡dashboard.blade.php` → becomes the workspace landing (route `/`).
-- `pages/⚡inbox.blade.php` → **renamed** to `pages/⚡triage.blade.php`.
+- `pages/⚡triage.blade.php` — workspace approval queue.
 - `pages/projects/⚡index.blade.php`, `⚡show.blade.php` — extended with workspace chrome and cards.
 - `pages/features/⚡show.blade.php` — slide-over story navigation.
 - `pages/stories/⚡show.blade.php` — **layout + visual rewrite**, data wiring retained. AC-led plan, decision log rail, live run band (Slice 2).
 - `pages/runs/⚡index.blade.php` — already renders `pull_request_error`; aligned to new state vocabulary.
-- `pages/repos/⚡index.blade.php` — moved under workspace routing.
-- `pages/events/⚡index.blade.php` — feeds the Project landing's live activity strip.
+- `pages/repos/⚡index.blade.php` — project repository management.
+- `pages/activity/⚡index.blade.php` — cross-project activity stream.
 
 New in this brief:
 - `pages/stories/subtasks/⚡show.blade.php` — Subtask drawer / page with leaderboard.
@@ -441,7 +439,7 @@ All keybindings registered through the Flux command surface; no custom global ke
 ## 9. Accessibility
 
 - All color-rail semantics duplicated in text (state pill is the readable label).
-- Timeline flame chart has a tabular fallback (toggle in tab header) — only present on structured-driver runs anyway.
+- Timeline flame chart has a tabular alternate view (toggle in tab header) — only present on structured-driver runs anyway.
 - All keybindings discoverable via `?` overlay.
 - Live regions (`aria-live="polite"`) for run state changes.
 - Motion respects `prefers-reduced-motion`: pulse becomes static; segmented bar transitions instant.
@@ -455,13 +453,13 @@ Three independently-shippable slices.
 ### Slice 1 — Spec surface (no realtime run viz)
 
 - Workspace switcher chrome + workspace landing.
-- Triage page (renamed from inbox).
+- Triage page.
 - AC-led Story document with Plan toggle (Grooming / Run).
 - Decision-log right rail with Approve / Request changes / Reject / Revoke. Author cannot approve own Story.
 - Plan-edit reset-approval banner with delta preview.
 - Threshold tally pill (`Pending · 1/2`).
 - `stories.{id}` Reverb channel — state events only (approval transitions, run lifecycle milestones, revision bumps).
-- Existing Folio pages reconciled: `⚡inbox` → `⚡triage`, projects/features/stories/runs/repos pages extended with workspace chrome.
+- Existing Folio pages reconciled around Triage, Activity, and project-scoped work pages.
 
 **Not in slice**: live run band, Subtask drawer, Run console, race UI, Timeline, log streaming.
 
@@ -513,5 +511,5 @@ Three independently-shippable slices.
 
 - Specific Tailwind tokens for rail colors (current draft uses default palette; harmonize with brand later).
 - Whether Plan toggle persists per-user or per-Story-state (likely per-user, sticky).
-- Pagination strategy for `/runs` and `/events`.
+- Pagination strategy for `/projects/:project/runs` and `/activity`.
 - Whether sentinel callouts in CLI logs link out to the structured representation when available (e.g. `already_complete` SHAs as clickable host-VCS links — likely yes, low-cost).

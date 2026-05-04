@@ -27,7 +27,7 @@ test('github callback creates a new user when none matches', function () {
     Socialite::shouldReceive('driver->user')->andReturn(fakeGithubUser('1234', 'octo@example.com'));
 
     $this->get(route('socialite.callback', 'github'))
-        ->assertRedirect(route('dashboard'));
+        ->assertRedirect(route('projects.index'));
 
     $user = User::where('github_id', '1234')->firstOrFail();
     expect($user->email)->toBe('octo@example.com')
@@ -45,7 +45,7 @@ test('github callback links to an existing user matched by email and stores toke
     Socialite::shouldReceive('driver->user')->andReturn(fakeGithubUser('999', 'me@example.com'));
 
     $this->get(route('socialite.callback', 'github'))
-        ->assertRedirect(route('dashboard'));
+        ->assertRedirect(route('projects.index'));
 
     $fresh = $existing->fresh();
     expect($fresh->github_id)->toBe('999')

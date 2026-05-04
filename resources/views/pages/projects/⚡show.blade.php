@@ -206,7 +206,7 @@ new #[Title('Project')] class extends Component {
             </a>
         </section>
 
-        <section class="flex flex-col gap-3">
+        <section id="features" class="flex flex-col gap-3">
             <div class="flex items-center justify-between gap-2">
                 <flux:heading size="lg">{{ __('Features') }}</flux:heading>
                 @if ($canManageFeatures)

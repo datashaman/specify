@@ -86,5 +86,5 @@ test('cannot save against a feature outside the user\'s teams', function () {
 });
 
 test('unauthenticated visitors are redirected', function () {
-    $this->get('/stories/create')->assertRedirect(route('login'));
+    $this->get(route('stories.create', ['project' => 1]))->assertRedirect(route('login'));
 });

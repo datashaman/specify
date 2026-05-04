@@ -32,7 +32,7 @@ function runScene(): array
 }
 
 test('runs page redirects unauthenticated users', function () {
-    $this->get('/runs')->assertRedirect(route('login'));
+    $this->get(route('runs.index', ['project' => 1]))->assertRedirect(route('login'));
 });
 
 test('lists runs scoped to the user\'s teams', function () {

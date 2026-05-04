@@ -66,7 +66,7 @@ class SocialiteController extends Controller
 
         Auth::login($user, remember: true);
 
-        return redirect()->intended(route('dashboard'));
+        return redirect()->intended(route('projects.index'));
     }
 
     private function supports(string $provider): bool

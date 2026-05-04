@@ -91,7 +91,7 @@ Concrete shape:
   Agents that want this affordance must be told to emit the sentinel.
 - `ExecutionResult` grows. Existing executors and tests that
   construct it without these fields keep working (defaults), so the
-  change is backwards-compatible.
+  change preserves the existing run schema.
 
 ### Neutral
 
