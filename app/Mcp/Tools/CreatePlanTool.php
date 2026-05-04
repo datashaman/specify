@@ -5,6 +5,7 @@ namespace App\Mcp\Tools;
 use App\Enums\PlanSource;
 use App\Enums\PlanStatus;
 use App\Mcp\Concerns\ResolvesProjectAccess;
+use App\Services\Plans\CurrentPlanSelector;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Laravel\Mcp\Request;
 use Laravel\Mcp\Response;
@@ -18,7 +19,7 @@ class CreatePlanTool extends Tool
 
     protected string $name = 'create-plan';
 
-    public function handle(Request $request): Response
+    public function handle(Request $request, CurrentPlanSelector $currentPlans): Response
     {
         $user = $this->resolveUser($request);
         if ($user instanceof Response) {
@@ -59,7 +60,7 @@ class CreatePlanTool extends Tool
         ]);
 
         if (($validated['set_current'] ?? false) === true) {
-            $story->forceFill(['current_plan_id' => $plan->id])->save();
+            $currentPlans->setCurrent($story, $plan);
         }
 
         return Response::json([
