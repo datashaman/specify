@@ -2,8 +2,8 @@
 
 An `AgentRun` is one auditable AI dispatch. It can represent task generation,
 Subtask execution, review response, or conflict resolution. The row records
-what was authorised, which executor ran, which branch was used, what changed,
-and how the run terminated.
+which approval context applied, which executor ran, which branch was used,
+what changed, and how the run terminated.
 
 This page describes the current implementation shape. The load-bearing
 decisions are [ADR-0003](../adr/0003-pluggable-executor-interface.md),
@@ -27,8 +27,9 @@ Primary fields:
 - `working_branch` is the branch the executor writes to.
 - `executor_driver` records the concrete executor used for this run.
 - `kind` records why the run exists.
-- `authorizing_approval_type` and `authorizing_approval_id` point at the
-  approval row that allowed the run.
+- `authorizing_approval_type` and `authorizing_approval_id` optionally point
+  at the approval row that allowed the run. They may be null when approval was
+  satisfied without a concrete approval row, such as auto-approval policies.
 - `status` records queued, running, or terminal state.
 - `input`, `output`, `diff`, token counts, and timestamps record run artefacts.
 - `cancel_requested` records a cooperative cancel request.
@@ -56,8 +57,10 @@ Terminal statuses are `succeeded`, `failed`, `aborted`, and `cancelled`.
 | `respond_to_review` | `Subtask` | Push a follow-up commit addressing PR review comments on an existing branch. | Ignored by the Subtask cascade. |
 | `resolve_conflicts` | `Subtask` | Repair merge conflicts on the Story's primary PR branch. | Ignored by the Subtask cascade. |
 
-Plan-generation runs use a `Story` runnable. They are authorised by Story
-approval and handled by `GenerateTasksJob`.
+Plan-generation runs use a `Story` runnable. They require the Story to be in
+an approval-satisfied state and are handled by `GenerateTasksJob`. When a
+concrete `StoryApproval` row authorised the generation, the run records it;
+auto-approval paths may leave `authorizing_approval` null.
 
 ## Ownership boundaries
 
@@ -74,7 +77,7 @@ The lifecycle is split across a few focused services and jobs.
 | `App\Jobs\OpenPullRequestJob` | Retries PR opening for a succeeded run whose PR step failed. |
 | `App\Jobs\ReviewPullRequestJob` | Posts optional advisory ADR-conformance review comments after a PR opens. |
 | `App\Jobs\RespondToPrReviewJob` | Pushes a follow-up commit for webhook-driven review feedback. |
-| `App\Jobs\ResolveConflictsJob` | Pushes a merge-conflict repair commit on the existing PR branch. |
+| `App\Jobs\ResolveConflictsJob` | Resolves merge conflicts on the existing PR branch, or records stale mergeability when no repair is needed. |
 
 `ExecutionService` is the write API callers should use. Queue jobs and UI
 actions should not hand-edit run terminal state because the transition methods
@@ -106,7 +109,9 @@ Execution is gated on the current product and implementation approvals:
 - Story status must be `approved`.
 - The Story must have a current Plan.
 - The current Plan must be approved.
-- Execute runs authorise against the current approving `PlanApproval`.
+- Execute runs require the current Plan to be approved. When a concrete
+  `PlanApproval` row authorised execution, the run records it; auto-approval
+  paths may leave `authorizing_approval` null.
 
 Subtasks become actionable only when their parent Task dependencies are done
 and the prior Subtasks in that Task are done. The scheduler dispatches the next
@@ -245,8 +250,11 @@ Conflict resolution:
 - creates a `resolve_conflicts` run through `ExecutionService`
 - uses the originating Execute run's Subtask, repo, branch, and driver
 - merges the default branch into the PR branch
-- asks the executor to resolve unmerged paths
-- pushes one repair commit and comments on the PR
+- if the merge succeeds without conflicts, marks the run succeeded with
+  `stale_mergeability=true`
+- if unmerged paths remain, asks the executor to resolve them
+- pushes one repair commit and comments on the PR only when conflict repair
+  was actually needed
 
 Both follow-up kinds are terminal audit rows. The Subtask cascade ignores them
 because the Execute run already determined Subtask delivery state.
@@ -302,8 +310,8 @@ advances delivery state. Callers should transition runs through
 - Do not let `respond_to_review` or `resolve_conflicts` affect Subtask
   completion.
 - Do not retry succeeded Execute runs.
-- Do not retry against stale approval; retries must bind to the current
-  approved Plan.
+- Do not retry against stale approval state; retries must re-check the current
+  approved Plan and record the current approval row when one exists.
 - Do not bypass `SubtaskExecutionScheduler::finalizeSubtaskFromRun()` for
   terminal Execute runs.
 - Do not share one branch for multiple race-mode drivers.
