@@ -78,7 +78,7 @@ class StoryWriter
             }
 
             if ($acceptanceCriteria !== null) {
-                $this->criteria->replace($story, $acceptanceCriteria);
+                $this->criteria->replaceInsideTransaction($story, $acceptanceCriteria);
             }
         });
     }

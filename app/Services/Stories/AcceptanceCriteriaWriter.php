@@ -36,18 +36,26 @@ class AcceptanceCriteriaWriter
     public function replace(Story $story, array $statements): void
     {
         DB::transaction(function () use ($story, $statements): void {
-            AcceptanceCriterion::withoutEvents(function () use ($story, $statements): void {
-                $story->acceptanceCriteria()->delete();
-
-                foreach ($statements as $i => $statement) {
-                    $story->acceptanceCriteria()->create([
-                        'statement' => $statement,
-                        'position' => $i + 1,
-                    ]);
-                }
-            });
-
-            $this->revisions->recordContentArtifactChanged($story);
+            $this->replaceInsideTransaction($story, $statements);
         });
+    }
+
+    /**
+     * @param  list<string>  $statements
+     */
+    public function replaceInsideTransaction(Story $story, array $statements): void
+    {
+        AcceptanceCriterion::withoutEvents(function () use ($story, $statements): void {
+            $story->acceptanceCriteria()->delete();
+
+            foreach ($statements as $i => $statement) {
+                $story->acceptanceCriteria()->create([
+                    'statement' => $statement,
+                    'position' => $i + 1,
+                ]);
+            }
+        });
+
+        $this->revisions->recordContentArtifactChanged($story);
     }
 }
