@@ -1,6 +1,5 @@
 <?php
 
-use App\Enums\AgentRunStatus;
 use App\Enums\ApprovalDecision;
 use App\Enums\PlanStatus;
 use App\Enums\StoryStatus;
@@ -8,10 +7,8 @@ use App\Enums\TaskStatus;
 use App\Models\AcceptanceCriterion;
 use App\Models\AgentRun;
 use App\Models\Story;
-use App\Models\Subtask;
-use App\Models\Task;
 use App\Services\ApprovalService;
-use App\Services\ExecutionService;
+use App\Services\Stories\StoryPageWorkflow;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Livewire\Attributes\Computed;
@@ -223,15 +220,8 @@ new #[Title('Story')] class extends Component {
     {
         $story = $this->story;
         abort_unless($story, 404);
-        abort_unless($story->status === StoryStatus::Draft, 422, 'Story is not a draft.');
-        abort_unless($story->created_by_id === Auth::id() || Auth::user()->canApproveInProject($story->feature->project), 403);
 
-        $story->submitForApproval();
-
-        $fresh = $story->fresh();
-        if ($fresh->status === StoryStatus::Approved && ! $fresh->currentPlanTasks()->exists()) {
-            app(ExecutionService::class)->dispatchTaskGeneration($fresh);
-        }
+        app(StoryPageWorkflow::class)->submitStory($story, Auth::user());
 
         unset($this->story);
     }
@@ -241,9 +231,8 @@ new #[Title('Story')] class extends Component {
         $story = $this->story;
         abort_unless($story, 404);
         $user = Auth::user();
-        abort_unless($user->canApproveInProject($story->feature->project), 403);
 
-        app(ApprovalService::class)->recordDecision(
+        app(StoryPageWorkflow::class)->recordStoryDecision(
             $story,
             $user,
             ApprovalDecision::from($decision),
@@ -257,22 +246,20 @@ new #[Title('Story')] class extends Component {
     public function submitPlan(): void
     {
         $story = $this->story;
-        abort_unless($story && $story->currentPlan, 404);
-        abort_unless(Auth::user()->canApproveInProject($story->feature->project), 403);
+        abort_unless($story, 404);
 
-        $story->currentPlan->submitForApproval();
+        app(StoryPageWorkflow::class)->submitCurrentPlan($story, Auth::user());
         unset($this->story);
     }
 
     public function decidePlan(string $decision): void
     {
         $story = $this->story;
-        abort_unless($story && $story->currentPlan, 404);
+        abort_unless($story, 404);
         $user = Auth::user();
-        abort_unless($user->canApproveInProject($story->feature->project), 403);
 
-        app(ApprovalService::class)->recordPlanDecision(
-            $story->currentPlan,
+        app(StoryPageWorkflow::class)->recordPlanDecision(
+            $story,
             $user,
             ApprovalDecision::from($decision),
             $this->planApprovalNote ?: null,
@@ -286,11 +273,8 @@ new #[Title('Story')] class extends Component {
     {
         $story = $this->story;
         abort_unless($story, 404);
-        abort_unless($story->status === StoryStatus::Approved, 422, 'Story must be Approved.');
-        abort_if($story->currentPlanTasks()->exists(), 422, 'Plan already exists.');
-        abort_unless(Auth::user()->canApproveInProject($story->feature->project), 403);
 
-        app(ExecutionService::class)->dispatchTaskGeneration($story);
+        app(StoryPageWorkflow::class)->generateCurrentPlan($story, Auth::user());
 
         unset($this->story);
     }
@@ -299,9 +283,8 @@ new #[Title('Story')] class extends Component {
     {
         $story = $this->story;
         abort_unless($story, 404);
-        abort_unless(Auth::user()->canApproveInProject($story->feature->project), 403);
 
-        $result = app(ExecutionService::class)->dispatchConflictResolution($story);
+        $result = app(StoryPageWorkflow::class)->resolveConflicts($story, Auth::user());
 
         match ($result['status']) {
             'dispatched' => session()->flash('conflict_resolution', __('AI conflict-resolution run queued.')),
@@ -316,25 +299,8 @@ new #[Title('Story')] class extends Component {
     {
         $story = $this->story;
         abort_unless($story, 404);
-        abort_unless($story->status === StoryStatus::Approved, 422, 'Story must be Approved.');
-        abort_unless(Auth::user()->canApproveInProject($story->feature->project), 403);
 
-        $subtaskIds = Subtask::whereIn('task_id', $story->currentPlanTasks()->pluck('id'))->pluck('id');
-
-        AgentRun::where('runnable_type', Subtask::class)
-            ->whereIn('runnable_id', $subtaskIds)
-            ->active()
-            ->update([
-                'status' => AgentRunStatus::Aborted->value,
-                'error_message' => 'Aborted on resume.',
-                'finished_at' => now(),
-            ]);
-
-        Subtask::whereIn('id', $subtaskIds)
-            ->where('status', TaskStatus::Blocked)
-            ->update(['status' => TaskStatus::Pending->value]);
-
-        app(ExecutionService::class)->startStoryExecution($story->fresh());
+        app(StoryPageWorkflow::class)->resumeExecution($story, Auth::user());
         unset($this->story);
     }
 
@@ -342,14 +308,8 @@ new #[Title('Story')] class extends Component {
     {
         $story = $this->story;
         abort_unless($story, 404);
-        abort_unless($story->status === StoryStatus::PendingApproval, 422, 'Story is not awaiting approval.');
-        abort_unless($story->currentPlanTasks()->exists(), 422, 'No plan to execute.');
 
-        $policy = $story->effectivePolicy();
-        abort_unless($policy->auto_approve || $policy->required_approvals === 0, 403, 'Policy requires explicit approvals.');
-        abort_unless(Auth::user()->canApproveInProject($story->feature->project), 403);
-
-        app(ApprovalService::class)->recompute($story);
+        app(StoryPageWorkflow::class)->autoApproveStoryContract($story, Auth::user());
         unset($this->story);
     }
 

@@ -9,6 +9,7 @@ use App\Models\AcceptanceCriterion;
 use App\Models\AgentRun;
 use App\Models\ApprovalPolicy;
 use App\Models\Feature;
+use App\Models\PlanApproval;
 use App\Models\Project;
 use App\Models\Story;
 use App\Models\StoryApproval;
@@ -160,6 +161,24 @@ test('author can approve own pending story when allow_self_approval=true', funct
         ->assertSee('Approve');
 });
 
+test('story decision action records approval with note through the story page workflow', function () {
+    $s = showPageScene(['status' => StoryStatus::PendingApproval]);
+    attachPolicy($s['ws'], required: 1, allowSelf: true);
+
+    $this->actingAs($s['user']);
+
+    Livewire::test('pages::stories.show', ['story' => $s['story']->id])
+        ->set('approvalNote', 'ship the contract')
+        ->call('decide', ApprovalDecision::Approve->value)
+        ->assertSet('approvalNote', null);
+
+    $approval = StoryApproval::query()->where('story_id', $s['story']->id)->sole();
+
+    expect($approval->decision)->toBe(ApprovalDecision::Approve)
+        ->and($approval->notes)->toBe('ship the contract')
+        ->and($s['story']->fresh()->status)->toBe(StoryStatus::Approved);
+});
+
 test('eligible-approvers section renders only when threshold > 1', function () {
     $other = User::factory()->create(['name' => 'second-eligible']);
     $s = showPageScene(['status' => StoryStatus::PendingApproval]);
@@ -209,6 +228,36 @@ test('approval tracks render separately for story contract and current plan', fu
         ->assertSee('Current plan')
         ->assertSee('Execution is blocked until the current plan is approved.')
         ->assertSee('Approve current plan');
+});
+
+test('plan decision action records approval with note through the story page workflow', function () {
+    $s = showPageScene(['status' => StoryStatus::Approved]);
+    attachPolicy($s['ws'], required: 1, allowSelf: true);
+
+    $ac = AcceptanceCriterion::create([
+        'story_id' => $s['story']->id,
+        'position' => 1,
+        'statement' => 'AC-text-must-lead',
+    ]);
+    $task = Task::factory()->forCurrentPlanOf($s['story'])->create([
+        'name' => 'task-name-secondary',
+        'position' => 1,
+        'acceptance_criterion_id' => $ac->id,
+    ]);
+    $task->plan->forceFill(['status' => PlanStatus::PendingApproval->value])->save();
+
+    $this->actingAs($s['user']);
+
+    Livewire::test('pages::stories.show', ['story' => $s['story']->id])
+        ->set('planApprovalNote', 'plan is executable')
+        ->call('decidePlan', ApprovalDecision::Approve->value)
+        ->assertSet('planApprovalNote', null);
+
+    $approval = PlanApproval::query()->where('plan_id', $task->plan_id)->sole();
+
+    expect($approval->decision)->toBe(ApprovalDecision::Approve)
+        ->and($approval->notes)->toBe('plan is executable')
+        ->and($task->plan->fresh()->status)->toBe(PlanStatus::Approved);
 });
 
 test('plan section is AC-led: AC text leads, Task name follows', function () {
