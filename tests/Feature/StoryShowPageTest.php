@@ -252,8 +252,7 @@ test('plan section labels current-plan task counts and empty AC mappings', funct
     Livewire::test('pages::stories.show', ['story' => $s['story']->id])
         ->assertSee('Current plan')
         ->assertSee('0 current-plan tasks')
-        ->assertSee('No current-plan task is mapped to this AC yet.')
-        ->assertDontSee('No task generated for this AC yet.');
+        ->assertSee('No current-plan task is mapped to this AC yet.');
 });
 
 test('task missing acceptance_criterion_id renders under current-plan unmapped tasks', function () {

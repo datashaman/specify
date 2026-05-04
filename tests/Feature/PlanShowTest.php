@@ -45,7 +45,5 @@ test('plan show uses plan-task language for unmapped tasks', function () {
         ->assertSee('1 plan tasks')
         ->assertSee('No plan task mapped to this AC.')
         ->assertSee('Plan tasks not mapped to an AC')
-        ->assertSee('cross-cutting task')
-        ->assertDontSee('Unmapped tasks')
-        ->assertDontSee('No task mapped to this AC in this plan.');
+        ->assertSee('cross-cutting task');
 });

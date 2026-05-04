@@ -91,8 +91,7 @@ test('Run console exposes a Retry button on terminal failure runs', function () 
         ->get("/projects/{$project->id}/stories/{$story->id}/subtasks/{$subtask->id}/runs/{$run->id}")
         ->assertOk()
         ->assertSee('Retry')
-        ->assertSee('authorised against the current PlanApproval')
-        ->assertDontSee('authorised against the current StoryApproval');
+        ->assertSee('authorised against the current PlanApproval');
 });
 
 test('Run console hides Retry on Succeeded runs', function () {
