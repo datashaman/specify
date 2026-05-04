@@ -14,7 +14,7 @@ use Laravel\Mcp\Server\Tool;
 /**
  * MCP tool: add-story-dependency
  */
-#[Description('Mark a story as depending on another story. Both stories must be in projects the user can access.')]
+#[Description('Mark a story as depending on another story. Both stories must be accessible, in the same workspace, and must not form a cycle.')]
 class AddStoryDependencyTool extends Tool
 {
     use ResolvesProjectAccess;
@@ -74,8 +74,8 @@ class AddStoryDependencyTool extends Tool
     public function schema(JsonSchema $schema): array
     {
         return [
-            'story_id' => $schema->integer()->description('Dependent story.')->required(),
-            'depends_on_story_id' => $schema->integer()->description('Story that must be done first.')->required(),
+            'story_id' => $schema->integer()->description('Dependent story. Must be accessible to the acting user.')->required(),
+            'depends_on_story_id' => $schema->integer()->description('Story that must be done first. Must be accessible, live in the same workspace, and not create a cycle.')->required(),
         ];
     }
 }
