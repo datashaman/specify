@@ -31,9 +31,14 @@ class AddAcceptanceCriterionTool extends Tool
 
         $validated = $request->validate([
             'story_id' => ['required', 'integer'],
-            'statement' => ['required', 'string'],
+            'statement' => ['required', 'string', 'max:1000'],
             'position' => ['nullable', 'integer'],
         ]);
+
+        $statement = trim($validated['statement']);
+        if ($statement === '') {
+            return Response::error('statement is required.');
+        }
 
         $story = $this->resolveAccessibleStory($validated['story_id'], $user);
         if ($story instanceof Response) {
@@ -44,7 +49,7 @@ class AddAcceptanceCriterionTool extends Tool
             ?? (int) ($story->acceptanceCriteria()->max('position') ?? 0) + 1;
 
         $ac = $story->acceptanceCriteria()->create([
-            'statement' => $validated['statement'],
+            'statement' => $statement,
             'position' => $position,
         ]);
 

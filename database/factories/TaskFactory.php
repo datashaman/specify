@@ -16,7 +16,7 @@ class TaskFactory extends Factory
     public function configure(): static
     {
         return $this->afterCreating(function (Task $task) {
-            $plan = $task->plan;
+            $plan = $task->plan()->first();
             $story = $plan?->story;
 
             if ($story && ! $story->current_plan_id) {
@@ -28,16 +28,18 @@ class TaskFactory extends Factory
     public function forStory(Story $story): static
     {
         return $this->state(function () use ($story) {
-            $freshStory = $story->fresh();
-            $plan = $freshStory?->current_plan_id
-                ? Plan::query()->find($freshStory->current_plan_id)
-                : Plan::factory()->create(['story_id' => $story->getKey()]);
-
-            if ($plan && ! $freshStory?->current_plan_id) {
-                $story->forceFill(['current_plan_id' => $plan->getKey()])->save();
+            $planId = $story->fresh()?->current_plan_id;
+            if ($planId) {
+                return ['plan_id' => $planId];
             }
 
-            return ['plan_id' => $plan?->getKey()];
+            return [
+                'plan_id' => Plan::factory()
+                    ->for($story)
+                    ->afterCreating(function (Plan $plan) use ($story) {
+                        $story->forceFill(['current_plan_id' => $plan->getKey()])->save();
+                    }),
+            ];
         });
     }
 
