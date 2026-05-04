@@ -33,7 +33,7 @@ class AddAcceptanceCriterionTool extends Tool
         $validated = $request->validate([
             'story_id' => ['required', 'integer'],
             'statement' => ['required', 'string', 'max:1000'],
-            'position' => ['nullable', 'integer'],
+            'position' => ['nullable', 'integer', 'min:1'],
         ]);
 
         $statement = trim($validated['statement']);
@@ -65,7 +65,7 @@ class AddAcceptanceCriterionTool extends Tool
         return [
             'story_id' => $schema->integer()->description('Story to add the criterion to.')->required(),
             'statement' => $schema->string()->description('Observable behaviour the story must satisfy. Use one atomic rule statement, not a full Given/When/Then scenario.')->required(),
-            'position' => $schema->integer()->description('Position in the list. Defaults to last + 1.'),
+            'position' => $schema->integer()->description('1-based position in the list. Defaults to last + 1.'),
         ];
     }
 }

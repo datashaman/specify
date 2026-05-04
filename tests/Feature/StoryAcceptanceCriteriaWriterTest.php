@@ -4,6 +4,7 @@ use App\Enums\StoryStatus;
 use App\Mcp\Tools\AddAcceptanceCriterionTool;
 use App\Mcp\Tools\UpdateStoryTool;
 use App\Models\AcceptanceCriterion;
+use App\Models\ApprovalPolicy;
 use App\Models\Feature;
 use App\Models\Project;
 use App\Models\Story;
@@ -62,4 +63,34 @@ test('update story tool replaces acceptance criteria as one story content revisi
         ->and($story->fresh()->revision)->toBe(2)
         ->and($story->acceptanceCriteria()->orderBy('position')->pluck('statement')->all())
         ->toBe(['New one', 'New two', 'New three']);
+});
+
+test('update story tool combines story fields and acceptance criteria into one story content revision', function () {
+    ['user' => $user, 'story' => $story] = storyCriteriaScene();
+    ApprovalPolicy::create([
+        'scope_type' => ApprovalPolicy::SCOPE_PROJECT,
+        'scope_id' => $story->feature->project_id,
+        'required_approvals' => 1,
+    ]);
+
+    AcceptanceCriterion::withoutEvents(function () use ($story): void {
+        AcceptanceCriterion::factory()->for($story)->create(['position' => 1, 'statement' => 'Old one']);
+    });
+
+    $this->actingAs($user);
+
+    $response = app(UpdateStoryTool::class)->handle(new Request([
+        'story_id' => $story->getKey(),
+        'name' => 'Renamed story',
+        'acceptance_criteria' => ['New one'],
+    ]), app(AcceptanceCriteriaWriter::class));
+
+    $fresh = $story->fresh();
+
+    expect($response->isError())->toBeFalse()
+        ->and($fresh->name)->toBe('Renamed story')
+        ->and($fresh->revision)->toBe(2)
+        ->and($fresh->status)->toBe(StoryStatus::PendingApproval)
+        ->and($fresh->acceptanceCriteria()->orderBy('position')->pluck('statement')->all())
+        ->toBe(['New one']);
 });

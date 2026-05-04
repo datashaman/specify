@@ -5,6 +5,7 @@ namespace App\Mcp\Tools;
 use App\Enums\StoryKind;
 use App\Enums\StoryStatus;
 use App\Mcp\Concerns\ResolvesProjectAccess;
+use App\Models\Story;
 use App\Services\Stories\AcceptanceCriteriaWriter;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Illuminate\Support\Facades\DB;
@@ -71,7 +72,13 @@ class UpdateStoryTool extends Tool
 
         DB::transaction(function () use ($story, $changes, $validated, $hasCriteriaUpdate, $criteria) {
             if ($changes) {
-                $story->fill($changes)->save();
+                if ($hasCriteriaUpdate) {
+                    Story::withoutRevisionBump(function () use ($story, $changes): void {
+                        $story->fill($changes)->save();
+                    });
+                } else {
+                    $story->fill($changes)->save();
+                }
             }
 
             if ($hasCriteriaUpdate) {
