@@ -3,7 +3,9 @@
 namespace App\Mcp\Tools;
 
 use App\Mcp\Concerns\ResolvesProjectAccess;
+use App\Services\Stories\StoryDependencyGraph;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
+use InvalidArgumentException;
 use Laravel\Mcp\Request;
 use Laravel\Mcp\Response;
 use Laravel\Mcp\Server\Attributes\Description;
@@ -12,7 +14,7 @@ use Laravel\Mcp\Server\Tool;
 /**
  * MCP tool: add-story-dependency
  */
-#[Description('Mark a story as depending on another story. Both stories must be in projects the user can access.')]
+#[Description('Mark a story as depending on another story. Both stories must be accessible, in the same workspace, and must not form a cycle.')]
 class AddStoryDependencyTool extends Tool
 {
     use ResolvesProjectAccess;
@@ -22,7 +24,7 @@ class AddStoryDependencyTool extends Tool
     /**
      * Handle the MCP tool invocation.
      */
-    public function handle(Request $request): Response
+    public function handle(Request $request, StoryDependencyGraph $dependencies): Response
     {
         $user = $this->resolveUser($request);
         if ($user instanceof Response) {
@@ -53,7 +55,11 @@ class AddStoryDependencyTool extends Tool
             return $dependency;
         }
 
-        $story->dependencies()->syncWithoutDetaching([$dependency->id]);
+        try {
+            $dependencies->addDependency($story, $dependency);
+        } catch (InvalidArgumentException $e) {
+            return Response::error($e->getMessage());
+        }
 
         return Response::json([
             'story_id' => $story->id,
@@ -68,8 +74,8 @@ class AddStoryDependencyTool extends Tool
     public function schema(JsonSchema $schema): array
     {
         return [
-            'story_id' => $schema->integer()->description('Dependent story.')->required(),
-            'depends_on_story_id' => $schema->integer()->description('Story that must be done first.')->required(),
+            'story_id' => $schema->integer()->description('Dependent story. Must be accessible to the acting user.')->required(),
+            'depends_on_story_id' => $schema->integer()->description('Story that must be done first. Must be accessible, live in the same workspace, and not create a cycle.')->required(),
         ];
     }
 }
