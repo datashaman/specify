@@ -4,6 +4,7 @@ use App\Enums\AgentRunStatus;
 use App\Enums\ApprovalDecision;
 use App\Enums\PlanStatus;
 use App\Enums\StoryStatus;
+use App\Enums\TaskStatus;
 use App\Enums\TeamRole;
 use App\Models\AcceptanceCriterion;
 use App\Models\AgentRun;
@@ -320,6 +321,57 @@ test('plan change-request and reject decisions require notes', function () {
 
     expect(PlanApproval::query()->where('plan_id', $task->plan_id)->count())->toBe(0)
         ->and($task->plan->fresh()->status)->toBe(PlanStatus::PendingApproval);
+});
+
+test('resume execution rejects unapproved current plan before mutating run state', function () {
+    $s = showPageScene(['status' => StoryStatus::Approved]);
+    attachPolicy($s['ws'], required: 1, allowSelf: true);
+
+    $task = Task::factory()->forCurrentPlanOf($s['story'])->create();
+    $task->plan->forceFill(['status' => PlanStatus::PendingApproval->value])->save();
+    $subtask = Subtask::factory()->for($task)->create(['status' => TaskStatus::Blocked]);
+    $run = AgentRun::factory()->create([
+        'runnable_type' => Subtask::class,
+        'runnable_id' => $subtask->id,
+        'status' => AgentRunStatus::Running,
+    ]);
+
+    $this->actingAs($s['user']);
+
+    Livewire::test('pages::stories.show', ['story' => $s['story']->id])
+        ->call('resumeExecution')
+        ->assertStatus(422);
+
+    expect($run->fresh()->status)->toBe(AgentRunStatus::Running)
+        ->and($subtask->fresh()->status)->toBe(TaskStatus::Blocked);
+});
+
+test('resume execution finalizes active race siblings through execution service', function () {
+    $s = showPageScene(['status' => StoryStatus::Approved]);
+    attachPolicy($s['ws'], required: 1, allowSelf: true);
+
+    $task = Task::factory()->forCurrentPlanOf($s['story'])->create();
+    $task->plan->forceFill(['status' => PlanStatus::Approved->value])->save();
+    $subtask = Subtask::factory()->for($task)->create(['status' => TaskStatus::Pending]);
+    AgentRun::factory()->create([
+        'runnable_type' => Subtask::class,
+        'runnable_id' => $subtask->id,
+        'status' => AgentRunStatus::Succeeded,
+    ]);
+    $active = AgentRun::factory()->create([
+        'runnable_type' => Subtask::class,
+        'runnable_id' => $subtask->id,
+        'status' => AgentRunStatus::Running,
+    ]);
+
+    $this->actingAs($s['user']);
+
+    Livewire::test('pages::stories.show', ['story' => $s['story']->id])
+        ->call('resumeExecution')
+        ->assertOk();
+
+    expect($active->fresh()->status)->toBe(AgentRunStatus::Aborted)
+        ->and($subtask->fresh()->status)->toBe(TaskStatus::Done);
 });
 
 test('plan section is AC-led: AC text leads, Task name follows', function () {

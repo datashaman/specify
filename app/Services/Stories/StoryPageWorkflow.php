@@ -2,7 +2,6 @@
 
 namespace App\Services\Stories;
 
-use App\Enums\AgentRunStatus;
 use App\Enums\ApprovalDecision;
 use App\Enums\PlanStatus;
 use App\Enums\StoryStatus;
@@ -84,17 +83,15 @@ class StoryPageWorkflow
     {
         abort_unless($story->status === StoryStatus::Approved, 422, 'Story must be Approved.');
         abort_unless($user->canApproveInProject($story->feature->project), 403);
+        abort_unless($story->currentPlan?->isApproved(), 422, 'Current plan must be Approved before execution resumes.');
 
         $subtaskIds = Subtask::whereIn('task_id', $story->currentPlanTasks()->pluck('id'))->pluck('id');
 
         AgentRun::where('runnable_type', Subtask::class)
             ->whereIn('runnable_id', $subtaskIds)
             ->active()
-            ->update([
-                'status' => AgentRunStatus::Aborted->value,
-                'error_message' => 'Aborted on resume.',
-                'finished_at' => now(),
-            ]);
+            ->get()
+            ->each(fn (AgentRun $run) => $this->execution->markAborted($run, 'Aborted on resume.'));
 
         Subtask::whereIn('id', $subtaskIds)
             ->where('status', TaskStatus::Blocked)
