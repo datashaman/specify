@@ -30,7 +30,7 @@ use RuntimeException;
  *
  * Each public dispatch* / start* method creates an `AgentRun` row, queues the
  * matching job, and (on completion via `markSucceeded`) advances the cascade
- * down through Subtask → Task → Story status. This class is the only place
+ * down through Subtask → Task → Plan → Story status. This class is the only place
  * AgentRun rows should be created.
  *
  * When `executor.race` is non-empty the dispatcher fans out to N siblings —
