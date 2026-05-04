@@ -42,7 +42,7 @@ class LaravelAiExecutor implements Executor
     {
         $context = [
             'subtask_id' => $subtask->getKey(),
-            'story_id' => $subtask->task?->story_id,
+            'story_id' => $subtask->task?->plan?->story_id,
             'branch' => $workingBranch,
             'working_dir' => $workingDir,
         ];

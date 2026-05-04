@@ -10,8 +10,8 @@ test('task dependencies must live in the same plan', function () {
     $storyA = Story::factory()->create();
     $storyB = Story::factory()->create();
 
-    $a = Task::factory()->for($storyA)->create();
-    $b = Task::factory()->for($storyB)->create();
+    $a = Task::factory()->forStory($storyA)->create();
+    $b = Task::factory()->forStory($storyB)->create();
 
     expect(fn () => $b->addDependency($a))
         ->toThrow(InvalidArgumentException::class, 'same plan');
@@ -19,8 +19,8 @@ test('task dependencies must live in the same plan', function () {
 
 test('task dependencies within the same story are allowed', function () {
     $story = Story::factory()->create();
-    $a = Task::factory()->for($story)->create();
-    $b = Task::factory()->for($story)->create();
+    $a = Task::factory()->forStory($story)->create();
+    $b = Task::factory()->forStory($story)->create();
 
     $b->addDependency($a);
 

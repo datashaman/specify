@@ -15,7 +15,7 @@ use InvalidArgumentException;
 /**
  * Actionable work item under a Plan.
  */
-#[Fillable(['plan_id', 'story_id', 'acceptance_criterion_id', 'scenario_id', 'position', 'name', 'description', 'status'])]
+#[Fillable(['plan_id', 'acceptance_criterion_id', 'scenario_id', 'position', 'name', 'description', 'status'])]
 class Task extends Model
 {
     /** @use HasFactory<TaskFactory> */
@@ -31,11 +31,6 @@ class Task extends Model
     public function plan(): BelongsTo
     {
         return $this->belongsTo(Plan::class);
-    }
-
-    public function story(): BelongsTo
-    {
-        return $this->belongsTo(Story::class);
     }
 
     public function acceptanceCriterion(): BelongsTo

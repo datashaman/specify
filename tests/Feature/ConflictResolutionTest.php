@@ -57,7 +57,7 @@ function conflictResolutionScene(bool $mergeable = false): array
     $project->attachRepo($repo);
 
     $ac = AcceptanceCriterion::factory()->for($story)->create();
-    $task = Task::factory()->for($story)->create(['acceptance_criterion_id' => $ac->id]);
+    $task = Task::factory()->forStory($story)->create(['acceptance_criterion_id' => $ac->id]);
     $subtask = Subtask::factory()->for($task)->create();
     $run = AgentRun::factory()->create([
         'runnable_type' => Subtask::class,

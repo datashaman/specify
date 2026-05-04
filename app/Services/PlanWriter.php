@@ -43,7 +43,7 @@ class PlanWriter
     {
         $this->validate($story, $tasks);
 
-        $result = DB::transaction(function () use ($story, $tasks) {
+        $result = DB::transaction(function () use ($story, $tasks, $attributes) {
             $previousPlan = $story->currentPlan;
 
             if ($previousPlan) {
@@ -70,7 +70,6 @@ class PlanWriter
             foreach ($tasks as $taskData) {
                 $task = Task::create([
                     'plan_id' => $plan->getKey(),
-                    'story_id' => $story->getKey(),
                     'acceptance_criterion_id' => $taskData['acceptance_criterion_id'] ?? null,
                     'scenario_id' => $taskData['scenario_id'] ?? null,
                     'position' => $taskData['position'],

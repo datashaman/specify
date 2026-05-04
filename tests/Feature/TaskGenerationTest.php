@@ -22,8 +22,8 @@ beforeEach(function () {
 
 test('dispatching task generation runs the job, creates Tasks linked to ACs with Subtasks, marks AgentRun succeeded', function () {
     $story = Story::factory()->create();
-    $ac1 = AcceptanceCriterion::factory()->for($story)->create(['position' => 0, 'criterion' => 'AC one']);
-    $ac2 = AcceptanceCriterion::factory()->for($story)->create(['position' => 1, 'criterion' => 'AC two']);
+    $ac1 = AcceptanceCriterion::factory()->for($story)->create(['position' => 0, 'statement' => 'AC one']);
+    $ac2 = AcceptanceCriterion::factory()->for($story)->create(['position' => 1, 'statement' => 'AC two']);
 
     TasksGenerator::fake(fn () => [
         'summary' => 'plan it',
@@ -63,7 +63,7 @@ test('dispatching task generation runs the job, creates Tasks linked to ACs with
 
 test('regeneration replaces the prior task list', function () {
     $story = Story::factory()->create();
-    AcceptanceCriterion::factory()->for($story)->create(['position' => 0, 'criterion' => 'AC one']);
+    AcceptanceCriterion::factory()->for($story)->create(['position' => 0, 'statement' => 'AC one']);
 
     TasksGenerator::fake(fn () => [
         'summary' => 'v1',

@@ -39,12 +39,12 @@ class UpdateSubtaskTool extends Tool
             'position' => ['nullable', 'integer', 'min:1'],
         ]);
 
-        $subtask = Subtask::query()->with('task.story.feature')->find($validated['subtask_id']);
+        $subtask = Subtask::query()->with('task.plan.story.feature')->find($validated['subtask_id']);
         if (! $subtask) {
             return Response::error('Subtask not found.');
         }
 
-        $story = $subtask->task?->story;
+        $story = $subtask->task?->plan?->story;
         if (! $story) {
             return Response::error('Subtask is orphaned.');
         }

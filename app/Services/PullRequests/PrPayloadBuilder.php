@@ -22,7 +22,7 @@ class PrPayloadBuilder
     public static function title(Subtask $subtask, ?string $driver = null): string
     {
         $task = $subtask->task;
-        $story = $task?->story;
+        $story = $task?->plan?->story;
         $acPos = $task?->acceptanceCriterion?->position;
 
         $tag = $story && $acPos !== null
@@ -52,7 +52,7 @@ class PrPayloadBuilder
     public static function body(Subtask $subtask, array $output): string
     {
         $task = $subtask->task;
-        $story = $task?->story;
+        $story = $task?->plan?->story;
         $criterion = $task?->acceptanceCriterion?->statement;
         $summary = self::clamp(trim((string) ($output['summary'] ?? '')), 8_192);
         $files = (array) ($output['files_changed'] ?? []);

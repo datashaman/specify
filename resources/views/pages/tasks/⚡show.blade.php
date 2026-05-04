@@ -33,14 +33,13 @@ new #[Title('Task')] class extends Component {
     public function task(): ?Task
     {
         return Task::query()
-            ->whereHas('story.feature', fn ($q) => $q
+            ->whereHas('plan.story.feature', fn ($q) => $q
                 ->where('project_id', $this->project_id)
                 ->whereIn('project_id', Auth::user()->accessibleProjectIds())
             )
-            ->whereHas('story', fn ($q) => $q->where('id', $this->story_id))
+            ->whereHas('plan.story', fn ($q) => $q->where('id', $this->story_id))
             ->with([
-                'story.feature.project',
-                'plan',
+                'plan.story.feature.project',
                 'acceptanceCriterion',
                 'scenario',
                 'dependencies',
@@ -57,7 +56,7 @@ new #[Title('Task')] class extends Component {
     @else
         @php
             $task = $this->task;
-            $story = $task->story;
+            $story = $task->plan->story;
             $feature = $story->feature;
             $project = $feature->project;
             $ac = $task->acceptanceCriterion;

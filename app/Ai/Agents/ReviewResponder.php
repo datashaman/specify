@@ -88,9 +88,9 @@ class ReviewResponder implements Agent, HasStructuredOutput, HasTools
 
     public function buildPrompt(): string
     {
-        $subtask = $this->subtask->loadMissing('task.story.feature.project', 'task.acceptanceCriterion');
+        $subtask = $this->subtask->loadMissing('task.plan.story.feature.project', 'task.acceptanceCriterion');
         $task = $subtask->task;
-        $story = $task?->story;
+        $story = $task?->plan?->story;
         $criterion = $task?->acceptanceCriterion?->statement;
 
         $criterionBlock = $criterion ? "Acceptance Criterion: {$criterion}\n\n" : '';

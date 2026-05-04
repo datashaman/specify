@@ -208,9 +208,9 @@ class CliExecutor implements Executor
 
     private function buildPrompt(Subtask $subtask, ?Repo $repo, ?string $workingBranch): string
     {
-        $subtask->loadMissing('task.story', 'task.acceptanceCriterion');
+        $subtask->loadMissing('task.plan.story', 'task.acceptanceCriterion');
         $task = $subtask->task;
-        $story = $task?->story;
+        $story = $task?->plan?->story;
         $criterion = $task?->acceptanceCriterion?->statement;
 
         $repoLine = $repo

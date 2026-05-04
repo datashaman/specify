@@ -159,7 +159,7 @@ test('SubtaskRunPipeline tags events with the current phase and writes them unde
         'required_approvals' => 0,
     ]);
     $ac = $story->acceptanceCriteria()->first() ?? AcceptanceCriterion::factory()->for($story)->create();
-    $task = Task::factory()->for($story)->create(['name' => 'append', 'position' => 0, 'acceptance_criterion_id' => $ac->id]);
+    $task = Task::factory()->forStory($story)->create(['name' => 'append', 'position' => 0, 'acceptance_criterion_id' => $ac->id]);
     $subtask = Subtask::factory()->for($task)->create(['name' => 'append', 'position' => 0]);
     $story->forceFill(['status' => StoryStatus::Draft->value])->save();
     $story->fresh()->submitForApproval();
@@ -185,7 +185,7 @@ test('GET /runs/{run}/events returns events scoped + after a cursor', function (
     $user = User::factory()->create();
     $project->team->addMember($user);
 
-    $task = Task::factory()->for($story)->create(['position' => 0]);
+    $task = Task::factory()->forStory($story)->create(['position' => 0]);
     $subtask = Subtask::factory()->for($task)->create(['position' => 0]);
 
     $run = AgentRun::create([
@@ -226,7 +226,7 @@ test('GET /runs/{run}/events 404s when the user has no project access', function
     Workspace::factory()->for($outsider, 'owner')->create();
 
     $story = makeStory();
-    $task = Task::factory()->for($story)->create(['position' => 0]);
+    $task = Task::factory()->forStory($story)->create(['position' => 0]);
     $subtask = Subtask::factory()->for($task)->create(['position' => 0]);
     $run = AgentRun::create([
         'runnable_type' => Subtask::class,

@@ -44,7 +44,7 @@ class WorkspaceRunner
 
         if ($run->runnable_type === Subtask::class) {
             $subtask = $run->runnable;
-            $story = $subtask?->task?->story;
+            $story = $subtask?->task?->plan?->story;
             $feature = $story?->feature;
             if ($feature && $story && $feature->slug && $story->slug) {
                 return $base.'/specify/'.$feature->slug.'/'.$story->slug;

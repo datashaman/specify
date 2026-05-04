@@ -34,13 +34,13 @@ new #[Title('Subtask')] class extends Component {
     public function subtask(): ?Subtask
     {
         return Subtask::query()
-            ->whereHas('task.story.feature', fn ($q) => $q
+            ->whereHas('task.plan.story.feature', fn ($q) => $q
                 ->where('project_id', $this->project_id)
                 ->whereIn('project_id', Auth::user()->accessibleProjectIds())
             )
-            ->whereHas('task.story', fn ($q) => $q->where('id', $this->story_id))
+            ->whereHas('task.plan.story', fn ($q) => $q->where('id', $this->story_id))
             ->with([
-                'task.story.feature.project',
+                'task.plan.story.feature.project',
                 'task.plan',
                 'task.acceptanceCriterion',
                 'task.scenario',
@@ -69,7 +69,7 @@ new #[Title('Subtask')] class extends Component {
         @php
             $subtask = $this->subtask;
             $task = $subtask->task;
-            $story = $task->story;
+            $story = $task->plan->story;
             $feature = $story->feature;
             $project = $feature->project;
             $runs = $this->runs;

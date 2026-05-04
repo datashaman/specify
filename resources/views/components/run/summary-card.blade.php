@@ -114,10 +114,10 @@
 
         <flux:heading class="mt-2">{{ $title }}</flux:heading>
 
-        @if ($run->runnable instanceof \App\Models\Subtask && $run->runnable->task?->story)
+        @if ($run->runnable instanceof \App\Models\Subtask && $run->runnable->task?->plan?->story)
             <flux:text class="mt-1 text-xs text-zinc-500">
-                {{ $run->runnable->task->story->feature?->project?->name }}
-                &middot; {{ $run->runnable->task->story->name }}
+                {{ $run->runnable->task->plan->story->feature?->project?->name }}
+                &middot; {{ $run->runnable->task->plan->story->name }}
                 @if ($run->runnable->task->plan)
                     &middot; {{ __('plan') }} v{{ $run->runnable->task->plan->version }}
                 @endif

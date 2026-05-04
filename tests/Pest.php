@@ -106,8 +106,7 @@ function approvedStoryInProjectWithRepo(): Story
     ]);
 
     $ac = $story->acceptanceCriteria()->first();
-    $task = Task::factory()->create([
-        'story_id' => $story->id,
+    $task = Task::factory()->forStory($story)->create([
         'acceptance_criterion_id' => $ac?->id,
         'position' => 1,
     ]);

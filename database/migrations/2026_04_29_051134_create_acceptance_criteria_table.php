@@ -15,7 +15,7 @@ return new class extends Migration
             $table->id();
             $table->foreignId('story_id')->constrained()->cascadeOnDelete();
             $table->unsignedInteger('position')->default(0);
-            $table->text('criterion');
+            $table->text('statement');
             $table->timestamps();
         });
     }

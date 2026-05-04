@@ -26,7 +26,7 @@ function runScene(): array
     $project = Project::factory()->for($team)->create();
     $feature = Feature::factory()->for($project)->create();
     $story = Story::factory()->for($feature)->create();
-    $task = Task::factory()->for($story)->create();
+    $task = Task::factory()->forStory($story)->create();
 
     return compact('user', 'project', 'feature', 'story', 'task');
 }
@@ -60,7 +60,7 @@ test('does not show runs from outside the user\'s teams', function () {
     $otherProject = Project::factory()->for($otherTeam)->create();
     $otherFeature = Feature::factory()->for($otherProject)->create();
     $otherStory = Story::factory()->for($otherFeature)->create();
-    $otherTask = Task::factory()->for($otherStory)->create();
+    $otherTask = Task::factory()->forStory($otherStory)->create();
     $hiddenSub = Subtask::factory()->for($otherTask)->create(['name' => 'hidden-sub']);
     AgentRun::factory()->create([
         'runnable_type' => Subtask::class,

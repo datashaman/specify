@@ -128,13 +128,13 @@ new #[Title('Run')] class extends Component {
             ->where('runnable_type', Subtask::class)
             ->where('runnable_id', $this->subtask_id)
             ->whereHasMorph('runnable', [Subtask::class], fn ($q) => $q
-                ->whereHas('task.story', fn ($qq) => $qq->where('id', $this->story_id))
-                ->whereHas('task.story.feature', fn ($qq) => $qq
+                ->whereHas('task.plan.story', fn ($qq) => $qq->where('id', $this->story_id))
+                ->whereHas('task.plan.story.feature', fn ($qq) => $qq
                     ->where('project_id', $this->project_id)
                     ->whereIn('project_id', $accessible)
                 )
             )
-            ->with(['runnable.task.plan', 'runnable.task.acceptanceCriterion', 'runnable.task.scenario', 'runnable.task.story.feature.project', 'repo'])
+            ->with(['runnable.task.plan', 'runnable.task.acceptanceCriterion', 'runnable.task.scenario', 'runnable.task.plan.story.feature.project', 'repo'])
             ->first();
     }
 
@@ -152,7 +152,7 @@ new #[Title('Run')] class extends Component {
             $run = $this->run;
             $subtask = $run->runnable;
             $task = $subtask->task;
-            $story = $task->story;
+            $story = $task->plan->story;
             $feature = $story->feature;
             $project = $feature->project;
             $rail = match ($run->status) {

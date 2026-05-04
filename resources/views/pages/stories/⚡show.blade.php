@@ -136,7 +136,7 @@ new #[Title('Story')] class extends Component {
         return DB::transaction(function () use ($story, $existing, &$kept, &$changed) {
             foreach ($this->editCriteria as $i => $row) {
                 $position = $i + 1;
-                $text = trim((string) ($row['statement'] ?? $row['criterion'] ?? ''));
+                $text = trim((string) ($row['statement'] ?? ''));
                 $id = $row['id'] ?? null;
 
                 if ($id !== null && $existing->has($id)) {
@@ -452,7 +452,7 @@ new #[Title('Story')] class extends Component {
         $kept = [];
         foreach ($this->editCriteria as $row) {
             $id = $row['id'] ?? null;
-            $text = trim((string) ($row['statement'] ?? $row['criterion'] ?? ''));
+            $text = trim((string) ($row['statement'] ?? ''));
             if ($id === null) {
                 if ($text !== '') {
                     $added++;

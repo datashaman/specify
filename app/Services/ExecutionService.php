@@ -77,7 +77,7 @@ class ExecutionService
      */
     public function dispatchSubtaskExecution(Subtask $subtask, ?PlanApproval $approval = null, ?Repo $repo = null): AgentRun
     {
-        $repo ??= $subtask->task?->story?->feature?->project?->primaryRepo();
+        $repo ??= $subtask->task?->plan?->story?->feature?->project?->primaryRepo();
 
         $race = $this->executors->raceDrivers();
         if ($race === []) {
@@ -231,7 +231,7 @@ class ExecutionService
 
     private function workingBranchFor(Subtask $subtask, ?string $driverSuffix): string
     {
-        $story = $subtask->task?->story;
+        $story = $subtask->task?->plan?->story;
         $feature = $story?->feature;
 
         $featureSlug = $feature?->slug ?? 'feature-'.($feature?->getKey() ?? 'orphan');
@@ -499,7 +499,7 @@ class ExecutionService
             throw new RuntimeException('Only failed / cancelled / aborted runs can be retried.');
         }
 
-        $story = $subtask->task?->story;
+        $story = $subtask->task?->plan?->story;
         if (! $story || $story->status !== StoryStatus::Approved) {
             throw new RuntimeException('Story is not Approved; retry is gated on a current plan approval.');
         }
@@ -644,7 +644,7 @@ class ExecutionService
             $task->forceFill(['status' => TaskStatus::Done->value])->save();
         }
 
-        $story = $task->story;
+        $story = $task->plan->story;
         if (! $story) {
             return;
         }

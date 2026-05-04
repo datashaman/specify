@@ -28,6 +28,14 @@ Refactor Specify's product and planning model so that these concepts each have a
 - proposal / design / implementation planning
 - executable tasks and subtasks
 
+Greenfield cleanup constraint:
+- Do not preserve legacy names, compatibility aliases, duplicate ownership columns, or old traversal helpers.
+- The product layer is `Feature -> Story -> AcceptanceCriterion/Scenario`.
+- The delivery layer is `Story -> Plan -> Task -> Subtask`.
+- Cross-links are explicit: `Story.current_plan_id`, optional `Scenario.acceptance_criterion_id`, optional `Task.acceptance_criterion_id`, and optional `Task.scenario_id`.
+- `Task` must not store `story_id`; resolve the Story through `Task -> Plan -> Story`.
+- Acceptance criteria must use `statement` only; remove `criterion` columns, attributes, request aliases, and tests.
+
 The current structure stores features, stories, acceptance criteria, tasks, and subtasks, but it mixes product structure with implementation structure and flattens behavior examples into text blobs.
 
 ---

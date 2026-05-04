@@ -45,21 +45,21 @@ class ListRunsTool extends Tool
         $query = AgentRun::query()->latest('id')->limit($limit);
 
         if ($subtaskId) {
-            $subtask = Subtask::query()->with('task.story.feature')->find($subtaskId);
+            $subtask = Subtask::query()->with('task.plan.story.feature')->find($subtaskId);
             if (! $subtask) {
                 return Response::error('Subtask not found.');
             }
-            $projectId = $subtask->task?->story?->feature?->project_id;
+            $projectId = $subtask->task?->plan?->story?->feature?->project_id;
             if (! $projectId || ! $this->canAccessProject($user, (int) $projectId)) {
                 return Response::error('Subtask not accessible.');
             }
             $query->where('runnable_type', Subtask::class)->where('runnable_id', $subtask->id);
         } elseif ($taskId) {
-            $task = Task::query()->with('story.feature', 'subtasks:id,task_id')->find($taskId);
+            $task = Task::query()->with('plan.story.feature', 'subtasks:id,task_id')->find($taskId);
             if (! $task) {
                 return Response::error('Task not found.');
             }
-            if (! $this->canAccessProject($user, (int) $task->story->feature->project_id)) {
+            if (! $this->canAccessProject($user, (int) $task->plan->story->feature->project_id)) {
                 return Response::error('Task not accessible.');
             }
             $subtaskIds = $task->subtasks->pluck('id')->all();
@@ -74,7 +74,7 @@ class ListRunsTool extends Tool
                 }
             });
         } else {
-            $story = Story::query()->with('feature', 'tasks:id,story_id,plan_id')->find($storyId);
+            $story = Story::query()->with('feature', 'tasks:id,plan_id')->find($storyId);
             if (! $story) {
                 return Response::error('Story not found.');
             }

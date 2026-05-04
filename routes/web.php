@@ -66,9 +66,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
         }
 
         if ($r->runnable_type === Subtask::class) {
-            $subtask = Subtask::with('task.story.feature')->find($r->runnable_id);
-            abort_unless($subtask?->task?->story, 404);
-            $story = $subtask->task->story;
+            $subtask = Subtask::with('task.plan.story.feature')->find($r->runnable_id);
+            abort_unless($subtask?->task?->plan?->story, 404);
+            $story = $subtask->task->plan->story;
             abort_unless(in_array($story->feature->project_id, auth()->user()->accessibleProjectIds(), true), 404);
 
             return redirect()->route('runs.show', [

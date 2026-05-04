@@ -15,22 +15,29 @@ class TaskFactory extends Factory
 {
     public function configure(): static
     {
-        return $this->afterMaking(function (Task $task) {
-            if ($task->story_id && ! $task->plan_id) {
-                $story = Story::query()->find($task->story_id);
-                $plan = $story?->current_plan_id
-                    ? Plan::query()->find($story->current_plan_id)
-                    : Plan::factory()->create(['story_id' => $task->story_id]);
-                $task->plan_id = $plan?->id;
+        return $this->afterCreating(function (Task $task) {
+            $plan = $task->plan;
+            $story = $plan?->story;
+
+            if ($story && ! $story->current_plan_id) {
+                $story->forceFill(['current_plan_id' => $plan->getKey()])->save();
+            }
+        });
+    }
+
+    public function forStory(Story $story): static
+    {
+        return $this->state(function () use ($story) {
+            $freshStory = $story->fresh();
+            $plan = $freshStory?->current_plan_id
+                ? Plan::query()->find($freshStory->current_plan_id)
+                : Plan::factory()->create(['story_id' => $story->getKey()]);
+
+            if ($plan && ! $freshStory?->current_plan_id) {
+                $story->forceFill(['current_plan_id' => $plan->getKey()])->save();
             }
 
-            if ($task->plan_id && ! $task->story_id) {
-                $task->story_id = Plan::query()->find($task->plan_id)?->story_id;
-            }
-        })->afterCreating(function (Task $task) {
-            if ($task->story && ! $task->story->current_plan_id) {
-                $task->story->forceFill(['current_plan_id' => $task->plan_id])->save();
-            }
+            return ['plan_id' => $plan?->getKey()];
         });
     }
 
@@ -40,8 +47,7 @@ class TaskFactory extends Factory
     public function definition(): array
     {
         return [
-            'plan_id' => null,
-            'story_id' => Story::factory(),
+            'plan_id' => Plan::factory(),
             'acceptance_criterion_id' => null,
             'scenario_id' => null,
             'position' => 1,

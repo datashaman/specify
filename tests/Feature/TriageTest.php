@@ -56,7 +56,7 @@ function pendingPlanFor(Feature $feature, string $name = 'Visible plan story')
         'status' => StoryStatus::Approved,
         'name' => $name,
     ]);
-    $task = Task::factory()->for($story)->create(['position' => 1]);
+    $task = Task::factory()->forStory($story)->create(['position' => 1]);
     $task->plan->forceFill(['status' => PlanStatus::PendingApproval->value])->save();
 
     return $task->plan->fresh();

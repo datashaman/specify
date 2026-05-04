@@ -76,11 +76,11 @@ class GetRunTool extends Tool
     {
         return match ($run->runnable_type) {
             Subtask::class => Subtask::query()
-                ->with('task.story.feature:id,project_id')
-                ->find($run->runnable_id)?->task?->story?->feature?->project_id,
+                ->with('task.plan.story.feature:id,project_id')
+                ->find($run->runnable_id)?->task?->plan?->story?->feature?->project_id,
             Task::class => Task::query()
-                ->with('story.feature:id,project_id')
-                ->find($run->runnable_id)?->story?->feature?->project_id,
+                ->with('plan.story.feature:id,project_id')
+                ->find($run->runnable_id)?->plan?->story?->feature?->project_id,
             Story::class => Story::query()
                 ->with('feature:id,project_id')
                 ->find($run->runnable_id)?->feature?->project_id,

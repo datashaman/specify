@@ -190,9 +190,9 @@ test('approval tracks render separately for story contract and current plan', fu
     $ac = AcceptanceCriterion::create([
         'story_id' => $s['story']->id,
         'position' => 1,
-        'criterion' => 'AC-text-must-lead',
+        'statement' => 'AC-text-must-lead',
     ]);
-    $task = Task::factory()->for($s['story'])->create([
+    $task = Task::factory()->forStory($s['story'])->create([
         'name' => 'task-name-secondary',
         'position' => 1,
         'acceptance_criterion_id' => $ac->id,
@@ -218,9 +218,9 @@ test('plan section is AC-led: AC text leads, Task name follows', function () {
     $ac = AcceptanceCriterion::create([
         'story_id' => $s['story']->id,
         'position' => 1,
-        'criterion' => 'AC-text-must-lead',
+        'statement' => 'AC-text-must-lead',
     ]);
-    Task::factory()->for($s['story'])->create([
+    Task::factory()->forStory($s['story'])->create([
         'name' => 'task-name-secondary',
         'position' => 1,
         'acceptance_criterion_id' => $ac->id,
@@ -241,7 +241,7 @@ test('task missing acceptance_criterion_id renders under Unmapped tasks', functi
     $s = showPageScene(['status' => StoryStatus::Approved]);
     attachPolicy($s['ws'], required: 1);
 
-    Task::factory()->for($s['story'])->create([
+    Task::factory()->forStory($s['story'])->create([
         'name' => 'orphan-task',
         'position' => 1,
         'acceptance_criterion_id' => null,
@@ -259,9 +259,9 @@ test('appended subtask renders provenance glyph and tooltip referencing originat
     attachPolicy($s['ws'], required: 1);
 
     $ac = AcceptanceCriterion::create([
-        'story_id' => $s['story']->id, 'position' => 1, 'criterion' => 'ac',
+        'story_id' => $s['story']->id, 'position' => 1, 'statement' => 'ac',
     ]);
-    $task = Task::factory()->for($s['story'])->create([
+    $task = Task::factory()->forStory($s['story'])->create([
         'position' => 1,
         'acceptance_criterion_id' => $ac->id,
     ]);
@@ -289,7 +289,7 @@ test('reset-approval banner renders with delta when AC count changes during edit
     attachPolicy($s['ws'], required: 1);
 
     $original = AcceptanceCriterion::create([
-        'story_id' => $s['story']->id, 'position' => 1, 'criterion' => 'original-ac',
+        'story_id' => $s['story']->id, 'position' => 1, 'statement' => 'original-ac',
     ]);
     forceStoryStatus($s['story'], StoryStatus::Approved);
 
@@ -298,8 +298,8 @@ test('reset-approval banner renders with delta when AC count changes during edit
     Livewire::test('pages::stories.show', ['story' => $s['story']->id])
         ->call('startEdit')
         ->set('editCriteria', [
-            ['id' => $original->id, 'criterion' => 'original-ac'],
-            ['id' => null, 'criterion' => 'newly-added-ac'],
+            ['id' => $original->id, 'statement' => 'original-ac'],
+            ['id' => null, 'statement' => 'newly-added-ac'],
         ])
         ->assertSeeHtml('data-banner="reset-approval"')
         ->assertSee('+1')
@@ -311,7 +311,7 @@ test('reset-approval banner renders ~1 when an existing AC text is edited on App
     attachPolicy($s['ws'], required: 1);
 
     $original = AcceptanceCriterion::create([
-        'story_id' => $s['story']->id, 'position' => 1, 'criterion' => 'original-ac',
+        'story_id' => $s['story']->id, 'position' => 1, 'statement' => 'original-ac',
     ]);
     forceStoryStatus($s['story'], StoryStatus::Approved);
 
@@ -320,7 +320,7 @@ test('reset-approval banner renders ~1 when an existing AC text is edited on App
     Livewire::test('pages::stories.show', ['story' => $s['story']->id])
         ->call('startEdit')
         ->set('editCriteria', [
-            ['id' => $original->id, 'criterion' => 'edited-ac-text'],
+            ['id' => $original->id, 'statement' => 'edited-ac-text'],
         ])
         ->assertSeeHtml('data-banner="reset-approval"')
         ->assertSee('~1')
@@ -332,7 +332,7 @@ test('reset-approval banner does not render when nothing changes during edit', f
     attachPolicy($s['ws'], required: 1);
 
     AcceptanceCriterion::create([
-        'story_id' => $s['story']->id, 'position' => 1, 'criterion' => 'unchanged-ac',
+        'story_id' => $s['story']->id, 'position' => 1, 'statement' => 'unchanged-ac',
     ]);
     forceStoryStatus($s['story'], StoryStatus::Approved);
 
@@ -349,7 +349,7 @@ test('plan section renders with compact/expanded toggle controls', function () {
     $s = showPageScene(['status' => StoryStatus::Approved]);
     attachPolicy($s['ws'], required: 1);
     AcceptanceCriterion::create([
-        'story_id' => $s['story']->id, 'position' => 1, 'criterion' => 'has-an-ac',
+        'story_id' => $s['story']->id, 'position' => 1, 'statement' => 'has-an-ac',
     ]);
 
     $this->actingAs($s['user']);

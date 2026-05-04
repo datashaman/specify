@@ -17,7 +17,7 @@
 
     <flux:heading class="mt-1" size="sm">
         <a
-            href="{{ route('tasks.show', ['project' => $task->story->feature->project_id, 'story' => $task->story_id, 'task' => $task->id]) }}"
+            href="{{ route('tasks.show', ['project' => $task->plan->story->feature->project_id, 'story' => $task->plan->story_id, 'task' => $task->id]) }}"
             wire:navigate
             class="hover:underline"
         >{{ $task->name }}</a>
@@ -46,7 +46,7 @@
                     <div class="flex flex-wrap items-center gap-2">
                         <flux:badge size="sm">T{{ $task->position }}.{{ $sub->position }}</flux:badge>
                         <a
-                            href="{{ route('subtasks.show', ['project' => $task->story->feature->project_id, 'story' => $task->story_id, 'subtask' => $sub->id]) }}"
+                            href="{{ route('subtasks.show', ['project' => $task->plan->story->feature->project_id, 'story' => $task->plan->story_id, 'subtask' => $sub->id]) }}"
                             wire:navigate
                             class="font-medium hover:underline"
                         >{{ $sub->name }}</a>
@@ -72,8 +72,8 @@
                     @if ($latestRun)
                         @php
                             $runUrl = route('runs.show', [
-                                'project' => $task->story->feature->project_id,
-                                'story' => $task->story_id,
+                                'project' => $task->plan->story->feature->project_id,
+                                'story' => $task->plan->story_id,
                                 'subtask' => $sub->id,
                                 'run' => $latestRun->id,
                             ]);
@@ -97,8 +97,8 @@
 
                             <x-run.history-panel
                                 :runs="$priorRuns"
-                                :project-id="$task->story->feature->project_id"
-                                :story-id="$task->story_id"
+                                :project-id="$task->plan->story->feature->project_id"
+                                :story-id="$task->plan->story_id"
                                 :subtask-id="$sub->id"
                             />
                         </div>
