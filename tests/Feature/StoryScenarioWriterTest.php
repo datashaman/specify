@@ -70,6 +70,46 @@ test('update scenario tool records one story content revision', function () {
         ->and($fresh->scenarios()->sole()->name)->toBe('Updated scenario');
 });
 
+test('update scenario tool does not revise the story for a no-op update', function () {
+    ['user' => $user, 'story' => $story, 'criterion' => $criterion] = scenarioWriterScene();
+    $scenario = Scenario::withoutEvents(fn () => Scenario::factory()->for($story)->create([
+        'acceptance_criterion_id' => $criterion->getKey(),
+        'position' => 1,
+        'name' => 'Existing scenario',
+    ]));
+    $this->actingAs($user);
+
+    $response = app(UpdateScenarioTool::class)->handle(new Request([
+        'scenario_id' => $scenario->getKey(),
+        'name' => 'Existing scenario',
+        'acceptance_criterion_id' => $criterion->getKey(),
+    ]), app(ScenarioWriter::class));
+
+    expect($response->isError())->toBeFalse()
+        ->and($story->fresh()->revision)->toBe(1);
+});
+
+test('update scenario tool rejects acceptance criteria from another story', function () {
+    ['user' => $user, 'story' => $story, 'criterion' => $criterion] = scenarioWriterScene();
+    $scenario = Scenario::withoutEvents(fn () => Scenario::factory()->for($story)->create([
+        'acceptance_criterion_id' => $criterion->getKey(),
+        'position' => 1,
+        'name' => 'Scenario',
+    ]));
+    $otherCriterion = AcceptanceCriterion::factory()->create();
+    $this->actingAs($user);
+
+    $response = app(UpdateScenarioTool::class)->handle(new Request([
+        'scenario_id' => $scenario->getKey(),
+        'acceptance_criterion_id' => $otherCriterion->getKey(),
+    ]), app(ScenarioWriter::class));
+
+    expect($response->isError())->toBeTrue()
+        ->and((string) $response->content())->toContain('does not belong to this story')
+        ->and($story->fresh()->revision)->toBe(1)
+        ->and($scenario->fresh()->acceptance_criterion_id)->toBe($criterion->getKey());
+});
+
 test('scenario writer rejects acceptance criteria from another story', function () {
     ['user' => $user, 'story' => $story] = scenarioWriterScene();
     $otherCriterion = AcceptanceCriterion::factory()->create();

@@ -25,6 +25,7 @@ class ScenarioWriter
     public function create(Story $story, array $attributes): Scenario
     {
         return DB::transaction(function () use ($story, $attributes): Scenario {
+            $story = Story::query()->whereKey($story->getKey())->lockForUpdate()->firstOrFail();
             $criterionId = $attributes['acceptance_criterion_id'] ?? null;
             $this->ensureCriterionBelongsToStory($story, $criterionId);
 
@@ -58,9 +59,21 @@ class ScenarioWriter
                 $this->ensureCriterionBelongsToStory($story, $changes['acceptance_criterion_id']);
             }
 
-            Scenario::withoutEvents(function () use ($scenario, $changes): void {
-                $scenario->forceFill($changes)->save();
+            $changed = Scenario::withoutEvents(function () use ($scenario, $changes): bool {
+                $scenario->forceFill($changes);
+
+                if (! $scenario->isDirty()) {
+                    return false;
+                }
+
+                $scenario->save();
+
+                return true;
             });
+
+            if (! $changed) {
+                return;
+            }
 
             $this->revisions->recordContentArtifactChanged($story);
         });
