@@ -19,11 +19,6 @@ class FakeExecutor implements Executor
         return false;
     }
 
-    public function supportsProgressEvents(): bool
-    {
-        return false;
-    }
-
     public function execute(Subtask $subtask, ?string $workingDir, ?Repo $repo, ?string $workingBranch, ?string $contextBrief = null, ?ProgressEmitter $emitter = null, ?string $promptOverride = null): ExecutionResult
     {
         // Pass a real (but throwaway) directory so SubtaskExecutor::tools() can construct

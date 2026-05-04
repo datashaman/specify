@@ -155,11 +155,6 @@ test('SubtaskRunPipeline does NOT append proposed subtasks when the run ends in 
             return true;
         }
 
-        public function supportsProgressEvents(): bool
-        {
-            return false;
-        }
-
         public function execute(Subtask $subtask, ?string $workingDir, ?Repo $repo, ?string $workingBranch, ?string $contextBrief = null, ?ProgressEmitter $emitter = null, ?string $promptOverride = null): ExecutionResult
         {
             return new ExecutionResult(
@@ -222,11 +217,6 @@ test('alreadyComplete returns the Succeeded-class outcome when evidence SHAs are
         public function needsWorkingDirectory(): bool
         {
             return true;
-        }
-
-        public function supportsProgressEvents(): bool
-        {
-            return false;
         }
 
         public function execute(Subtask $subtask, ?string $workingDir, ?Repo $repo, ?string $workingBranch, ?string $contextBrief = null, ?ProgressEmitter $emitter = null, ?string $promptOverride = null): ExecutionResult
@@ -297,11 +287,6 @@ test('alreadyComplete falls through to noDiff when evidence is empty (ADR-0007 s
             return true;
         }
 
-        public function supportsProgressEvents(): bool
-        {
-            return false;
-        }
-
         public function execute(Subtask $subtask, ?string $workingDir, ?Repo $repo, ?string $workingBranch, ?string $contextBrief = null, ?ProgressEmitter $emitter = null, ?string $promptOverride = null): ExecutionResult
         {
             return new ExecutionResult(
@@ -364,11 +349,6 @@ test('alreadyComplete falls through to noDiff when ANY cited SHA is unreachable,
         public function needsWorkingDirectory(): bool
         {
             return true;
-        }
-
-        public function supportsProgressEvents(): bool
-        {
-            return false;
         }
 
         public function execute(Subtask $subtask, ?string $workingDir, ?Repo $repo, ?string $workingBranch, ?string $contextBrief = null, ?ProgressEmitter $emitter = null, ?string $promptOverride = null): ExecutionResult
@@ -435,11 +415,6 @@ test('alreadyComplete falls through to noDiff when none of the cited SHAs are re
         public function needsWorkingDirectory(): bool
         {
             return true;
-        }
-
-        public function supportsProgressEvents(): bool
-        {
-            return false;
         }
 
         public function execute(Subtask $subtask, ?string $workingDir, ?Repo $repo, ?string $workingBranch, ?string $contextBrief = null, ?ProgressEmitter $emitter = null, ?string $promptOverride = null): ExecutionResult
@@ -527,11 +502,6 @@ test('context_brief is persisted on AgentRun.output even when the run ends in no
         public function needsWorkingDirectory(): bool
         {
             return true;
-        }
-
-        public function supportsProgressEvents(): bool
-        {
-            return false;
         }
 
         public function execute(Subtask $subtask, ?string $workingDir, ?Repo $repo, ?string $workingBranch, ?string $contextBrief = null, ?ProgressEmitter $emitter = null, ?string $promptOverride = null): ExecutionResult

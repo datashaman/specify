@@ -26,11 +26,6 @@ class LaravelAiExecutor implements Executor
         return true;
     }
 
-    public function supportsProgressEvents(): bool
-    {
-        return false;
-    }
-
     /**
      * Run the agent loop and translate its final output into an `ExecutionResult`.
      *

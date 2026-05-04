@@ -28,11 +28,6 @@ class CliExecutor implements Executor
         return true;
     }
 
-    public function supportsProgressEvents(): bool
-    {
-        return true;
-    }
-
     /**
      * Pipe a prompt to the CLI, run it in `$workingDir`, and report changed files.
      *
@@ -137,8 +132,8 @@ class CliExecutor implements Executor
      * `<<<SPECIFY:already_complete>>>sha1,sha2<<<END>>>` — and return the
      * flag plus the parsed SHA list. ADR-0007.
      *
-     * Free-text CLI agents that don't emit the sentinel keep the legacy
-     * no-diff-as-failure path — opt-in, not magic detection.
+     * CLI agents only mark a Subtask as already complete when they emit this
+     * explicit sentinel; no-diff runs without it still fail.
      *
      * @return array{0: bool, 1: list<string>}
      */

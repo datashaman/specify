@@ -23,15 +23,6 @@ interface Executor
     public function needsWorkingDirectory(): bool;
 
     /**
-     * Capability flag (ADR-0011). When true, the pipeline constructs a
-     * `ProgressEmitter` for the run and passes it to `execute()`; the
-     * driver emits typed events as work happens. Drivers that return
-     * false receive `null` and do nothing differently — backwards
-     * compatibility for existing impls.
-     */
-    public function supportsProgressEvents(): bool;
-
-    /**
      * Run the executor against a Subtask.
      *
      * `$contextBrief`, when non-null, is a markdown block produced by a
@@ -43,6 +34,10 @@ interface Executor
      * `$promptOverride`, when non-null, replaces the executor's default prompt
      * built from the Subtask (used for merge-conflict resolution and similar).
      * `$contextBrief` is still prepended when both are set.
+     *
+     * `$emitter` records run progress events. Executors that can expose
+     * streaming output should emit through it; executors without useful
+     * progress events may ignore it.
      */
     public function execute(Subtask $subtask, ?string $workingDir, ?Repo $repo, ?string $workingBranch, ?string $contextBrief = null, ?ProgressEmitter $emitter = null, ?string $promptOverride = null): ExecutionResult;
 }
