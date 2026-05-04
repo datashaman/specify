@@ -6,10 +6,10 @@ use App\Enums\StoryKind;
 use App\Enums\StoryStatus;
 use App\Models\Concerns\HasSlug;
 use App\Services\Approvals\ApprovalPolicyResolver;
-use App\Services\ApprovalService;
 use App\Services\Stories\StoryApprovalSubmission;
 use App\Services\Stories\StoryDependencyGraph;
 use App\Services\Stories\StoryPullRequestProjection;
+use App\Services\Stories\StoryRevisionLifecycle;
 use App\Services\Stories\StoryRunProjection;
 use Database\Factories\StoryFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
@@ -48,9 +48,16 @@ class Story extends Model
      */
     public function silentlyForceFill(array $attributes): void
     {
+        self::withoutRevisionBump(function () use ($attributes) {
+            $this->forceFill($attributes)->save();
+        });
+    }
+
+    public static function withoutRevisionBump(callable $callback): void
+    {
         self::$suppressRevisionBump = true;
         try {
-            $this->forceFill($attributes)->save();
+            $callback();
         } finally {
             self::$suppressRevisionBump = false;
         }
@@ -59,48 +66,23 @@ class Story extends Model
     protected static function booted(): void
     {
         static::creating(function (self $story) {
-            if (empty($story->position)) {
-                $max = static::where('feature_id', $story->feature_id)->max('position') ?? 0;
-                $story->position = $max + 1;
-            }
+            app(StoryRevisionLifecycle::class)->assignInitialPosition($story);
         });
 
         static::updating(function (self $story) {
             if (self::$suppressRevisionBump) {
                 return;
             }
-            $watched = ['name', 'kind', 'actor', 'intent', 'outcome', 'description', 'notes'];
-            if (! collect($watched)->contains(fn ($key) => $story->isDirty($key))) {
-                return;
-            }
-            if ($story->isDirty('revision')) {
-                return;
-            }
-            $story->revision = ($story->revision ?? 1) + 1;
+
+            app(StoryRevisionLifecycle::class)->bumpRevisionForWatchedChanges($story);
         });
 
         static::updated(function (self $story) {
             if (self::$suppressRevisionBump) {
                 return;
             }
-            if (! $story->wasChanged('revision')) {
-                return;
-            }
 
-            $currentPlan = $story->currentPlan()->first();
-            if ($currentPlan) {
-                $currentPlan->reopenForApproval();
-            }
-
-            if (in_array($story->status, [StoryStatus::Draft, StoryStatus::Rejected, StoryStatus::Done, StoryStatus::Cancelled], true)) {
-                return;
-            }
-            self::$suppressRevisionBump = true;
-            try {
-                app(ApprovalService::class)->recompute($story);
-            } finally {
-                self::$suppressRevisionBump = false;
-            }
+            app(StoryRevisionLifecycle::class)->handleRevisionChanged($story, self::withoutRevisionBump(...));
         });
     }
 
