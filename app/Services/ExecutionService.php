@@ -5,10 +5,7 @@ namespace App\Services;
 use App\Enums\AgentRunKind;
 use App\Enums\AgentRunStatus;
 use App\Enums\ApprovalDecision;
-use App\Enums\PlanStatus;
 use App\Enums\StoryStatus;
-use App\Enums\TaskStatus;
-use App\Jobs\ExecuteSubtaskJob;
 use App\Jobs\GenerateTasksJob;
 use App\Jobs\OpenPullRequestJob;
 use App\Jobs\ResolveConflictsJob;
@@ -19,19 +16,16 @@ use App\Models\Repo;
 use App\Models\Story;
 use App\Models\StoryApproval;
 use App\Models\Subtask;
-use App\Models\Task;
-use App\Services\Executors\ExecutorFactory;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
 
 /**
- * Orchestrates AgentRun lifecycles for task generation and subtask execution.
+ * Orchestrates AgentRun lifecycles.
  *
  * Each public dispatch* / start* method creates an `AgentRun` row, queues the
- * matching job, and (on completion via `markSucceeded`) advances the cascade
- * down through Subtask → Task → Plan → Story status. This class is the only place
- * AgentRun rows should be created.
+ * matching job, and records terminal run state. Subtask execution dispatch
+ * and cascade advancement live in SubtaskExecutionScheduler.
  *
  * When `executor.race` is non-empty the dispatcher fans out to N siblings —
  * one AgentRun per race driver, each on its own branch. The cascade waits
@@ -41,7 +35,7 @@ use RuntimeException;
  */
 class ExecutionService
 {
-    public function __construct(public ExecutorFactory $executors) {}
+    public function __construct(private SubtaskExecutionScheduler $subtasks) {}
 
     /**
      * Queue a `GenerateTasksJob` for the given Story and return the AgentRun row.
@@ -77,20 +71,7 @@ class ExecutionService
      */
     public function dispatchSubtaskExecution(Subtask $subtask, ?PlanApproval $approval = null, ?Repo $repo = null): AgentRun
     {
-        $repo ??= $subtask->task?->plan?->story?->feature?->project?->primaryRepo();
-
-        $race = $this->executors->raceDrivers();
-        if ($race === []) {
-            return $this->createAndDispatchRun($subtask, $approval, $repo, $this->executors->defaultDriver(), null);
-        }
-
-        $first = null;
-        foreach ($race as $driver) {
-            $run = $this->createAndDispatchRun($subtask, $approval, $repo, $driver, $driver);
-            $first ??= $run;
-        }
-
-        return $first;
+        return $this->subtasks->dispatch($subtask, $approval, $repo);
     }
 
     /**
@@ -210,41 +191,6 @@ class ExecutionService
         });
     }
 
-    private function createAndDispatchRun(Subtask $subtask, ?PlanApproval $approval, ?Repo $repo, string $driver, ?string $branchSuffix, ?int $retryOfId = null): AgentRun
-    {
-        $run = AgentRun::create([
-            'runnable_type' => $subtask->getMorphClass(),
-            'runnable_id' => $subtask->getKey(),
-            'repo_id' => $repo?->getKey(),
-            'working_branch' => $this->workingBranchFor($subtask, $branchSuffix),
-            'executor_driver' => $driver,
-            'authorizing_approval_type' => $approval?->getMorphClass(),
-            'authorizing_approval_id' => $approval?->getKey(),
-            'status' => AgentRunStatus::Queued,
-            'retry_of_id' => $retryOfId,
-        ]);
-
-        ExecuteSubtaskJob::dispatch($run->getKey());
-
-        return $run;
-    }
-
-    private function workingBranchFor(Subtask $subtask, ?string $driverSuffix): string
-    {
-        $story = $subtask->task?->plan?->story;
-        $feature = $story?->feature;
-
-        $featureSlug = $feature?->slug ?? 'feature-'.($feature?->getKey() ?? 'orphan');
-        $storySlug = $story?->slug ?? 'story-'.($story?->getKey() ?? 'orphan');
-        $branch = "specify/{$featureSlug}/{$storySlug}";
-
-        if ($driverSuffix !== null && $driverSuffix !== '') {
-            $branch .= '-by-'.$driverSuffix;
-        }
-
-        return $branch;
-    }
-
     /**
      * Begin executing an Approved Story by dispatching every actionable subtask.
      *
@@ -255,38 +201,7 @@ class ExecutionService
      */
     public function startStoryExecution(Story $story, ?PlanApproval $approval = null): void
     {
-        if (in_array($story->status, [StoryStatus::Done, StoryStatus::Cancelled, StoryStatus::Rejected], true)) {
-            return;
-        }
-
-        if ($story->status !== StoryStatus::Approved) {
-            throw new RuntimeException('Story must be Approved before execution starts.');
-        }
-
-        $currentPlan = $story->currentPlan;
-        if (! $currentPlan) {
-            throw new RuntimeException('Story must have a current plan before execution starts.');
-        }
-        if (! $currentPlan->isApproved()) {
-            throw new RuntimeException('Current plan must be Approved before execution starts.');
-        }
-
-        $approval ??= PlanApproval::query()
-            ->where('plan_id', $currentPlan->getKey())
-            ->where('plan_revision', $currentPlan->revision ?? 1)
-            ->where('decision', ApprovalDecision::Approve->value)
-            ->latest('created_at')
-            ->first();
-
-        DB::transaction(function () use ($story, $approval) {
-            foreach ($this->nextActionableSubtasks($story) as $subtask) {
-                $hasOpenRun = $subtask->agentRuns()->active()->exists();
-                if ($hasOpenRun) {
-                    continue;
-                }
-                $this->dispatchSubtaskExecution($subtask, $approval);
-            }
-        });
+        $this->subtasks->startStory($story, $approval);
     }
 
     /**
@@ -297,20 +212,7 @@ class ExecutionService
      */
     public function nextActionableSubtasks(Story $story): Collection
     {
-        return $story->tasks()
-            ->with(['dependencies:id,status', 'subtasks:id,task_id,position,status'])
-            ->get()
-            ->filter(fn (Task $task) => $task->dependencies->every(fn (Task $d) => $d->status === TaskStatus::Done))
-            ->flatMap(function (Task $task) {
-                $sorted = $task->subtasks->sortBy('position')->values();
-                $next = $sorted->first(fn (Subtask $s) => $s->status !== TaskStatus::Done);
-                if (! $next || $next->status !== TaskStatus::Pending) {
-                    return [];
-                }
-
-                return [$next];
-            })
-            ->values();
+        return $this->subtasks->nextActionableSubtasks($story);
     }
 
     /**
@@ -357,7 +259,7 @@ class ExecutionService
         ])->save();
 
         if ($run->runnable_type === Subtask::class) {
-            $this->finalizeSubtaskFromRun($run);
+            $this->subtasks->finalizeSubtaskFromRun($run);
         }
     }
 
@@ -396,7 +298,7 @@ class ExecutionService
         ])->syncOriginal();
 
         if ($run->runnable_type === Subtask::class) {
-            $this->finalizeSubtaskFromRun($run);
+            $this->subtasks->finalizeSubtaskFromRun($run);
         }
     }
 
@@ -410,7 +312,7 @@ class ExecutionService
         ])->save();
 
         if ($run->runnable_type === Subtask::class) {
-            $this->finalizeSubtaskFromRun($run);
+            $this->subtasks->finalizeSubtaskFromRun($run);
         }
     }
 
@@ -428,7 +330,7 @@ class ExecutionService
         ])->save();
 
         if ($run->runnable_type === Subtask::class) {
-            $this->finalizeSubtaskFromRun($run);
+            $this->subtasks->finalizeSubtaskFromRun($run);
         }
     }
 
@@ -517,16 +419,12 @@ class ExecutionService
             ->first();
 
         $repo = $fromRun->repo ?? $story->feature?->project?->primaryRepo();
-        $resolvedDriver = $driver ?? $fromRun->executor_driver ?? $this->executors->defaultDriver();
-        $race = $this->executors->raceDrivers();
-        $branchSuffix = in_array($resolvedDriver, $race, true) ? $resolvedDriver : null;
 
-        return $this->createAndDispatchRun(
+        return $this->subtasks->dispatchRetry(
             $subtask,
             $approval,
             $repo,
-            $resolvedDriver,
-            $branchSuffix,
+            $driver ?? $fromRun->executor_driver,
             $fromRun->getKey(),
         );
     }
@@ -569,103 +467,5 @@ class ExecutionService
         }
 
         return $changed;
-    }
-
-    /**
-     * Cascade gate. Called whenever a Subtask AgentRun reaches a terminal
-     * state. Defers if any sibling on the same Subtask is still Queued or
-     * Running. Once all siblings have terminated:
-     *
-     *   - any Succeeded   → Subtask Done, advance the cascade
-     *   - none Succeeded  → Subtask Blocked, no cascade
-     *
-     * Concurrency: serialised on the parent Subtask row via
-     * `lockForUpdate` inside a transaction. Without the lock, two terminal
-     * callbacks arriving simultaneously on the last two siblings could both
-     * pass the "no still-open" check, both call `advanceFromSubtask`, and
-     * both dispatch the *next* Subtask before either AgentRun was committed
-     * — duplicating downstream runs. The lock makes the cascade decision
-     * (read siblings → write Subtask status → dispatch next) atomic per
-     * Subtask.
-     */
-    private function finalizeSubtaskFromRun(AgentRun $run): void
-    {
-        // ADR-0008: review-response runs do not decide cascade — the Subtask
-        // is already Done by the time review feedback arrives, and the
-        // RespondToReview run only pushes a `fix(review):` commit on its
-        // open PR. Returning here keeps the cascade gate purely about
-        // Execute-kind run terminations.
-        if (in_array($run->kind, [AgentRunKind::RespondToReview, AgentRunKind::ResolveConflicts], true)) {
-            return;
-        }
-
-        DB::transaction(function () use ($run) {
-            $subtask = Subtask::query()->whereKey($run->runnable_id)->lockForUpdate()->first();
-            if (! $subtask) {
-                return;
-            }
-
-            $siblings = AgentRun::query()
-                ->where('runnable_type', $run->runnable_type)
-                ->where('runnable_id', $subtask->getKey())
-                ->where('kind', AgentRunKind::Execute->value)
-                ->get();
-
-            if ($siblings->contains(fn (AgentRun $r) => $r->isActive())) {
-                return;
-            }
-
-            $anySucceeded = $siblings->contains(fn (AgentRun $r) => $r->status === AgentRunStatus::Succeeded);
-
-            if ($anySucceeded) {
-                $subtask->forceFill(['status' => TaskStatus::Done->value])->save();
-                $this->advanceFromSubtask($subtask->fresh(), $run->authorizingApproval);
-
-                return;
-            }
-
-            $subtask->forceFill(['status' => TaskStatus::Blocked->value])->save();
-        });
-    }
-
-    private function advanceFromSubtask(?Subtask $subtask, $authorizingApproval): void
-    {
-        if (! $subtask) {
-            return;
-        }
-
-        $task = $subtask->task;
-        if (! $task) {
-            return;
-        }
-
-        $remainingInTask = $task->subtasks()->where('status', '!=', TaskStatus::Done->value)->count();
-        if ($remainingInTask === 0) {
-            $task->forceFill(['status' => TaskStatus::Done->value])->save();
-        }
-
-        $story = $task->plan->story;
-        if (! $story) {
-            return;
-        }
-
-        $remainingTasks = $story->tasks()->where('tasks.status', '!=', TaskStatus::Done->value)->count();
-        if ($remainingTasks === 0) {
-            if ($story->currentPlan) {
-                $story->currentPlan->forceFill(['status' => PlanStatus::Done->value])->save();
-            }
-            $story->forceFill(['status' => StoryStatus::Done->value])->save();
-
-            return;
-        }
-
-        $approval = $authorizingApproval instanceof PlanApproval ? $authorizingApproval : null;
-
-        foreach ($this->nextActionableSubtasks($story->fresh()) as $next) {
-            if ($next->agentRuns()->active()->exists()) {
-                continue;
-            }
-            $this->dispatchSubtaskExecution($next, $approval);
-        }
     }
 }
