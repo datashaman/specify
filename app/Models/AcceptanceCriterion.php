@@ -2,9 +2,8 @@
 
 namespace App\Models;
 
-use App\Enums\StoryStatus;
 use App\Enums\TaskStatus;
-use App\Services\ApprovalService;
+use App\Services\Stories\StoryRevisionLifecycle;
 use Database\Factories\AcceptanceCriterionFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Casts\Attribute;
@@ -32,18 +31,7 @@ class AcceptanceCriterion extends Model
                 return;
             }
 
-            $story->silentlyForceFill([
-                'status' => $story->status === StoryStatus::Draft
-                    ? StoryStatus::Draft->value
-                    : StoryStatus::PendingApproval->value,
-                'revision' => ($story->revision ?? 1) + 1,
-            ]);
-
-            if ($story->currentPlan) {
-                $story->currentPlan->reopenForApproval();
-            }
-
-            app(ApprovalService::class)->recompute($story->fresh());
+            app(StoryRevisionLifecycle::class)->recordContentArtifactChanged($story);
         };
 
         static::created($reopen);
