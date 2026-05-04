@@ -10,7 +10,8 @@ use App\Models\PlanApproval;
 use App\Models\Story;
 use App\Models\StoryApproval;
 use App\Models\User;
-use Illuminate\Support\Collection;
+use App\Services\Approvals\ApprovalGate;
+use App\Services\Approvals\ApprovalGateStatuses;
 use InvalidArgumentException;
 use RuntimeException;
 
@@ -23,6 +24,8 @@ use RuntimeException;
  */
 class ApprovalService
 {
+    public function __construct(private ApprovalGate $gate) {}
+
     /**
      * Record an approval decision against the story's current revision and recompute status.
      *
@@ -104,70 +107,30 @@ class ApprovalService
      */
     public function recompute(Story $story): void
     {
-        $policy = $story->effectivePolicy();
-        $state = $this->approvalState(
-            $story->approvals()->where('story_revision', $story->revision ?? 1)->orderBy('created_at')->get()
+        $next = $this->gate->nextStatus(
+            approvals: $story->approvals()->where('story_revision', $story->revision ?? 1)->orderBy('created_at')->get(),
+            policy: $story->effectivePolicy(),
+            currentStatus: $story->status,
+            statuses: ApprovalGateStatuses::story(),
         );
 
-        if ($state['rejected']) {
-            $story->forceFill(['status' => StoryStatus::Rejected->value])->save();
-
-            return;
+        if ($next !== null) {
+            $story->forceFill(['status' => $next->value])->save();
         }
-
-        if ($state['changes_requested']) {
-            $story->forceFill(['status' => StoryStatus::ChangesRequested->value])->save();
-
-            return;
-        }
-
-        if ($policy->auto_approve || $state['count'] >= $policy->required_approvals) {
-            if ($story->status !== StoryStatus::Draft) {
-                $story->forceFill(['status' => StoryStatus::Approved->value])->save();
-            }
-
-            return;
-        }
-
-        if ($story->status === StoryStatus::Draft) {
-            return;
-        }
-
-        $story->forceFill(['status' => StoryStatus::PendingApproval->value])->save();
     }
 
     public function recomputePlan(Plan $plan): void
     {
-        $policy = $plan->effectivePolicy();
-        $state = $this->approvalState(
-            $plan->approvals()->where('plan_revision', $plan->revision ?? 1)->orderBy('created_at')->get()
+        $next = $this->gate->nextStatus(
+            approvals: $plan->approvals()->where('plan_revision', $plan->revision ?? 1)->orderBy('created_at')->get(),
+            policy: $plan->effectivePolicy(),
+            currentStatus: $plan->status,
+            statuses: ApprovalGateStatuses::plan(),
         );
 
-        if ($state['rejected']) {
-            $plan->forceFill(['status' => PlanStatus::Rejected->value])->save();
-
-            return;
+        if ($next !== null) {
+            $plan->forceFill(['status' => $next->value])->save();
         }
-
-        if ($state['changes_requested']) {
-            $plan->forceFill(['status' => PlanStatus::PendingApproval->value])->save();
-
-            return;
-        }
-
-        if ($policy->auto_approve || $state['count'] >= $policy->required_approvals) {
-            if ($plan->status !== PlanStatus::Draft) {
-                $plan->forceFill(['status' => PlanStatus::Approved->value])->save();
-            }
-
-            return;
-        }
-
-        if ($plan->status === PlanStatus::Draft) {
-            return;
-        }
-
-        $plan->forceFill(['status' => PlanStatus::PendingApproval->value])->save();
     }
 
     private function guardSelfApproval(bool $allowSelfApproval, ?int $creatorId, User $approver, ApprovalDecision $decision): void
@@ -180,45 +143,5 @@ class ApprovalService
         ) {
             throw new InvalidArgumentException('Self-approval not permitted by policy.');
         }
-    }
-
-    /**
-     * @param  Collection<int, StoryApproval|PlanApproval>  $approvals
-     * @return array{rejected: bool, changes_requested: bool, count: int}
-     */
-    private function approvalState(Collection $approvals): array
-    {
-        if ($approvals->contains(fn ($a) => $a->decision === ApprovalDecision::Reject)) {
-            return ['rejected' => true, 'changes_requested' => false, 'count' => 0];
-        }
-
-        $effective = [];
-        $changesRequested = false;
-
-        foreach ($approvals as $approval) {
-            $approverKey = (int) $approval->approver_id;
-
-            switch ($approval->decision) {
-                case ApprovalDecision::Approve:
-                    $effective[$approverKey] = true;
-                    $changesRequested = false;
-                    break;
-                case ApprovalDecision::Revoke:
-                    unset($effective[$approverKey]);
-                    break;
-                case ApprovalDecision::ChangesRequested:
-                    $effective = [];
-                    $changesRequested = true;
-                    break;
-                case ApprovalDecision::Reject:
-                    break;
-            }
-        }
-
-        return [
-            'rejected' => false,
-            'changes_requested' => $changesRequested,
-            'count' => count($effective),
-        ];
     }
 }
