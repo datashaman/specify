@@ -4,7 +4,7 @@ namespace App\Models;
 
 use App\Enums\PlanSource;
 use App\Enums\PlanStatus;
-use App\Services\ApprovalService;
+use App\Services\Plans\PlanApprovalLifecycle;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -53,33 +53,11 @@ class Plan extends Model
 
     public function submitForApproval(): void
     {
-        if ($this->status === PlanStatus::Rejected) {
-            throw new \RuntimeException('Cannot submit a rejected plan.');
-        }
-        if ($this->tasks()->count() === 0) {
-            throw new \RuntimeException('Add at least one task before submitting a plan.');
-        }
-
-        $this->forceFill(['status' => PlanStatus::PendingApproval->value])->save();
-        app(ApprovalService::class)->recomputePlan($this->fresh());
+        app(PlanApprovalLifecycle::class)->submit($this);
     }
 
     public function reopenForApproval(): void
     {
-        $nextStatus = match ($this->status) {
-            PlanStatus::Draft => PlanStatus::Draft,
-            PlanStatus::Superseded => PlanStatus::Superseded,
-            PlanStatus::Done => PlanStatus::Done,
-            default => PlanStatus::PendingApproval,
-        };
-
-        $this->forceFill([
-            'revision' => ($this->revision ?? 1) + 1,
-            'status' => $nextStatus->value,
-        ])->save();
-
-        if ($nextStatus !== PlanStatus::Draft && $nextStatus !== PlanStatus::Superseded && $nextStatus !== PlanStatus::Done) {
-            app(ApprovalService::class)->recomputePlan($this->fresh());
-        }
+        app(PlanApprovalLifecycle::class)->reopen($this);
     }
 }
