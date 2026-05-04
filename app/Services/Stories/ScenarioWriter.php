@@ -4,12 +4,16 @@ namespace App\Services\Stories;
 
 use App\Models\Scenario;
 use App\Models\Story;
+use App\Services\Ordering\ScopedPositionAllocator;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 
 class ScenarioWriter
 {
-    public function __construct(private StoryRevisionLifecycle $revisions) {}
+    public function __construct(
+        private StoryRevisionLifecycle $revisions,
+        private ScopedPositionAllocator $positions,
+    ) {}
 
     /**
      * @param  array{
@@ -24,15 +28,14 @@ class ScenarioWriter
      */
     public function create(Story $story, array $attributes): Scenario
     {
-        return DB::transaction(function () use ($story, $attributes): Scenario {
-            $story = Story::query()->whereKey($story->getKey())->lockForUpdate()->firstOrFail();
+        return $this->positions->withNextPosition($story, 'scenarios', function (int $nextPosition, Story $story) use ($attributes): Scenario {
             $criterionId = $attributes['acceptance_criterion_id'] ?? null;
             $this->ensureCriterionBelongsToStory($story, $criterionId);
 
-            $scenario = Scenario::withoutEvents(function () use ($story, $attributes, $criterionId): Scenario {
+            $scenario = Scenario::withoutEvents(function () use ($story, $attributes, $criterionId, $nextPosition): Scenario {
                 return $story->scenarios()->create([
                     'acceptance_criterion_id' => $criterionId,
-                    'position' => $attributes['position'] ?? ((int) $story->scenarios()->max('position') + 1),
+                    'position' => $attributes['position'] ?? $nextPosition,
                     'name' => $attributes['name'],
                     'given_text' => $attributes['given_text'] ?? null,
                     'when_text' => $attributes['when_text'] ?? null,

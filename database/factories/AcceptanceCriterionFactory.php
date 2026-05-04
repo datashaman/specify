@@ -20,7 +20,9 @@ class AcceptanceCriterionFactory extends Factory
     {
         return [
             'story_id' => Story::factory(),
-            'position' => 1,
+            'position' => fn (array $attributes): int => ((int) AcceptanceCriterion::query()
+                ->where('story_id', $attributes['story_id'])
+                ->max('position')) + 1,
             'statement' => fake()->sentence(),
         ];
     }

@@ -19,7 +19,9 @@ class SubtaskFactory extends Factory
     {
         return [
             'task_id' => Task::factory(),
-            'position' => 1,
+            'position' => fn (array $attributes): int => ((int) Subtask::query()
+                ->where('task_id', $attributes['task_id'])
+                ->max('position')) + 1,
             'name' => fake()->sentence(4),
             'description' => fake()->paragraph(),
             'status' => TaskStatus::Pending,

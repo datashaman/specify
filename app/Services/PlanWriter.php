@@ -11,9 +11,9 @@ use App\Models\Story;
 use App\Models\Subtask;
 use App\Models\Task;
 use App\Services\Executors\ProposedSubtask;
+use App\Services\Ordering\ScopedPositionAllocator;
 use App\Services\Plans\PlanInputNormalizer;
 use App\Services\Plans\PlanVersionAllocator;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use InvalidArgumentException;
 
@@ -29,6 +29,7 @@ class PlanWriter
     public function __construct(
         private PlanInputNormalizer $planInputs,
         private PlanVersionAllocator $planVersions,
+        private ScopedPositionAllocator $positions,
     ) {}
 
     /**
@@ -153,8 +154,7 @@ class PlanWriter
             $proposed = array_slice($proposed, 0, $cap);
         }
 
-        return DB::transaction(function () use ($task, $proposed, $run) {
-            $startPosition = ((int) $task->subtasks()->max('position')) + 1;
+        return $this->positions->withNextPosition($task, 'subtasks', function (int $startPosition, Task $task) use ($proposed, $run): array {
             $created = [];
 
             foreach ($proposed as $i => $entry) {
@@ -182,7 +182,7 @@ class PlanWriter
 
         $taskPositions = array_column($tasks, 'position');
         if (count($taskPositions) !== count(array_unique($taskPositions))) {
-            throw new InvalidArgumentException('Task positions must be unique within a story.');
+            throw new InvalidArgumentException('Task positions must be unique within a plan.');
         }
 
         $allowedAcIds = $story->acceptanceCriteria()->pluck('id')->all();

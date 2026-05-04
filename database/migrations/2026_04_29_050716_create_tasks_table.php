@@ -14,11 +14,12 @@ return new class extends Migration
         Schema::create('tasks', function (Blueprint $table) {
             $table->id();
             $table->foreignId('plan_id')->constrained()->cascadeOnDelete();
-            $table->unsignedInteger('position')->default(0);
+            $table->unsignedInteger('position');
             $table->string('name');
             $table->text('description')->nullable();
             $table->string('status')->default('pending');
             $table->timestamps();
+            $table->unique(['plan_id', 'position']);
         });
     }
 
