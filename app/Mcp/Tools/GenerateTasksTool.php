@@ -48,7 +48,7 @@ class GenerateTasksTool extends Tool
             return Response::error('Story must be Approved before generating a plan.');
         }
 
-        if ($story->tasks()->exists()) {
+        if ($story->currentPlanTasks()->exists()) {
             return Response::error('Story already has Tasks in its current Plan. Use set-tasks / update-task to replace or edit the current Plan.');
         }
 

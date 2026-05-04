@@ -12,6 +12,11 @@ arch('tasks are owned by plans')
     ->toHaveMethod('plan')
     ->not->toHaveMethod('st'.'ory');
 
+arch('stories expose current plan tasks explicitly')
+    ->expect(Story::class)
+    ->toHaveMethod('currentPlanTasks')
+    ->not->toHaveMethod('tasks');
+
 test('tasks table stores plan ownership only', function () {
     expect(Schema::hasColumn('tasks', 'plan_id'))->toBeTrue()
         ->and(Schema::hasColumn('tasks', 'st'.'ory_id'))->toBeFalse()

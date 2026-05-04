@@ -7,7 +7,7 @@
 ])
 
 @php
-    $tasks = $story->relationLoaded('tasks') ? $story->tasks : collect();
+    $tasks = $story->relationLoaded('currentPlanTasks') ? $story->currentPlanTasks : collect();
     $tasksTotal = $tasks->count();
     $tasksDone = $tasks->filter(fn ($task) => $task->status === \App\Enums\TaskStatus::Done)->count();
 @endphp

@@ -3,7 +3,7 @@
         <div class="flex flex-wrap items-center gap-x-3 gap-y-1">
             <flux:heading size="lg">{{ __('Current plan') }}</flux:heading>
             <flux:text class="text-xs text-zinc-500">
-                {{ $acs->count() }} {{ __('ACs') }} · {{ $story->tasks->count() }} {{ __('current-plan tasks') }} · {{ $subtaskCount }} {{ __('subtasks') }}
+                {{ $acs->count() }} {{ __('ACs') }} · {{ $story->currentPlanTasks->count() }} {{ __('current-plan tasks') }} · {{ $subtaskCount }} {{ __('subtasks') }}
                 @if ($story->currentPlan)
                     · {{ __('current') }} {{ $story->currentPlan->name ?? ('v'.$story->currentPlan->version) }}
                 @endif
@@ -41,7 +41,7 @@
                 </div>
             @endif
 
-            @if ($story->status === \App\Enums\StoryStatus::Approved && $story->tasks->isEmpty() && ! $this->pendingPlanRun && $this->canApproveStory)
+            @if ($story->status === \App\Enums\StoryStatus::Approved && $story->currentPlanTasks->isEmpty() && ! $this->pendingPlanRun && $this->canApproveStory)
                 <flux:button wire:click="generatePlan" wire:target="generatePlan" wire:loading.attr="disabled" variant="primary">
                     <span wire:loading.remove wire:target="generatePlan">{{ __('Generate plan') }}</span>
                     <span wire:loading wire:target="generatePlan">{{ __('Working…') }}</span>
@@ -98,11 +98,11 @@
         </flux:card>
     @endif
 
-    @if ($acs->isEmpty() && $story->tasks->isEmpty() && ! $this->pendingPlanRun && $story->status !== \App\Enums\StoryStatus::Approved)
+    @if ($acs->isEmpty() && $story->currentPlanTasks->isEmpty() && ! $this->pendingPlanRun && $story->status !== \App\Enums\StoryStatus::Approved)
         <flux:text class="text-zinc-500">{{ __('Current plan is generated once the story contract is approved.') }}</flux:text>
     @endif
 
-    @if ($story->currentPlan && $story->currentPlan->status !== \App\Enums\PlanStatus::Approved && $story->tasks->isNotEmpty())
+    @if ($story->currentPlan && $story->currentPlan->status !== \App\Enums\PlanStatus::Approved && $story->currentPlanTasks->isNotEmpty())
         <div class="rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-700 dark:bg-amber-900/20 dark:text-amber-200" data-section="plan-approval-note">
             {{ __('Execution is blocked until the current plan is approved.') }}
         </div>

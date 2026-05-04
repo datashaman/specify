@@ -22,7 +22,7 @@ class StoryPullRequestProjection
      */
     public function all(Story $story): Collection
     {
-        $subtaskIds = $story->tasks()
+        $subtaskIds = $story->currentPlanTasks()
             ->with('subtasks:id,task_id')
             ->get()
             ->flatMap(fn ($task) => $task->subtasks->pluck('id'))

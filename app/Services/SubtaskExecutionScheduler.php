@@ -116,7 +116,7 @@ class SubtaskExecutionScheduler
      */
     public function nextActionableSubtasks(Story $story): Collection
     {
-        return $story->tasks()
+        return $story->currentPlanTasks()
             ->with(['dependencies:id,status', 'subtasks:id,task_id,position,status'])
             ->get()
             ->filter(fn (Task $task) => $task->dependencies->every(fn (Task $d) => $d->status === TaskStatus::Done))
@@ -232,7 +232,7 @@ class SubtaskExecutionScheduler
             return;
         }
 
-        $remainingTasks = $story->tasks()->where('tasks.status', '!=', TaskStatus::Done->value)->count();
+        $remainingTasks = $story->currentPlanTasks()->where('tasks.status', '!=', TaskStatus::Done->value)->count();
         if ($remainingTasks === 0) {
             if ($story->currentPlan) {
                 $story->currentPlan->forceFill(['status' => PlanStatus::Done->value])->save();

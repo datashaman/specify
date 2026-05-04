@@ -92,7 +92,7 @@ test('editing the current plan invalidates prior plan approvals but leaves story
     expect($plan->fresh()->status)->toBe(PlanStatus::Approved)
         ->and($story->fresh()->status)->toBe(StoryStatus::Approved);
 
-    $task = $story->tasks()->firstOrFail();
+    $task = $story->currentPlanTasks()->firstOrFail();
     $task->update(['name' => 'renamed task']);
     $task->plan->reopenForApproval();
 
