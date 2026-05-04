@@ -3,6 +3,7 @@
 use App\Enums\StoryStatus;
 use App\Enums\TaskStatus;
 use App\Mcp\Tools\AddStoryDependencyTool;
+use App\Mcp\Tools\UpdateTaskTool;
 use App\Models\Feature;
 use App\Models\Project;
 use App\Models\Story;
@@ -11,6 +12,7 @@ use App\Models\Team;
 use App\Models\User;
 use App\Models\Workspace;
 use App\Services\Stories\StoryDependencyGraph;
+use App\Services\Tasks\TaskDependencyGraph;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Mcp\Request;
 
@@ -156,6 +158,30 @@ test('add story dependency tool rejects cycles', function () {
         'story_id' => $a->id,
         'depends_on_story_id' => $b->id,
     ]), app(StoryDependencyGraph::class));
+
+    expect($response->isError())->toBeTrue()
+        ->and((string) $response->content())->toContain('cycle')
+        ->and($a->fresh()->dependencies()->whereKey($b->id)->exists())->toBeFalse();
+});
+
+test('update task tool rejects dependency cycles', function () {
+    $workspace = Workspace::factory()->create();
+    $team = Team::factory()->for($workspace)->create();
+    $user = User::factory()->create();
+    $team->addMember($user);
+    $project = Project::factory()->for($team)->create();
+    $feature = Feature::factory()->for($project)->create();
+    $story = Story::factory()->for($feature)->create();
+    $a = Task::factory()->forCurrentPlanOf($story)->create(['position' => 1]);
+    $b = Task::factory()->for($a->plan)->create(['position' => 2]);
+
+    $b->addDependency($a);
+    $this->actingAs($user);
+
+    $response = app(UpdateTaskTool::class)->handle(new Request([
+        'task_id' => $a->id,
+        'depends_on_positions' => [2],
+    ]), app(TaskDependencyGraph::class));
 
     expect($response->isError())->toBeTrue()
         ->and((string) $response->content())->toContain('cycle')

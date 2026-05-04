@@ -10,6 +10,28 @@ class TaskDependencyGraph
 {
     public function addDependency(Task $task, Task $dependency): void
     {
+        $this->ensureCanDependOn($task, $dependency);
+
+        $task->dependencies()->syncWithoutDetaching([$dependency->getKey()]);
+    }
+
+    /**
+     * @param  iterable<Task>  $dependencies
+     */
+    public function replaceDependencies(Task $task, iterable $dependencies): void
+    {
+        $ids = [];
+
+        foreach ($dependencies as $dependency) {
+            $this->ensureCanDependOn($task, $dependency);
+            $ids[] = $dependency->getKey();
+        }
+
+        $task->dependencies()->sync(array_values(array_unique($ids)));
+    }
+
+    private function ensureCanDependOn(Task $task, Task $dependency): void
+    {
         if ($task->is($dependency)) {
             throw new InvalidArgumentException('A task cannot depend on itself.');
         }
@@ -21,8 +43,6 @@ class TaskDependencyGraph
         if ($this->dependsOnTransitively($dependency, $task)) {
             throw new InvalidArgumentException('Adding this dependency would create a cycle.');
         }
-
-        $task->dependencies()->syncWithoutDetaching([$dependency->getKey()]);
     }
 
     public function dependsOnTransitively(Task $task, Task $candidate): bool
