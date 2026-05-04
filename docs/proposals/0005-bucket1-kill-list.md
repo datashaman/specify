@@ -1,6 +1,6 @@
 # Proposal 0005 — Bucket 1 kill-list
 
-Status: Draft (items 3–5 implemented on this branch; items 1–2 deferred as RFC)
+Status: Draft (items 3–5 implemented; items 1–2 deferred as RFC)
 Date: 2026-05-01
 Source: AI strategy audit, Bucket 1
 
@@ -43,15 +43,15 @@ Title remains short but adds the AC position so reviewers can scan a queue: `'Sp
 
 **File**: `app/Services/Executors/CliExecutor.php` and `app/Services/SubtaskRunPipeline.php`.
 
-### #5 (partial) — fix `PlanGenerator` ghost reference in README
+### #5 — Rename planning references to `TasksGenerator` / `generate-tasks`
 
 **Before**: README says "GenerateTasksJob → PlanGenerator agent" but the actual class is `TasksGenerator`.
 
-**After**: README says "GenerateTasksJob → TasksGenerator agent". One-line doc fix; not an API change.
+**After**: README says "GenerateTasksJob → TasksGenerator agent". The MCP tool slug was also renamed from `generate-plan` to `generate-tasks`.
 
-**File**: `README.md`.
+**Resolution**: greenfield codebase, no external callers to migrate. The legacy slug was deleted outright in the same change as the rename; `GenerateTasksTool` is the only entry point.
 
-The MCP tool slug rename (`generate-plan` → `generate-tasks`) is **deferred** because it's a public-API break for any MCP client. See "Deferred — needs an ADR" below.
+**Files**: `README.md`, `app/Mcp/Tools/GenerateTasksTool.php`.
 
 ## Deferred — needs an ADR
 
@@ -71,16 +71,12 @@ This is a real ADR, not a kill-list line. Recommend opening it as `ADR-0005-runn
 
 Same shape as #1: the linear pipeline is a deliberate design that an ADR should redesign, not a code edit. The voice-for-the-executor work in Proposal 0004 is the smallest first step that opens this door without contradicting ADR-0001.
 
-### #5 (full) — Rename `generate-plan` MCP tool to `generate-tasks`
-
-**Resolution**: greenfield codebase, no external callers to migrate. The legacy slug was deleted outright in the same change as the rename; `GenerateTasksTool` is the only entry point.
-
 ## Risk and reversibility
 
 The three implemented items are all reversible and low-blast-radius:
 
 - The PR body change reverts to a one-liner with one commit.
 - The CLI executor stdout passthrough is additive — no removed fields.
-- The README fix is a doc-only change.
+- The README / MCP tool rename is direct and intentionally greenfield — no legacy alias exists.
 
-The three deferred items are intentionally not implemented here. Each gets its own ADR or follow-up PR.
+The two deferred items are intentionally not implemented here. Each gets its own ADR or follow-up PR.
