@@ -5,8 +5,8 @@ namespace App\Mcp\Tools;
 use App\Enums\StoryKind;
 use App\Enums\StoryStatus;
 use App\Mcp\Concerns\ResolvesProjectAccess;
+use App\Services\Stories\StoryWriter;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
-use Illuminate\Support\Facades\DB;
 use Laravel\Mcp\Request;
 use Laravel\Mcp\Response;
 use Laravel\Mcp\Server\Attributes\Description;
@@ -25,7 +25,7 @@ class CreateStoryTool extends Tool
     /**
      * Handle the MCP tool invocation.
      */
-    public function handle(Request $request): Response
+    public function handle(Request $request, StoryWriter $stories): Response
     {
         $user = $this->resolveUser($request);
         if ($user instanceof Response) {
@@ -55,29 +55,17 @@ class CreateStoryTool extends Tool
             return $feature;
         }
 
-        $story = DB::transaction(function () use ($feature, $user, $validated) {
-            $story = $feature->stories()->create([
-                'created_by_id' => $user->id,
-                'name' => $validated['name'],
-                'kind' => isset($validated['kind']) ? StoryKind::from($validated['kind']) : StoryKind::UserStory,
-                'actor' => $validated['actor'] ?? null,
-                'intent' => $validated['intent'] ?? null,
-                'outcome' => $validated['outcome'] ?? null,
-                'description' => $validated['description'] ?? null,
-                'notes' => $validated['notes'] ?? null,
-                'status' => isset($validated['status']) ? StoryStatus::from($validated['status']) : StoryStatus::Draft,
-                'revision' => 1,
-            ]);
-
-            foreach (($validated['acceptance_criteria'] ?? []) as $i => $criterion) {
-                $story->acceptanceCriteria()->create([
-                    'statement' => $criterion,
-                    'position' => $i + 1,
-                ]);
-            }
-
-            return $story;
-        });
+        $story = $stories->create($feature, $user, [
+            'name' => $validated['name'],
+            'kind' => isset($validated['kind']) ? StoryKind::from($validated['kind']) : StoryKind::UserStory,
+            'actor' => $validated['actor'] ?? null,
+            'intent' => $validated['intent'] ?? null,
+            'outcome' => $validated['outcome'] ?? null,
+            'description' => $validated['description'] ?? null,
+            'notes' => $validated['notes'] ?? null,
+            'status' => isset($validated['status']) ? StoryStatus::from($validated['status']) : StoryStatus::Draft,
+            'acceptance_criteria' => $validated['acceptance_criteria'] ?? [],
+        ]);
 
         return Response::json([
             'id' => $story->id,
