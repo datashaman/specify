@@ -3,12 +3,11 @@
 namespace App\Models;
 
 use App\Enums\AgentRunKind;
-use App\Enums\RepoProvider;
 use App\Enums\StoryKind;
 use App\Enums\StoryStatus;
 use App\Models\Concerns\HasSlug;
 use App\Services\ApprovalService;
-use App\Services\PullRequests\GithubPullRequestProbe;
+use App\Services\Stories\StoryPullRequestProjection;
 use Database\Factories\StoryFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -206,93 +205,7 @@ class Story extends Model
      */
     public function pullRequests(): Collection
     {
-        $subtaskIds = $this->tasks()
-            ->with('subtasks:id,task_id')
-            ->get()
-            ->flatMap(fn ($t) => $t->subtasks->pluck('id'))
-            ->all();
-
-        if ($subtaskIds === []) {
-            return collect();
-        }
-
-        $entries = AgentRun::query()
-            ->where('runnable_type', Subtask::class)
-            ->whereIn('runnable_id', $subtaskIds)
-            ->where('kind', AgentRunKind::Execute->value)
-            ->whereJsonContainsKey('output->pull_request_url')
-            ->orderByDesc('id')
-            ->get(['id', 'repo_id', 'executor_driver', 'working_branch', 'output', 'finished_at'])
-            ->map(function (AgentRun $run) {
-                $o = (array) $run->output;
-                $url = (string) ($o['pull_request_url'] ?? '');
-                if ($url === '') {
-                    return null;
-                }
-
-                return [
-                    'url' => $url,
-                    'number' => $o['pull_request_number'] ?? null,
-                    'driver' => $run->executor_driver,
-                    'branch' => $run->working_branch,
-                    'run_id' => $run->getKey(),
-                    'repo_id' => $run->repo_id,
-                    'merged' => $o['pull_request_merged'] ?? null,
-                    'action' => $o['pull_request_action'] ?? null,
-                    // The run's terminal timestamp — *not* the PR's open
-                    // time. We don't fetch the upstream PR's created_at;
-                    // this is the closest proxy for "when did Specify
-                    // first know about this PR" without an extra API
-                    // call. Rename the key so callers don't think it's
-                    // an authoritative PR timestamp.
-                    'run_finished_at' => $run->finished_at,
-                ];
-            })
-            ->filter()
-            ->values();
-
-        // Deduplicate on URL: when a PR retry adopts an already-open PR
-        // every retried run records the same URL. Keep the freshest one
-        // (the most recent run wins because we ordered by id desc).
-        $entries = $entries
-            ->groupBy('url')
-            ->map(fn (Collection $g) => $g->first())
-            ->values();
-
-        $repoIds = $entries->pluck('repo_id')->filter()->unique()->values();
-        $reposById = Repo::query()->whereIn('id', $repoIds)->get()->keyBy('id');
-        $probe = app(GithubPullRequestProbe::class);
-
-        // Hoist merged PRs to the top while preserving the id-desc order
-        // within each partition. A compound sort key (merged-bit, then
-        // -run_id) is order-stable across PHP / Laravel versions and
-        // doesn't depend on Collection::sortBy's stability semantics.
-        return $entries
-            ->map(function (array $pr) use ($probe, $reposById) {
-                $repoId = $pr['repo_id'] ?? null;
-                unset($pr['repo_id']);
-                $pr['mergeable'] = null;
-                $pr['mergeable_state'] = null;
-
-                $number = $pr['number'] ?? null;
-                if ($repoId && is_numeric($number)) {
-                    $repo = $reposById->get($repoId);
-                    if ($repo && $repo->provider === RepoProvider::Github) {
-                        $result = $probe->probeMergeable($repo, (int) $number);
-                        if ($result !== null) {
-                            $pr['mergeable'] = $result['mergeable'];
-                            $pr['mergeable_state'] = $result['mergeable_state'];
-                        }
-                    }
-                }
-
-                return $pr;
-            })
-            ->sortBy(fn ($pr) => [
-                $pr['merged'] === true ? 0 : 1,
-                -1 * (int) $pr['run_id'],
-            ])
-            ->values();
+        return app(StoryPullRequestProjection::class)->all($this);
     }
 
     /**
@@ -307,17 +220,7 @@ class Story extends Model
      */
     public function primaryPullRequest(): ?array
     {
-        $prs = $this->pullRequests();
-        if ($prs->isEmpty()) {
-            return null;
-        }
-
-        $merged = $prs->first(fn ($pr) => $pr['merged'] === true);
-        if ($merged !== null) {
-            return $merged;
-        }
-
-        return $prs->count() === 1 ? $prs->first() : null;
+        return app(StoryPullRequestProjection::class)->primary($this);
     }
 
     public function effectivePolicy(): ApprovalPolicy
