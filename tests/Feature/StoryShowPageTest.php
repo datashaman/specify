@@ -237,7 +237,26 @@ test('plan section is AC-led: AC text leads, Task name follows', function () {
         ->and($acIdx)->toBeLessThan($taskIdx);
 });
 
-test('task missing acceptance_criterion_id renders under Unmapped tasks', function () {
+test('plan section labels current-plan task counts and empty AC mappings', function () {
+    $s = showPageScene(['status' => StoryStatus::Approved]);
+    attachPolicy($s['ws'], required: 1);
+
+    AcceptanceCriterion::create([
+        'story_id' => $s['story']->id,
+        'position' => 1,
+        'statement' => 'empty-ac',
+    ]);
+
+    $this->actingAs($s['user']);
+
+    Livewire::test('pages::stories.show', ['story' => $s['story']->id])
+        ->assertSee('Current plan')
+        ->assertSee('0 current-plan tasks')
+        ->assertSee('No current-plan task is mapped to this AC yet.')
+        ->assertDontSee('No task generated for this AC yet.');
+});
+
+test('task missing acceptance_criterion_id renders under current-plan unmapped tasks', function () {
     $s = showPageScene(['status' => StoryStatus::Approved]);
     attachPolicy($s['ws'], required: 1);
 
@@ -251,6 +270,7 @@ test('task missing acceptance_criterion_id renders under Unmapped tasks', functi
 
     Livewire::test('pages::stories.show', ['story' => $s['story']->id])
         ->assertSeeHtml('data-ac="unmapped"')
+        ->assertSee('Current-plan tasks not mapped to an AC')
         ->assertSee('orphan-task');
 });
 

@@ -1,9 +1,9 @@
 <section class="flex flex-col gap-3" data-section="plan">
     <div class="flex flex-wrap items-center justify-between gap-3">
         <div class="flex flex-wrap items-center gap-x-3 gap-y-1">
-            <flux:heading size="lg">{{ __('Plan') }}</flux:heading>
+            <flux:heading size="lg">{{ __('Current plan') }}</flux:heading>
             <flux:text class="text-xs text-zinc-500">
-                {{ $acs->count() }} {{ __('ACs') }} · {{ $subtaskCount }} {{ __('subtasks') }}
+                {{ $acs->count() }} {{ __('ACs') }} · {{ $story->tasks->count() }} {{ __('current-plan tasks') }} · {{ $subtaskCount }} {{ __('subtasks') }}
                 @if ($story->currentPlan)
                     · {{ __('current') }} {{ $story->currentPlan->name ?? ('v'.$story->currentPlan->version) }}
                 @endif
@@ -69,7 +69,7 @@
                 </summary>
 
                 @if ($acTasks->isEmpty())
-                    <flux:text class="mt-2 text-xs text-zinc-500">{{ __('No task generated for this AC yet.') }}</flux:text>
+                    <flux:text class="mt-2 text-xs text-zinc-500">{{ __('No current-plan task is mapped to this AC yet.') }}</flux:text>
                 @else
                     @foreach ($acTasks as $task)
                         @include('partials.story-task', ['task' => $task])
@@ -89,7 +89,7 @@
         <flux:card data-ac="unmapped">
             <details :open="planRunMode">
                 <summary class="cursor-pointer text-sm font-medium">
-                    {{ __('Unmapped tasks') }} ({{ $unmappedTasks->count() }})
+                    {{ __('Current-plan tasks not mapped to an AC') }} ({{ $unmappedTasks->count() }})
                 </summary>
                 @foreach ($unmappedTasks as $task)
                     @include('partials.story-task', ['task' => $task])
@@ -99,7 +99,7 @@
     @endif
 
     @if ($acs->isEmpty() && $story->tasks->isEmpty() && ! $this->pendingPlanRun && $story->status !== \App\Enums\StoryStatus::Approved)
-        <flux:text class="text-zinc-500">{{ __('Plan is generated once the story contract is approved.') }}</flux:text>
+        <flux:text class="text-zinc-500">{{ __('Current plan is generated once the story contract is approved.') }}</flux:text>
     @endif
 
     @if ($story->currentPlan && $story->currentPlan->status !== \App\Enums\PlanStatus::Approved && $story->tasks->isNotEmpty())
