@@ -41,3 +41,22 @@ test('create story tool writes initial acceptance criteria without extra story r
         ->and($payload['acceptance_criteria'][0]['position'])->toBe(1)
         ->and($payload['acceptance_criteria'][1]['position'])->toBe(2);
 });
+
+test('story writer normalizes keyed initial acceptance criteria before assigning positions', function () {
+    $workspace = Workspace::factory()->create();
+    $team = Team::factory()->for($workspace)->create();
+    $creator = User::factory()->create();
+    $feature = Feature::factory()->for(Project::factory()->for($team))->create();
+
+    $story = app(StoryWriter::class)->create($feature, $creator, [
+        'name' => 'Import customer data',
+        'acceptance_criteria' => [
+            'first' => 'Import accepts CSV files.',
+            'second' => 'Import rejects malformed rows.',
+        ],
+    ]);
+
+    expect($story->fresh()->revision)->toBe(1)
+        ->and($story->acceptanceCriteria()->orderBy('position')->pluck('position')->all())
+        ->toBe([1, 2]);
+});

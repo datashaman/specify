@@ -42,7 +42,7 @@ class StoryWriter
             ]);
 
             AcceptanceCriterion::withoutEvents(function () use ($story, $attributes): void {
-                foreach (($attributes['acceptance_criteria'] ?? []) as $i => $criterion) {
+                foreach (array_values($attributes['acceptance_criteria'] ?? []) as $i => $criterion) {
                     $story->acceptanceCriteria()->create([
                         'statement' => $criterion,
                         'position' => $i + 1,
