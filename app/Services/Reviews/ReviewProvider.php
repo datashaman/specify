@@ -14,8 +14,9 @@ use App\Models\Repo;
  * creation).
  *
  * Reviews are always advisory — they post as a `COMMENT`-style review on
- * the host VCS, never `REQUEST_CHANGES` or `APPROVE`. The Story remains
- * the only approval gate (ADR-0001); this surface adds *signal*, not gates.
+ * the host VCS, never `REQUEST_CHANGES` or `APPROVE`. Story and Plan
+ * approvals remain the gates (ADR-0001); this surface adds *signal*, not
+ * gates.
  */
 interface ReviewProvider
 {

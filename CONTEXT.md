@@ -4,21 +4,23 @@ Living document. Terms are added as they're sharpened during design discussions.
 
 ## Core hierarchy
 
-`Workspace → Project → Feature → Story → Task → Subtask`
+`Workspace -> Project -> Feature -> Story -> AcceptanceCriterion / Scenario -> Plan -> Task -> Subtask`
 
 - **Workspace** — tenant boundary, owned by a User. Hosts Projects, Repos, Teams, and ApprovalPolicies. In the UI, workspace is **ambient chrome** (top-left switcher), not a breadcrumb segment. Cross-workspace navigation is a route change; within a workspace, the breadcrumb starts at Project.
 - **Project** — a body of work inside a Workspace. Holds Features and is linked M:N to workspace-scoped Repos via `project_repo` (with `role`, `is_primary`).
 - **Feature** — product-owner framing of a capability. Holds Stories.
-- **Story** — product-owner unit of value. Carries an integer `revision` (auto-bumps on edit), a description, notes, and AcceptanceCriteria. **The only approval gate** (ADR-0001).
-- **AcceptanceCriterion** — observable behaviour the Story must satisfy. 1:1 with Task (ADR-0002). In the UI, AC and Task are not two separate lists: the Story's plan section is the AC list, with each row leading on the AC text (product-owner voice) and the Task description + Subtasks (engineering voice) folded beneath. The Plan toggle (Grooming / Run) drives default collapse — Grooming collapses everything below the AC; Run expands Task + Subtasks for live watching.
-- **Task** — engineering contract for one AcceptanceCriterion. Owns 1+ Subtasks.
+- **Story** — product-owner unit of value. Carries kind, actor, intent, outcome, an integer `revision` (auto-bumps on product contract edits), description, notes, AcceptanceCriteria, and Scenarios. StoryApproval gates the product contract (ADR-0001).
+- **AcceptanceCriterion** — observable behaviour the Story must satisfy. Stores an atomic `statement`; it may be referenced by Tasks but does not map 1:1 to Tasks (ADR-0002).
+- **Scenario** — Given / When / Then behaviour example under a Story. It may be referenced by Tasks when the delivery work is scenario-shaped.
+- **Plan** — implementation interpretation of a Story. The current Plan is approved separately from the Story and owns Tasks (ADR-0001/0002).
+- **Task** — delivery work item under a Plan. May reference an AcceptanceCriterion and/or Scenario. Owns 1+ Subtasks.
 - **Subtask** — the unit an Executor runs (one Subtask per `ExecuteSubtaskJob`).
 
 ## Adjacent
 
 - **Team** — workspace-scoped, M:N with User via `team_user`.
 - **Repo** — workspace-scoped, attached to Projects via `project_repo`. Carries `provider`, encrypted `access_token`, and `webhook_secret`.
-- **ApprovalPolicy** — cascade `workspace → project → story` with a `required_approvals` threshold. Resolved policy decides how many Approve decisions a Story needs. The threshold is surfaced in the UI as a tally pill in the Story breadcrumb (`Approved · 2/2`, `Pending · 1/2`, `Changes requested`). The Story right rail shows the immutable **decision log** (Approve / ChangesRequested / Reject / Revoke, approver, time) rather than a flat approver list. ChangesRequested resets the tally — the editor must surface this consequence before the click. Reject is terminal and lives in a "more" menu with a hard confirm. **Story authors cannot approve their own Stories** — the Approve button is hidden for the author. When threshold > 1, the rail lists eligible approvers.
+- **ApprovalPolicy** — cascade `workspace -> project -> story` with a `required_approvals` threshold. Resolved policy decides how many Approve decisions a Story or Plan needs; Plans use their Story's effective policy. StoryApproval gates the product contract and PlanApproval gates execution against the current Plan. The threshold is surfaced in the UI as tally pills (`Approved · 2/2`, `Pending · 1/2`, `Changes requested`). The approval rail shows immutable **decision logs** (Approve / ChangesRequested / Reject / Revoke, approver, time) rather than flat approver lists. ChangesRequested resets the relevant tally — the editor must surface this consequence before the click. Reject is terminal and lives in a "more" menu with a hard confirm. **Story authors cannot approve their own Stories** — the Approve button is hidden for the author. When threshold > 1, the rail lists eligible approvers.
 
 ## Runs and race mode
 
@@ -56,10 +58,10 @@ The Logs tab header carries a small driver badge so watchers know which anatomy 
 
 ## Cancel and retry
 
-Neither cancel nor retry is in V1.
+Cancel and retry are first-class AgentRun operations (ADR-0010).
 
-- **Cancel** — `Executor::execute` returns one `ExecutionResult` at the end and has no in-process kill switch; `LaravelAiExecutor` runs synchronously inside `ExecuteSubtaskJob`; `CliExecutor` has a configurable timeout but no cooperative cancel plumbing. Race-mode cancellation is also semantically ambiguous (one sibling vs. all). The button is **hidden** until a cancel ADR lands; it's not stubbed.
-- **Retry** — manual Subtask retry has no domain affordance today. Failed Subtasks surface their failure (state + error) but offer no one-click retry. Re-running is an ADR-worthy capability, not a UI feature.
+- **Cancel** — `ExecutionService::cancelRun()` sets `agent_runs.cancel_requested`; the pipeline observes it at phase boundaries and transitions to Cancelled. Race-mode cancellation targets one sibling unless the caller explicitly cancels the Subtask's siblings.
+- **Retry** — `ExecutionService::retrySubtaskExecution()` creates a new AgentRun linked by `retry_of_id`. Execution retry re-resolves authorisation through the current approving PlanApproval; it does not mutate the previous terminal run.
 
 ## Realtime transport
 

@@ -39,7 +39,7 @@ Concrete shape:
 
 - Retry is **not** a state transition on the existing run; it is a **new AgentRun**. `agent_runs` is append-only (CLAUDE.md).
 - New column `agent_runs.retry_of_id` (nullable FK on `agent_runs`). Populated when `ExecutionService::retrySubtaskExecution(Subtask, ?fromRun)` dispatches a fresh run for a Subtask whose previous run terminated Failed / Cancelled / Blocked.
-- The new run authorises against the **same `StoryApproval`** as the retried-from run, *only if* the Story is still at the same revision. If the Story has been edited since (revision bumped → approval reset → re-approved at a new revision), the retry binds to the **current** approving `StoryApproval`. Retrying a run authorised by an approval that has been revoked or superseded by ChangesRequested fails with a clear error.
+- The new run authorises against the current approving `PlanApproval` for the Story's current Plan. If the Story or Plan has been edited since (revision bumped -> approval reopened), retry binds to the newly approved current Plan. Retrying while the Story or current Plan is not approved fails with a clear error.
 - Race mode: `retrySubtaskExecution` retries **only the targeted sibling driver** by default; an explicit `retryRace(Subtask)` retries every driver in the configured race list.
 - `respond_to_review` runs (ADR-0008) are not retryable through this mechanism — they re-fire automatically when new review events arrive (subject to cycle cap).
 
@@ -57,7 +57,7 @@ Concrete shape:
 - The "kill this run" question gets an honest answer: cooperative cancel works uniformly, drivers that can react faster do, drivers that can't fall back to phase-boundary checks.
 - Retry becomes a queryable history (`retry_of_id` chain) rather than a hidden re-dispatch — a reviewer can ask "how many attempts did Subtask 37 take?" and get an answer.
 - ADR-0004's named follow-up (retry the PR open for a successful run) lands without any change to the run's terminal-state semantics.
-- ADR-0001's invariant (approval is the only gate) stays intact: retry re-resolves authorisation through the current `StoryApproval`, never bypasses it.
+- ADR-0001's invariant stays intact: retry re-resolves authorisation through the current `PlanApproval`, never bypasses Story or Plan approval.
 
 ### Negative
 

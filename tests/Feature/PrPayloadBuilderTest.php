@@ -42,7 +42,7 @@ test('title renders AC#0 instead of dropping the AC tag (regression: truthiness 
         ->toContain('AC#0');
 });
 
-test('title falls back to Story-only tag when AC position is null', function () {
+test('title falls back to Story tag when AC position is null', function () {
     $story = Story::factory()->create();
     $task = Task::factory()->forStory($story)->create([
         'name' => 'task',
@@ -68,7 +68,7 @@ test('body renders Story, AC, summary, files, and Specify footer', function () {
         ->and($body)->toContain('## Acceptance Criterion', 'Users can export their data as CSV.')
         ->and($body)->toContain('## What changed', 'Wired the export endpoint')
         ->and($body)->toContain('## Files', '`app/Http/Controllers/ExportController.php`', '`routes/web.php`')
-        ->and($body)->toContain('Specify: human approval recorded on the Story');
+        ->and($body)->toContain('Specify: human approval recorded on the current Plan');
 });
 
 test('body renders an Open questions section when clarifications are present', function () {

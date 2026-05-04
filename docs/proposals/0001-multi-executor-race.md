@@ -34,7 +34,7 @@ Add a meta-driver `multi` that fans `ExecuteSubtaskJob` across N configured driv
 `app/Services/Executors/MultiExecutor.php`
 
 - `needsWorkingDirectory(): true`
-- `execute(...)`: dispatches `N` child `ExecuteSubtaskJob`s via `Bus::batch()`, one per child driver. Each child job receives the *same* `Subtask` but a derived `working_branch` (e.g. `specify/story-{id}-v{rev}-task-{pos}-by-{driver}`). Returns an `ExecutionResult` whose `summary` is "raced N executors; see batch {id}".
+- `execute(...)`: dispatches `N` child `ExecuteSubtaskJob`s via `Bus::batch()`, one per child driver. Each child job receives the *same* `Subtask` but a derived `working_branch` (e.g. `specify/{feature-slug}/{story-slug}-by-{driver}`). Returns an `ExecutionResult` whose `summary` is "raced N executors; see batch {id}".
 - The pipeline already opens one PR per `AgentRun`; multi creates one `AgentRun` per child driver, each with its own branch. The reviewer sees N PRs side-by-side.
 
 ### Capability flag (prerequisite — Bucket 2 #3)
@@ -49,7 +49,7 @@ public function capabilities(): ExecutorCapabilities; // { streaming, multi-atte
 
 ### Branch naming
 
-Existing convention: `specify/story-{id}-v{revision}-task-{position}`.
+Existing convention: `specify/{feature-slug}/{story-slug}`.
 Race convention: append `-by-{driver-slug}`. Drivers register a slug (`laravel-ai`, `cli-claude`, `cli-codex`).
 
 ### PR titles

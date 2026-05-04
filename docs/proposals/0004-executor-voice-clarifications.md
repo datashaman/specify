@@ -90,7 +90,7 @@ If `clarifications` is non-empty *and* contains any `kind=conflict`, automatical
 
 - **The model produces noise to look thoughtful.** Mitigation: the kind enum is small and the prompt is firm — only four legitimate kinds. Reject runs with > 3 clarifications and log for prompt iteration.
 - **Reviewers ignore the clarifications.** Mitigation: render them prominently in the PR body. If they're still ignored, that's the review process being broken, not the feature.
-- **Clarifications drift into being a second approval gate.** Mitigation: ADR-0001 is the lodestone. Clarifications are *information*. The Story is still the only gate.
+- **Clarifications drift into being another approval gate.** Mitigation: ADR-0001 is the lodestone. Clarifications are *information*. Story and Plan approval remain the gates.
 
 ## Reversibility
 

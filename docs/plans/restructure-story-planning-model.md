@@ -7,7 +7,7 @@ Related:
 
 ## Status
 
-Proposed implementation plan.
+Implemented by PR #49. This document is retained as historical implementation context; the canonical decisions now live in ADR-0001 and ADR-0002.
 
 Important constraint:
 - Existing Specify data is **not sacred**.
@@ -383,7 +383,7 @@ Because existing data is disposable, prefer a clean reset over compatibility wor
 
 ## PlanWriter
 
-Current code assumes the story owns tasks directly. That should change.
+Previous code assumed the story owned tasks directly. PR #49 changed this to `Task -> Plan -> Story`.
 
 - [ ] Rewrite `PlanWriter` so it writes tasks under a real `Plan`.
 - [ ] Decide whether plan replacement creates a new version or overwrites in place.
@@ -392,7 +392,7 @@ Current code assumes the story owns tasks directly. That should change.
 ## Approval services
 
 - [ ] Keep story approval for product contract.
-- [ ] Add a separate `PlanApprovalService` for plan approval.
+- [ ] Add plan approval handling.
 - [ ] Ensure execution is gated by both story approval and plan approval.
 
 ## ExecutionService
@@ -416,12 +416,12 @@ Current code assumes the story owns tasks directly. That should change.
 ## Pull request payloads / run surfaces
 
 - [ ] Recheck PR payload copy and execution assumptions.
-- [ ] Ensure any references to story-only approval reflect the new story/plan split.
+- [ ] Ensure any references to the temporary collapsed approval model reflect the new Story/Plan split.
 
 ### Files affected
 - `app/Services/PlanWriter.php`
 - `app/Services/ApprovalService.php`
-- new `app/Services/PlanApprovalService.php`
+- plan approval handling in `app/Services/ApprovalService.php`
 - `app/Services/ExecutionService.php`
 - `app/Services/SubtaskRunPipeline.php`
 - `app/Services/PullRequests/PrPayloadBuilder.php`
@@ -435,7 +435,7 @@ The MCP server instructions and tool payloads need to reflect the new truth.
 
 ## Server instructions
 - [ ] Update `SpecifyServer` instructions to describe the hierarchy as feature → story → criteria/scenarios + plan → task → subtask.
-- [ ] Remove the claim that a task is always one acceptance criterion.
+- [ ] Remove the claim that a Task is always one acceptance criterion.
 - [ ] Explicitly say Given / When / Then belongs in scenarios.
 
 ## Story tools

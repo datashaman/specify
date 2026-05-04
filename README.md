@@ -14,28 +14,29 @@ Requires PHP `^8.4`, Node, and SQLite by default. `composer setup` creates `data
 
 ## Domain at a glance
 
-`Workspace → Project → Feature → Story → Task → Subtask` (with `AcceptanceCriterion` on Story; one `Task` per AC; each `Task` has 1+ `Subtask`s).
+`Workspace -> Project -> Feature -> Story -> AcceptanceCriterion / Scenario -> Plan -> Task -> Subtask`.
 
 - **Workspace** — tenant boundary, owned by a User. `Team` is workspace-scoped (M:N via `team_user`).
-- **Story** — product-owner unit of value; carries `revision` (auto-bumps on edit), `description`, `notes`, and acceptance criteria.
-- **Task** — engineering contract for one acceptance criterion. Subtasks are the executor's step list.
-- **Approval is the core reframe.** `ApprovalPolicy` (Story/Project/Workspace cascade, configurable `required_approvals` threshold) plus `StoryApproval` (immutable audit log). `ApprovalService::recordDecision/recompute` runs the state machine. **Story is the only approval gate** — Tasks and Subtasks don't gate; the diff-review surface is the PR.
+- **Story** — product-owner unit of value; carries kind, actor, intent, outcome, `revision` (auto-bumps on product edits), `description`, `notes`, acceptance criteria, and scenarios.
+- **Plan** — implementation interpretation of a Story. `stories.current_plan_id` points at the active Plan; previous Plans remain history.
+- **Task** — delivery work item under a Plan. A Task may reference an acceptance criterion or scenario, but it is not defined as one acceptance criterion. Subtasks are the executor's step list.
+- **Approval is the core reframe.** `ApprovalPolicy` (Story/Project/Workspace cascade, configurable `required_approvals` threshold) plus immutable `StoryApproval` and `PlanApproval` logs. Story approval gates the product contract; current Plan approval gates execution. Tasks and Subtasks don't gate; the diff-review surface is the PR.
 
 See `docs/adr/` for the load-bearing decisions in detail.
 
 ## How a run works
 
 ```
-Story approved
-  → Tasks generated (GenerateTasksJob → TasksGenerator agent, structured output)
-  → Story re-approved (any task edit resets to PendingApproval)
+Story submitted and approved
+  → Plan generated/replaced (GenerateTasksJob → TasksGenerator agent, structured output)
+  → current Plan submitted and approved
   → Subtasks dispatched (ExecuteSubtaskJob)
       → SubtaskRunPipeline: prepare workdir → checkout branch → executor edits
       → commit → diff → push → open PR
   → mark Done → cascade
 ```
 
-`AgentRun` records every dispatch (polymorphic `runnable`, polymorphic `authorizing_approval`, append-only).
+Product edits reopen Story approval and current Plan approval. Plan/Task/Subtask edits reopen Plan approval. `AgentRun` records every dispatch (polymorphic `runnable`, polymorphic `authorizing_approval`, append-only): task-generation runs may authorise against `StoryApproval`; execution runs authorise against `PlanApproval`.
 
 ## Pluggable executors
 
@@ -53,7 +54,7 @@ Bound by `specify.executor.driver`. See `config/specify.php` for all knobs (`run
 
 `PullRequestProvider` interface; drivers exist for GitHub, GitLab, and Bitbucket. `ExecuteSubtaskJob` opens a PR after push (config-gated); failures are recorded as `pull_request_error` and don't fail the run.
 
-Branch naming: `specify/story-{id}-v{revision}-task-{position}`.
+Branch naming: `specify/{feature-slug}/{story-slug}`; race-mode siblings add `-by-{driver}`.
 
 ## Where to look
 

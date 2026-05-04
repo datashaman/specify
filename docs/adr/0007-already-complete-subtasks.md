@@ -95,9 +95,9 @@ Concrete shape:
 
 ### Neutral
 
-- ADR-0001 is preserved: Story is still the only approval gate. The
-  reviewer's diff-review surface (the PR) shows the cited commits
-  alongside everything else on the branch.
+- ADR-0001 is preserved: Story and current Plan remain the approval
+  gates. The reviewer's diff-review surface (the PR) shows the cited
+  commits alongside everything else on the branch.
 - ADR-0004 is preserved: the new state is Succeeded-class, like
   `pullRequestFailed`. Both route to `markSucceeded`.
 
