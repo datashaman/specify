@@ -4,7 +4,6 @@ namespace App\Services\PullRequests;
 
 use App\Enums\RepoProvider;
 use App\Models\Repo;
-use App\Models\Story;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
@@ -18,7 +17,7 @@ final class GithubPullRequestProbe
 {
     /**
      * Fetch mergeability for a pull request. Per-request memoization avoids
-     * duplicate GETs when {@see Story::pullRequests()} walks siblings.
+     * duplicate GETs when Story pull request projections walk siblings.
      *
      * @return array{mergeable: ?bool, mergeable_state: ?string}|null Null on error or unsupported repo.
      */
