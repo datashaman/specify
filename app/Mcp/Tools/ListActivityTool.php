@@ -12,14 +12,14 @@ use Laravel\Mcp\Server\Attributes\Description;
 use Laravel\Mcp\Server\Tool;
 
 /**
- * MCP tool: list-events
+ * MCP tool: list-activity
  */
-#[Description('List recent webhook events. Filter by repo_id (required unless project_id given). Newest first.')]
-class ListEventsTool extends Tool
+#[Description('List recent project activity from webhook deliveries. Filter by repo_id or project_id. Newest first.')]
+class ListActivityTool extends Tool
 {
     use ResolvesProjectAccess;
 
-    protected string $name = 'list-events';
+    protected string $name = 'list-activity';
 
     /**
      * Handle the MCP tool invocation.
@@ -61,18 +61,18 @@ class ListEventsTool extends Tool
         }
 
         if (empty($repoIds)) {
-            return Response::json(['count' => 0, 'events' => []]);
+            return Response::json(['count' => 0, 'activity' => []]);
         }
 
-        $events = WebhookEvent::query()
+        $activity = WebhookEvent::query()
             ->whereIn('repo_id', $repoIds)
             ->latest('id')
             ->limit($limit)
             ->get(['id', 'repo_id', 'provider', 'event', 'action', 'signature_valid', 'matched_run_id', 'created_at']);
 
         return Response::json([
-            'count' => $events->count(),
-            'events' => $events->map(fn (WebhookEvent $e) => [
+            'count' => $activity->count(),
+            'activity' => $activity->map(fn (WebhookEvent $e) => [
                 'id' => $e->id,
                 'repo_id' => $e->repo_id,
                 'provider' => $e->provider,
@@ -91,9 +91,9 @@ class ListEventsTool extends Tool
     public function schema(JsonSchema $schema): array
     {
         return [
-            'repo_id' => $schema->integer()->description('Repo to list events for.'),
-            'project_id' => $schema->integer()->description('Or, list events across all repos in this project.'),
-            'limit' => $schema->integer()->description('Max number of events (1–200, default 25).'),
+            'repo_id' => $schema->integer()->description('Repo to list activity for.'),
+            'project_id' => $schema->integer()->description('Or, list activity across all repos in this project.'),
+            'limit' => $schema->integer()->description('Max number of activity entries (1–200, default 25).'),
         ];
     }
 }

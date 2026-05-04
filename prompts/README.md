@@ -7,7 +7,7 @@ name.
 | File | Loaded by | Purpose |
 |------|-----------|---------|
 | `subtask-executor.md` | `App\Ai\Agents\SubtaskExecutor::instructions()` | System prompt for the per-Subtask execution agent. |
-| `tasks-generator.md`  | `App\Ai\Agents\TasksGenerator::instructions()`  | System prompt for the planning agent that drafts a task list from a Story. |
+| `tasks-generator.md`  | `App\Ai\Agents\TasksGenerator::instructions()`  | System prompt for the planning agent that drafts a current Plan from a Story. |
 
 Both are loaded via `App\Services\Prompts\PromptLoader`, which caches contents
 within a single PHP request. Edit the markdown directly — there is no build

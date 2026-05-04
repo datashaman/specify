@@ -114,8 +114,8 @@ class UpdateStoryTool extends Tool
             'actor' => $schema->string()->description('New "As a ..." actor or role.'),
             'intent' => $schema->string()->description('New "I want ..." intent statement.'),
             'outcome' => $schema->string()->description('New "So that / in order to ..." outcome statement.'),
-            'description' => $schema->string()->description('Product-owner framing and context. No implementation detail (schemas, classes, file paths). Markdown supported.'),
-            'notes' => $schema->string()->description('Caveats, links, scope reminders. Markdown supported.'),
+            'description' => $schema->string()->description('Product-owner framing and context. No implementation detail (schemas, classes, file paths, or implementation steps). Implementation belongs in Plans, Tasks, and Subtasks. Markdown supported.'),
+            'notes' => $schema->string()->description('Caveats, links, scope reminders. Implementation steps belong in Plans, Tasks, and Subtasks. Markdown supported.'),
             'status' => $schema->string()
                 ->description('New status. One of: '.implode(', ', $statuses)),
             'acceptance_criteria' => $schema->array()

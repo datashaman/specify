@@ -21,7 +21,7 @@ use App\Mcp\Tools\GetRepoTool;
 use App\Mcp\Tools\GetRunTool;
 use App\Mcp\Tools\GetStoryTool;
 use App\Mcp\Tools\GetTaskTool;
-use App\Mcp\Tools\ListEventsTool;
+use App\Mcp\Tools\ListActivityTool;
 use App\Mcp\Tools\ListFeaturesTool;
 use App\Mcp\Tools\ListPlansTool;
 use App\Mcp\Tools\ListProjectsTool;
@@ -124,7 +124,7 @@ class SpecifyServer extends Server
         StartRunTool::class,
         ListReposTool::class,
         GetRepoTool::class,
-        ListEventsTool::class,
+        ListActivityTool::class,
     ];
 
     protected array $resources = [
