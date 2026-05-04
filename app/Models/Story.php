@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Enums\StoryKind;
 use App\Enums\StoryStatus;
 use App\Models\Concerns\HasSlug;
+use App\Services\Approvals\ApprovalPolicyResolver;
 use App\Services\ApprovalService;
 use App\Services\Stories\StoryPullRequestProjection;
 use App\Services\Stories\StoryRunProjection;
@@ -210,25 +211,7 @@ class Story extends Model
 
     public function effectivePolicy(): ApprovalPolicy
     {
-        $project = $this->feature?->project;
-        $workspace = $project?->team?->workspace;
-
-        $candidates = collect([
-            ApprovalPolicy::query()
-                ->where('scope_type', ApprovalPolicy::SCOPE_STORY)
-                ->where('scope_id', $this->getKey())
-                ->first(),
-            $project ? ApprovalPolicy::query()
-                ->where('scope_type', ApprovalPolicy::SCOPE_PROJECT)
-                ->where('scope_id', $project->getKey())
-                ->first() : null,
-            $workspace ? ApprovalPolicy::query()
-                ->where('scope_type', ApprovalPolicy::SCOPE_WORKSPACE)
-                ->where('scope_id', $workspace->getKey())
-                ->first() : null,
-        ])->filter();
-
-        return $candidates->first() ?? ApprovalPolicy::default();
+        return app(ApprovalPolicyResolver::class)->forStory($this);
     }
 
     public function isApproved(): bool
