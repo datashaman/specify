@@ -2,6 +2,7 @@
 
 use App\Ai\Agents\SubtaskExecutor;
 use App\Enums\AgentRunStatus;
+use App\Enums\PlanStatus;
 use App\Enums\StoryStatus;
 use App\Enums\TaskStatus;
 use App\Models\AcceptanceCriterion;
@@ -132,6 +133,7 @@ test('full story execution: subtasks succeed and story flips to Done', function 
     app(ExecutionService::class)->startStoryExecution($story->fresh());
 
     expect($story->fresh()->status)->toBe(StoryStatus::Done)
+        ->and($story->fresh()->currentPlan->status)->toBe(PlanStatus::Done)
         ->and($taskA->fresh()->status)->toBe(TaskStatus::Done)
         ->and($taskB->fresh()->status)->toBe(TaskStatus::Done);
 });

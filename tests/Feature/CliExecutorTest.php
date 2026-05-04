@@ -1,6 +1,7 @@
 <?php
 
 use App\Enums\AgentRunStatus;
+use App\Enums\PlanStatus;
 use App\Enums\StoryStatus;
 use App\Enums\TaskStatus;
 use App\Models\AcceptanceCriterion;
@@ -214,6 +215,7 @@ test('full pipeline with cli driver: clone → branch → cli edits → commit �
         ->and($run->diff)->toContain('AGENT_NOTE.md')
         ->and($run->diff)->toContain('edited by agent')
         ->and($subtask->fresh()->status)->toBe(TaskStatus::Done)
+        ->and($story->fresh()->currentPlan->status)->toBe(PlanStatus::Done)
         ->and($story->fresh()->status)->toBe(StoryStatus::Done);
 
     $remoteBranches = new Process(['git', 'branch', '--list'], $bare);
