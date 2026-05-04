@@ -53,9 +53,11 @@ class Plan extends Model
 
     public function isCurrent(): bool
     {
-        $this->loadMissing('story');
+        if (! $this->exists) {
+            return false;
+        }
 
-        return (int) $this->story?->current_plan_id === (int) $this->getKey();
+        return (int) $this->story()->value('current_plan_id') === (int) $this->getKey();
     }
 
     public function submitForApproval(): void
