@@ -527,6 +527,70 @@ test('reset-approval banner does not render when nothing changes during edit', f
         ->assertDontSee('Save & request re-approval');
 });
 
+test('saving unchanged story contract does not bump revision', function () {
+    $s = showPageScene(['status' => StoryStatus::Draft, 'revision' => 7]);
+    attachPolicy($s['ws'], required: 1);
+
+    AcceptanceCriterion::withoutEvents(function () use ($s): void {
+        AcceptanceCriterion::create([
+            'story_id' => $s['story']->id,
+            'position' => 1,
+            'statement' => 'unchanged-ac',
+        ]);
+    });
+    forceStoryStatus($s['story'], StoryStatus::Approved, revision: 7);
+
+    $this->actingAs($s['user']);
+
+    Livewire::test('pages::stories.show', ['story' => $s['story']->id])
+        ->call('startEdit')
+        ->call('saveEdit')
+        ->assertOk();
+
+    $fresh = $s['story']->fresh();
+
+    expect($fresh->revision)->toBe(7)
+        ->and($fresh->status)->toBe(StoryStatus::Approved);
+});
+
+test('saving edited story contract preserves acceptance criterion ids and reopens approvals once', function () {
+    $s = showPageScene(['status' => StoryStatus::Draft, 'revision' => 3]);
+    attachPolicy($s['ws'], required: 1);
+
+    $criterion = AcceptanceCriterion::withoutEvents(fn () => AcceptanceCriterion::create([
+        'story_id' => $s['story']->id,
+        'position' => 1,
+        'statement' => 'original-ac',
+    ]));
+    $task = Task::factory()->forCurrentPlanOf($s['story'])->create([
+        'acceptance_criterion_id' => $criterion->id,
+    ]);
+    $task->plan->forceFill(['status' => PlanStatus::Approved->value])->save();
+    forceStoryStatus($s['story'], StoryStatus::Approved, revision: 3);
+
+    $this->actingAs($s['user']);
+
+    Livewire::test('pages::stories.show', ['story' => $s['story']->id])
+        ->call('startEdit')
+        ->set('editName', 'edited story name')
+        ->set('editCriteria', [
+            ['id' => $criterion->id, 'statement' => 'edited-ac'],
+        ])
+        ->call('saveEdit')
+        ->assertOk();
+
+    $fresh = $s['story']->fresh();
+    $freshCriterion = $criterion->fresh();
+
+    expect($fresh->name)->toBe('edited story name')
+        ->and($fresh->revision)->toBe(4)
+        ->and($fresh->status)->toBe(StoryStatus::PendingApproval)
+        ->and($freshCriterion->statement)->toBe('edited-ac')
+        ->and($freshCriterion->getKey())->toBe($criterion->getKey())
+        ->and($task->fresh()->acceptance_criterion_id)->toBe($criterion->getKey())
+        ->and($task->plan->fresh()->status)->toBe(PlanStatus::PendingApproval);
+});
+
 test('plan section renders with compact/expanded toggle controls', function () {
     $s = showPageScene(['status' => StoryStatus::Approved]);
     attachPolicy($s['ws'], required: 1);

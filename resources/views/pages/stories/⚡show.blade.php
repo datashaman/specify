@@ -7,10 +7,9 @@ use App\Enums\TaskStatus;
 use App\Models\AcceptanceCriterion;
 use App\Models\AgentRun;
 use App\Models\Story;
-use App\Services\ApprovalService;
+use App\Services\Stories\StoryContractEditor;
 use App\Services\Stories\StoryPageWorkflow;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\DB;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Title;
 use Livewire\Attributes\Validate;
@@ -105,62 +104,15 @@ new #[Title('Story')] class extends Component {
             'editCriteria.*.statement' => 'required|string|max:1000',
         ]);
 
-        $criteriaChanged = $this->syncCriteria($story);
-
-        $story->update([
-            'name' => trim($this->editName),
-            'description' => $this->editDescription,
-        ]);
-
-        if ($criteriaChanged && in_array($story->status, [StoryStatus::Approved, StoryStatus::ChangesRequested], true)) {
-            $story->silentlyForceFill([
-                'status' => StoryStatus::PendingApproval->value,
-                'revision' => ($story->revision ?? 1) + 1,
-            ]);
-            app(ApprovalService::class)->recompute($story->fresh());
-        }
+        app(StoryContractEditor::class)->update(
+            $story,
+            $this->editName,
+            $this->editDescription,
+            $this->editCriteria,
+        );
 
         $this->editing = false;
         unset($this->story);
-    }
-
-    private function syncCriteria(Story $story): bool
-    {
-        $existing = $story->acceptanceCriteria()->get()->keyBy('id');
-        $kept = [];
-        $changed = false;
-
-        return DB::transaction(function () use ($story, $existing, &$kept, &$changed) {
-            foreach ($this->editCriteria as $i => $row) {
-                $position = $i + 1;
-                $text = trim((string) ($row['statement'] ?? ''));
-                $id = $row['id'] ?? null;
-
-                if ($id !== null && $existing->has($id)) {
-                    $ac = $existing[$id];
-                    if ($ac->statement !== $text || $ac->position !== $position) {
-                        $ac->update(['statement' => $text, 'position' => $position]);
-                        $changed = true;
-                    }
-                    $kept[] = $id;
-                } else {
-                    AcceptanceCriterion::create([
-                        'story_id' => $story->id,
-                        'position' => $position,
-                        'statement' => $text,
-                    ]);
-                    $changed = true;
-                }
-            }
-
-            $toDelete = $existing->keys()->diff($kept);
-            if ($toDelete->isNotEmpty()) {
-                AcceptanceCriterion::whereIn('id', $toDelete)->delete();
-                $changed = true;
-            }
-
-            return $changed;
-        });
     }
 
     private function canEdit(Story $story): bool
