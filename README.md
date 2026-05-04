@@ -22,7 +22,7 @@ Requires PHP `^8.4`, Node, and SQLite by default. `composer setup` creates `data
 - **Task** — delivery work item under a Plan. A Task may reference an acceptance criterion or scenario, but it is not defined as one acceptance criterion. Subtasks are the executor's step list.
 - **Approval is the core reframe.** `ApprovalPolicy` (Story/Project/Workspace cascade, configurable `required_approvals` threshold) plus immutable `StoryApproval` and `PlanApproval` logs. Story approval gates the product contract; current Plan approval gates execution. Tasks and Subtasks don't gate; the diff-review surface is the PR.
 
-See `docs/adr/` for the load-bearing decisions in detail.
+See `docs/architecture/story-planning-model.md` for the current implementation shape and `docs/adr/` for the load-bearing decisions in detail.
 
 ## How a run works
 
@@ -67,6 +67,7 @@ Branch naming: `specify/{feature-slug}/{story-slug}`; race-mode siblings add `-b
 | Git workdir lifecycle | `app/Services/WorkspaceRunner.php` |
 | Run pipeline | `app/Services/SubtaskRunPipeline.php` |
 | Run orchestration | `app/Jobs/GenerateTasksJob.php`, `app/Jobs/ExecuteSubtaskJob.php` |
+| Story planning architecture | `docs/architecture/story-planning-model.md` |
 | Status enums | `app/Enums/` |
 | Architecture decisions | `docs/adr/` |
 | Config | `config/specify.php` |
