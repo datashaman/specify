@@ -1,5 +1,6 @@
 <?php
 
+use App\Enums\PlanStatus;
 use App\Mcp\Servers\SpecifyServer;
 use App\Mcp\Tools\GenerateTasksTool;
 use App\Mcp\Tools\GetStoryTool;
@@ -109,6 +110,8 @@ test('mcp instructions and planning tool descriptions speak in current-plan term
 
     expect($descriptions[GenerateTasksTool::class])->toContain('fresh current Plan')
         ->and($descriptions[SetTasksTool::class])->toContain('Replace the story\'s current implementation Plan')
+        ->and($descriptions[SetTasksTool::class])->toContain('For Approved stories, the fresh Plan starts PendingApproval')
+        ->and($descriptions[SetTasksTool::class])->toContain('for non-Approved stories, it stays Draft')
         ->and($descriptions[ListTasksTool::class])->toContain('Tasks in a story\'s current Plan')
         ->and($descriptions[GetTaskTool::class])->toContain('Plan-owned Task')
         ->and($descriptions[GetStoryTool::class])->toContain('current Plan metadata');
@@ -128,8 +131,17 @@ test('list-tasks exposes current plan ownership on every task row', function () 
     $project = Project::factory()->for($team)->create();
     $feature = Feature::factory()->for($project)->create();
     $story = Story::factory()->for($feature)->create();
-    $task = Task::factory()->forStory($story)->create(['position' => 1]);
-    Subtask::factory()->for($task)->create(['position' => 1]);
+    $supersededTask = Task::factory()->forStory($story)->create(['position' => 1, 'name' => 'old plan task']);
+    Subtask::factory()->for($supersededTask)->create(['position' => 1]);
+    $supersededPlan = $supersededTask->plan;
+
+    $currentPlan = Plan::factory()->for($story)->create([
+        'version' => 2,
+        'status' => PlanStatus::Draft,
+    ]);
+    $story->forceFill(['current_plan_id' => $currentPlan->getKey()])->save();
+    $currentTask = Task::factory()->for($currentPlan)->create(['position' => 1, 'name' => 'current plan task']);
+    Subtask::factory()->for($currentTask)->create(['position' => 1]);
 
     $this->actingAs($user);
 
@@ -137,9 +149,12 @@ test('list-tasks exposes current plan ownership on every task row', function () 
     $payload = json_decode((string) $response->content(), true, flags: JSON_THROW_ON_ERROR);
 
     expect($payload['story_id'])->toBe($story->getKey())
-        ->and($payload['current_plan_id'])->toBe($task->plan_id)
-        ->and($payload['tasks'][0]['id'])->toBe($task->getKey())
-        ->and($payload['tasks'][0]['plan_id'])->toBe($task->plan_id);
+        ->and($payload['current_plan_id'])->toBe($currentPlan->getKey())
+        ->and($payload['tasks'])->toHaveCount(1)
+        ->and($payload['tasks'][0]['id'])->toBe($currentTask->getKey())
+        ->and($payload['tasks'][0]['plan_id'])->toBe($currentPlan->getKey())
+        ->and(collect($payload['tasks'])->pluck('id')->all())->not->toContain($supersededTask->getKey())
+        ->and($supersededPlan->getKey())->not->toBe($currentPlan->getKey());
 });
 
 function namedParameterType(ReflectionMethod $method, string $parameterName): string
