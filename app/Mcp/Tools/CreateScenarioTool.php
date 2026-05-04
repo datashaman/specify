@@ -3,7 +3,9 @@
 namespace App\Mcp\Tools;
 
 use App\Mcp\Concerns\ResolvesProjectAccess;
+use App\Services\Stories\ScenarioWriter;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
+use InvalidArgumentException;
 use Laravel\Mcp\Request;
 use Laravel\Mcp\Response;
 use Laravel\Mcp\Server\Attributes\Description;
@@ -16,7 +18,7 @@ class CreateScenarioTool extends Tool
 
     protected string $name = 'create-scenario';
 
-    public function handle(Request $request): Response
+    public function handle(Request $request, ScenarioWriter $scenarios): Response
     {
         $user = $this->resolveUser($request);
         if ($user instanceof Response) {
@@ -39,23 +41,11 @@ class CreateScenarioTool extends Tool
             return $story;
         }
 
-        $criterionId = $validated['acceptance_criterion_id'] ?? null;
-        if ($criterionId !== null && ! $story->acceptanceCriteria()->whereKey($criterionId)->exists()) {
-            return Response::error("acceptance_criterion_id {$criterionId} does not belong to this story.");
+        try {
+            $scenario = $scenarios->create($story, $validated);
+        } catch (InvalidArgumentException $e) {
+            return Response::error($e->getMessage());
         }
-
-        $position = $validated['position']
-            ?? ((int) $story->scenarios()->max('position') + 1);
-
-        $scenario = $story->scenarios()->create([
-            'acceptance_criterion_id' => $criterionId,
-            'position' => $position,
-            'name' => $validated['name'],
-            'given_text' => $validated['given_text'] ?? null,
-            'when_text' => $validated['when_text'] ?? null,
-            'then_text' => $validated['then_text'] ?? null,
-            'notes' => $validated['notes'] ?? null,
-        ]);
 
         return Response::json([
             'id' => $scenario->id,

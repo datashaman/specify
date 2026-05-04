@@ -3,7 +3,9 @@
 namespace App\Mcp\Tools;
 
 use App\Mcp\Concerns\ResolvesProjectAccess;
+use App\Services\Stories\ScenarioWriter;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
+use InvalidArgumentException;
 use Laravel\Mcp\Request;
 use Laravel\Mcp\Response;
 use Laravel\Mcp\Server\Attributes\Description;
@@ -16,7 +18,7 @@ class UpdateScenarioTool extends Tool
 
     protected string $name = 'update-scenario';
 
-    public function handle(Request $request): Response
+    public function handle(Request $request, ScenarioWriter $scenarios): Response
     {
         $user = $this->resolveUser($request);
         if ($user instanceof Response) {
@@ -47,18 +49,19 @@ class UpdateScenarioTool extends Tool
         }
 
         if (array_key_exists('acceptance_criterion_id', $validated)) {
-            $criterionId = $validated['acceptance_criterion_id'];
-            if ($criterionId !== null && ! $scenario->story->acceptanceCriteria()->whereKey($criterionId)->exists()) {
-                return Response::error("acceptance_criterion_id {$criterionId} does not belong to this story.");
-            }
-            $changes['acceptance_criterion_id'] = $criterionId;
+            $changes['acceptance_criterion_id'] = $validated['acceptance_criterion_id'];
         }
 
         if ($changes === []) {
             return Response::error('Provide at least one field to update.');
         }
 
-        $scenario->forceFill($changes)->save();
+        try {
+            $scenarios->update($scenario, $changes);
+        } catch (InvalidArgumentException $e) {
+            return Response::error($e->getMessage());
+        }
+
         $scenario->refresh();
 
         return Response::json([
