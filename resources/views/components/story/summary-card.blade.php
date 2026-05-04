@@ -26,7 +26,7 @@
                     <flux:badge>{{ __('by') }} {{ $story->creator->name }}</flux:badge>
                 @endif
                 @if ($tasksTotal > 0)
-                    <flux:badge>{{ $tasksDone }}/{{ $tasksTotal }} {{ __('current-plan tasks') }}</flux:badge>
+                    <flux:badge>{{ $tasksDone }}/{{ $tasksTotal }} {{ __('current Plan Tasks') }}</flux:badge>
                 @endif
                 @if ($story->updated_at)
                     <flux:text class="ml-auto text-xs text-zinc-500">{{ $story->updated_at->diffForHumans() }}</flux:text>

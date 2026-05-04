@@ -143,12 +143,12 @@ test('review responder prompt includes current plan context', function () {
         ->and($prompt)->toContain('Parent Task #1: Address review feedback');
 });
 
-test('mcp instructions and planning tool descriptions speak in current-plan terms', function () {
+test('mcp instructions and planning tool descriptions speak in current plan terms', function () {
     $instructions = serverAttribute(SpecifyServer::class, Instructions::class);
 
     expect($instructions)->toContain('Project → Feature → Story → AcceptanceCriterion / Scenario → Plan → Task → Subtask')
         ->and($instructions)->toContain('the current plan owns tasks')
-        ->and($instructions)->toContain('current-plan approval gates execution');
+        ->and($instructions)->toContain('current plan approval gates execution');
 
     $descriptions = [
         GenerateTasksTool::class => descriptionFor(GenerateTasksTool::class),
