@@ -3,8 +3,10 @@
 namespace App\Services\Stories;
 
 use App\Enums\StoryStatus;
+use App\Models\Feature;
 use App\Models\Story;
 use App\Services\ApprovalService;
+use Illuminate\Support\Facades\DB;
 
 class StoryRevisionLifecycle
 {
@@ -21,11 +23,18 @@ class StoryRevisionLifecycle
             return;
         }
 
-        $max = Story::query()
-            ->where('feature_id', $story->feature_id)
-            ->max('position') ?? 0;
+        $story->position = DB::transaction(function () use ($story): int {
+            $feature = Feature::query()
+                ->whereKey($story->feature_id)
+                ->lockForUpdate()
+                ->firstOrFail(['id', 'next_story_position']);
 
-        $story->position = $max + 1;
+            $position = (int) $feature->next_story_position;
+
+            $feature->forceFill(['next_story_position' => $position + 1])->save();
+
+            return $position;
+        });
     }
 
     public function bumpRevisionForWatchedChanges(Story $story): void
