@@ -12,6 +12,7 @@ use App\Models\Team;
 use App\Models\User;
 use App\Models\Workspace;
 use App\Services\Stories\AcceptanceCriteriaWriter;
+use App\Services\Stories\StoryWriter;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Mcp\Request;
 
@@ -57,7 +58,7 @@ test('update story tool replaces acceptance criteria as one story content revisi
     $response = app(UpdateStoryTool::class)->handle(new Request([
         'story_id' => $story->getKey(),
         'acceptance_criteria' => ['New one', 'New two', 'New three'],
-    ]), app(AcceptanceCriteriaWriter::class));
+    ]), app(StoryWriter::class));
 
     expect($response->isError())->toBeFalse()
         ->and($story->fresh()->revision)->toBe(2)
@@ -83,7 +84,7 @@ test('update story tool combines story fields and acceptance criteria into one s
         'story_id' => $story->getKey(),
         'name' => 'Renamed story',
         'acceptance_criteria' => ['New one'],
-    ]), app(AcceptanceCriteriaWriter::class));
+    ]), app(StoryWriter::class));
 
     $fresh = $story->fresh();
 
