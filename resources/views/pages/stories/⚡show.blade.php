@@ -731,71 +731,14 @@ new #[Title('Story')] class extends Component {
         <div class="flex min-w-0 flex-1 flex-col gap-6 lg:flex-row">
             <div class="flex min-w-0 max-w-4xl flex-1 flex-col gap-6">
 
-        @if (session('conflict_resolution'))
-            <div class="rounded-md border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-900 dark:border-emerald-800 dark:bg-emerald-900/20 dark:text-emerald-200">
-                {{ session('conflict_resolution') }}
-            </div>
-        @endif
-        @if (session('conflict_resolution_error'))
-            <div class="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-900 dark:border-red-800 dark:bg-red-900/20 dark:text-red-200">
-                {{ session('conflict_resolution_error') }}
-            </div>
-        @endif
+        @include('partials.story-show.flash')
 
         {{-- ── Header ──────────────────────────────────────────── --}}
         <div>
-            <nav aria-label="Breadcrumb" class="flex flex-wrap items-center gap-1 text-sm text-zinc-500" data-section="breadcrumb">
-                <a href="{{ route('projects.show', $project->id) }}" wire:navigate class="hover:text-zinc-700 hover:underline dark:hover:text-zinc-300">{{ $project->name }}</a>
-                <span aria-hidden="true">›</span>
-                <a href="{{ route('features.show', ['project' => $project->id, 'feature' => $story->feature_id]) }}" wire:navigate class="hover:text-zinc-700 hover:underline dark:hover:text-zinc-300">{{ $story->feature->name }}</a>
-                <span aria-hidden="true">›</span>
-                <span class="text-zinc-700 dark:text-zinc-300" aria-current="page">{{ $story->name }}</span>
-            </nav>
+            @include('partials.story-show.breadcrumb', ['story' => $story, 'project' => $project])
 
             @if ($editing)
-                <div class="mt-3 flex flex-col gap-3">
-                    @php $delta = $this->acDelta; @endphp
-                    @if ($delta)
-                        <div data-banner="reset-approval" class="rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-700 dark:bg-amber-900/20 dark:text-amber-200">
-                            <div class="font-medium">{{ __('Saving will reset this Story to Pending Approval.') }}</div>
-                            <div class="mt-1 text-xs">
-                                {{ __('Plan delta:') }}
-                                <span class="tabular-nums">+{{ $delta['added'] }}</span> {{ __('AC,') }}
-                                <span class="tabular-nums">~{{ $delta['edited'] }}</span> {{ __('edited,') }}
-                                <span class="tabular-nums">-{{ $delta['removed'] }}</span> {{ __('removed') }}
-                            </div>
-                        </div>
-                    @endif
-
-                    <flux:input wire:model="editName" :label="__('Name')" />
-                    <flux:textarea wire:model="editDescription" :label="__('Description (markdown supported)')" rows="8" />
-
-                    <div class="flex flex-col gap-2">
-                        <flux:label>{{ __('Acceptance criteria') }}</flux:label>
-                        @foreach ($editCriteria as $i => $row)
-                            <div wire:key="ac-{{ $i }}" class="flex items-start gap-2">
-                                <flux:badge class="mt-2" size="sm">AC{{ $i + 1 }}</flux:badge>
-                                <flux:textarea wire:model="editCriteria.{{ $i }}.statement" rows="2" class="flex-1" />
-                                <flux:button wire:click="removeCriterion({{ $i }})" variant="ghost" size="sm" class="mt-1">{{ __('Remove') }}</flux:button>
-                            </div>
-                        @endforeach
-                        <div>
-                            <flux:button wire:click="addCriterion" variant="ghost" size="sm">{{ __('+ Add criterion') }}</flux:button>
-                        </div>
-                        @error('editCriteria')
-                            <flux:text class="text-xs text-red-500">{{ $message }}</flux:text>
-                        @enderror
-                    </div>
-
-                    <div class="flex items-center gap-2">
-                        @php $saveLabel = $this->acDelta ? __('Save & request re-approval') : __('Save'); @endphp
-                        <flux:button wire:click="saveEdit" wire:target="saveEdit" wire:loading.attr="disabled" variant="primary">
-                            <span wire:loading.remove wire:target="saveEdit">{{ $saveLabel }}</span>
-                            <span wire:loading wire:target="saveEdit">{{ __('Saving…') }}</span>
-                        </flux:button>
-                        <flux:button wire:click="cancelEdit" variant="ghost">{{ __('Cancel') }}</flux:button>
-                    </div>
-                </div>
+                @include('partials.story-show.edit-form')
             @else
                 @php $storyPrs = $story->pullRequests(); @endphp
                 @include('partials.story-show.header', ['story' => $story, 'pill' => $pill, 'planPill' => $planPill, 'storyPrs' => $storyPrs])
@@ -804,67 +747,7 @@ new #[Title('Story')] class extends Component {
 
         @unless ($editing)
             {{-- ── Story body: framing + description + notes ── --}}
-            <section class="flex flex-col gap-3">
-                @if ($story->kind || $story->actor || $story->intent || $story->outcome || $story->currentPlan)
-                    <div class="flex flex-wrap gap-2 text-xs text-zinc-500">
-                        @if ($story->kind)
-                            <flux:badge size="sm">{{ $story->kind->value }}</flux:badge>
-                        @endif
-                        @if ($story->currentPlan)
-                            <flux:badge size="sm">{{ __('current plan') }} v{{ $story->currentPlan->version }}</flux:badge>
-                            <x-state-pill :state="$planPill['state']" :tally="$planPill['tally']" :label="__('Plan').' · '.$planPill['label']" />
-                        @endif
-                    </div>
-                    @if ($story->actor || $story->intent || $story->outcome)
-                        <div class="rounded-md border border-zinc-200 bg-zinc-50 p-3 text-sm dark:border-zinc-700 dark:bg-zinc-900/40">
-                            @if ($story->actor)
-                                <div><span class="font-medium">{{ __('As a') }}</span> {{ $story->actor }}</div>
-                            @endif
-                            @if ($story->intent)
-                                <div class="mt-1"><span class="font-medium">{{ __('I want') }}</span> {{ $story->intent }}</div>
-                            @endif
-                            @if ($story->outcome)
-                                <div class="mt-1"><span class="font-medium">{{ __('So that') }}</span> {{ $story->outcome }}</div>
-                            @endif
-                        </div>
-                    @endif
-                @endif
-
-                <x-markdown :content="$story->description" />
-
-                @if ($story->scenarios->isNotEmpty())
-                    <div class="flex flex-col gap-2">
-                        <flux:heading size="sm">{{ __('Scenarios') }}</flux:heading>
-                        @foreach ($story->scenarios->sortBy('position') as $scenario)
-                            <div class="rounded-md border border-zinc-200 bg-zinc-50 p-3 text-sm dark:border-zinc-700 dark:bg-zinc-900/40">
-                                <div class="flex flex-wrap items-center gap-2 text-xs text-zinc-500">
-                                    <flux:badge size="sm">{{ __('Scenario') }} {{ $scenario->position }}</flux:badge>
-                                    @if ($scenario->acceptanceCriterion)
-                                        <flux:badge size="sm">{{ __('AC') }}{{ $scenario->acceptanceCriterion->position }}</flux:badge>
-                                    @endif
-                                </div>
-                                <div class="mt-1 font-medium">{{ $scenario->name }}</div>
-                                @if ($scenario->given_text)
-                                    <div class="mt-1"><span class="font-medium">{{ __('Given') }}</span> {{ $scenario->given_text }}</div>
-                                @endif
-                                @if ($scenario->when_text)
-                                    <div class="mt-1"><span class="font-medium">{{ __('When') }}</span> {{ $scenario->when_text }}</div>
-                                @endif
-                                @if ($scenario->then_text)
-                                    <div class="mt-1"><span class="font-medium">{{ __('Then') }}</span> {{ $scenario->then_text }}</div>
-                                @endif
-                            </div>
-                        @endforeach
-                    </div>
-                @endif
-
-                @if ($story->notes)
-                    <details>
-                        <summary class="cursor-pointer text-xs text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300">{{ __('Notes') }}</summary>
-                        <x-markdown :content="$story->notes" class="mt-2" />
-                    </details>
-                @endif
-            </section>
+            @include('partials.story-show.contract', ['story' => $story, 'planPill' => $planPill])
         @endunless
 
         @php
