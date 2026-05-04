@@ -121,6 +121,12 @@ new #[Title('Feature')] class extends Component {
         }
 
         DB::transaction(function () use ($clean) {
+            $offset = count($clean) + 1;
+
+            foreach ($clean as $i => $id) {
+                DB::table('stories')->where('id', $id)->update(['position' => $offset + $i]);
+            }
+
             foreach ($clean as $i => $id) {
                 DB::table('stories')->where('id', $id)->update(['position' => $i + 1]);
             }
