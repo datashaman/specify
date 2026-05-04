@@ -7,6 +7,7 @@ use App\Enums\StoryStatus;
 use App\Models\Concerns\HasSlug;
 use App\Services\Approvals\ApprovalPolicyResolver;
 use App\Services\ApprovalService;
+use App\Services\Stories\StoryDependencyGraph;
 use App\Services\Stories\StoryPullRequestProjection;
 use App\Services\Stories\StoryRunProjection;
 use Database\Factories\StoryFactory;
@@ -18,7 +19,6 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Support\Collection;
-use InvalidArgumentException;
 
 /**
  * Product contract under a Feature.
@@ -254,54 +254,21 @@ class Story extends Model
 
     public function addDependency(self $other): void
     {
-        if ($this->is($other)) {
-            throw new InvalidArgumentException('A story cannot depend on itself.');
-        }
-
-        if ($this->workspaceId() !== $other->workspaceId()) {
-            throw new InvalidArgumentException('Story dependencies must live in the same workspace.');
-        }
-
-        if ($other->dependsOnTransitively($this)) {
-            throw new InvalidArgumentException('Adding this dependency would create a cycle.');
-        }
-
-        $this->dependencies()->syncWithoutDetaching([$other->getKey()]);
+        app(StoryDependencyGraph::class)->addDependency($this, $other);
     }
 
     public function dependsOnTransitively(self $candidate): bool
     {
-        $visited = [];
-        $stack = [$this->getKey()];
-
-        while ($stack !== []) {
-            $id = array_pop($stack);
-            if (isset($visited[$id])) {
-                continue;
-            }
-            $visited[$id] = true;
-
-            $deps = self::find($id)?->dependencies()->pluck('stories.id')->all() ?? [];
-            foreach ($deps as $depId) {
-                if ($depId === $candidate->getKey()) {
-                    return true;
-                }
-                $stack[] = $depId;
-            }
-        }
-
-        return false;
+        return app(StoryDependencyGraph::class)->dependsOnTransitively($this, $candidate);
     }
 
     public function isReady(): bool
     {
-        return $this->dependencies()
-            ->where('status', '!=', StoryStatus::Done->value)
-            ->doesntExist();
+        return app(StoryDependencyGraph::class)->isReady($this);
     }
 
     public function workspaceId(): ?int
     {
-        return $this->feature?->project?->team?->workspace_id;
+        return app(StoryDependencyGraph::class)->workspaceId($this);
     }
 }

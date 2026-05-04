@@ -3,7 +3,9 @@
 namespace App\Mcp\Tools;
 
 use App\Mcp\Concerns\ResolvesProjectAccess;
+use App\Services\Stories\StoryDependencyGraph;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
+use InvalidArgumentException;
 use Laravel\Mcp\Request;
 use Laravel\Mcp\Response;
 use Laravel\Mcp\Server\Attributes\Description;
@@ -22,7 +24,7 @@ class AddStoryDependencyTool extends Tool
     /**
      * Handle the MCP tool invocation.
      */
-    public function handle(Request $request): Response
+    public function handle(Request $request, StoryDependencyGraph $dependencies): Response
     {
         $user = $this->resolveUser($request);
         if ($user instanceof Response) {
@@ -53,7 +55,11 @@ class AddStoryDependencyTool extends Tool
             return $dependency;
         }
 
-        $story->dependencies()->syncWithoutDetaching([$dependency->id]);
+        try {
+            $dependencies->addDependency($story, $dependency);
+        } catch (InvalidArgumentException $e) {
+            return Response::error($e->getMessage());
+        }
 
         return Response::json([
             'story_id' => $story->id,

@@ -2,13 +2,17 @@
 
 use App\Enums\StoryStatus;
 use App\Enums\TaskStatus;
+use App\Mcp\Tools\AddStoryDependencyTool;
 use App\Models\Feature;
 use App\Models\Project;
 use App\Models\Story;
 use App\Models\Task;
 use App\Models\Team;
+use App\Models\User;
 use App\Models\Workspace;
+use App\Services\Stories\StoryDependencyGraph;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Laravel\Mcp\Request;
 
 uses(RefreshDatabase::class);
 
@@ -106,4 +110,54 @@ test('story dependency cycle is prevented', function () {
 
     expect(fn () => $a->addDependency($c))
         ->toThrow(InvalidArgumentException::class, 'cycle');
+});
+
+test('add story dependency tool rejects accessible stories across workspaces', function () {
+    $user = User::factory()->create();
+
+    $workspaceA = Workspace::factory()->create();
+    $teamA = Team::factory()->for($workspaceA)->create();
+    $teamA->addMember($user);
+    $projectA = Project::factory()->for($teamA)->create();
+    $storyA = Story::factory()->for(Feature::factory()->for($projectA))->create();
+
+    $workspaceB = Workspace::factory()->create();
+    $teamB = Team::factory()->for($workspaceB)->create();
+    $teamB->addMember($user);
+    $projectB = Project::factory()->for($teamB)->create();
+    $storyB = Story::factory()->for(Feature::factory()->for($projectB))->create();
+
+    $this->actingAs($user);
+
+    $response = app(AddStoryDependencyTool::class)->handle(new Request([
+        'story_id' => $storyA->id,
+        'depends_on_story_id' => $storyB->id,
+    ]), app(StoryDependencyGraph::class));
+
+    expect($response->isError())->toBeTrue()
+        ->and((string) $response->content())->toContain('same workspace')
+        ->and($storyA->fresh()->dependencies()->whereKey($storyB->id)->exists())->toBeFalse();
+});
+
+test('add story dependency tool rejects cycles', function () {
+    $workspace = Workspace::factory()->create();
+    $team = Team::factory()->for($workspace)->create();
+    $user = User::factory()->create();
+    $team->addMember($user);
+    $project = Project::factory()->for($team)->create();
+    $feature = Feature::factory()->for($project)->create();
+    $a = Story::factory()->for($feature)->create();
+    $b = Story::factory()->for($feature)->create();
+
+    $b->addDependency($a);
+    $this->actingAs($user);
+
+    $response = app(AddStoryDependencyTool::class)->handle(new Request([
+        'story_id' => $a->id,
+        'depends_on_story_id' => $b->id,
+    ]), app(StoryDependencyGraph::class));
+
+    expect($response->isError())->toBeTrue()
+        ->and((string) $response->content())->toContain('cycle')
+        ->and($a->fresh()->dependencies()->whereKey($b->id)->exists())->toBeFalse();
 });
