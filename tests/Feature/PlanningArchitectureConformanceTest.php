@@ -7,7 +7,6 @@ use App\Mcp\Tools\GetStoryTool;
 use App\Mcp\Tools\GetTaskTool;
 use App\Mcp\Tools\ListTasksTool;
 use App\Mcp\Tools\SetTasksTool;
-use App\Models\AcceptanceCriterion;
 use App\Models\Feature;
 use App\Models\Plan;
 use App\Models\PlanApproval;
@@ -20,26 +19,9 @@ use App\Models\Team;
 use App\Models\User;
 use App\Models\Workspace;
 use App\Services\ExecutionService;
-use Illuminate\Support\Facades\Schema;
 use Laravel\Mcp\Request;
 use Laravel\Mcp\Server\Attributes\Description;
 use Laravel\Mcp\Server\Attributes\Instructions;
-
-test('tasks are owned by plans and do not carry direct story ownership', function () {
-    expect(Schema::hasColumn('tasks', 'plan_id'))->toBeTrue()
-        ->and(Schema::hasColumn('tasks', 'story_id'))->toBeFalse()
-        ->and(method_exists(Task::class, 'story'))->toBeFalse()
-        ->and(Task::make()->plan()->getRelated())->toBeInstanceOf(Plan::class);
-});
-
-test('acceptance criteria use statement as the only persisted content field', function () {
-    $columns = Schema::getColumnListing('acceptance_criteria');
-
-    expect($columns)->toContain('statement')
-        ->and($columns)->not->toContain('criterion')
-        ->and((new AcceptanceCriterion)->getFillable())->toContain('statement')
-        ->and((new AcceptanceCriterion)->getFillable())->not->toContain('criterion');
-});
 
 test('agent run authorization keeps story generation and plan execution distinct', function () {
     $taskGeneration = new ReflectionMethod(ExecutionService::class, 'dispatchTaskGeneration');
@@ -49,37 +31,20 @@ test('agent run authorization keeps story generation and plan execution distinct
         ->and(namedParameterType($subtaskExecution, 'approval'))->toBe(PlanApproval::class);
 });
 
-test('load-bearing docs do not reintroduce the retired planning model', function () {
-    $files = [
-        'AGENTS.md',
-        'CHANGELOG.md',
-        'CONTEXT.md',
-        'CONTRIBUTING.md',
-        'README.md',
-        'docs/adr/README.md',
-        'prompts/tasks-generator.md',
-        'app/Ai/Agents/TasksGenerator.php',
-    ];
+test('load-bearing docs describe the current planning model', function () {
+    $readme = file_get_contents(base_path('README.md'));
+    $agents = file_get_contents(base_path('AGENTS.md'));
+    $adrIndex = file_get_contents(base_path('docs/adr/README.md'));
+    $prompt = file_get_contents(base_path('prompts/tasks-generator.md'));
+    $agent = file_get_contents(base_path('app/Ai/Agents/TasksGenerator.php'));
 
-    $forbidden = [
-        'Story is the only approval gate',
-        'Plan is retired',
-        'Plan retired',
-        'Tasks attach to Stories',
-        'tasks.story_id',
-        'Task::story',
-        'Produce exactly one Task per Acceptance Criterion',
-        'One Task per Acceptance Criterion, each',
-    ];
-
-    foreach ($files as $file) {
-        $contents = file_get_contents(base_path($file));
-
-        foreach ($forbidden as $phrase) {
-            expect($contents, "{$file} must not contain stale phrase [{$phrase}]")
-                ->not->toContain($phrase);
-        }
-    }
+    expect($readme)->toContain('Story -> AcceptanceCriterion / Scenario -> Plan -> Task -> Subtask')
+        ->and($readme)->toContain('Story approval gates the product contract; current Plan approval gates execution')
+        ->and($agents)->toContain('Tasks attach to Plans; Subtasks live under Tasks')
+        ->and($agents)->toContain('Resolve Story through `Task -> Plan -> Story`')
+        ->and($adrIndex)->toContain('Story and current Plan are the approval gates')
+        ->and($prompt)->toContain('Shape Tasks around coherent implementation work')
+        ->and($agent)->toContain('may span acceptance criteria, scenarios, or shared enabling work');
 });
 
 test('task generation prompt allows cross-cutting plan tasks', function () {
@@ -88,7 +53,7 @@ test('task generation prompt allows cross-cutting plan tasks', function () {
 
     expect($prompt)->toContain('Shape Tasks around coherent implementation work')
         ->and($prompt)->toContain('Leave it absent when the Task is cross-cutting')
-        ->and($agent)->toContain('do not force one Task per Acceptance Criterion')
+        ->and($agent)->toContain('may span acceptance criteria, scenarios, or shared enabling work')
         ->and($agent)->toContain("'acceptance_criterion_position' =>")
         ->and($agent)->not->toContain("'acceptance_criterion_position' => \$schema->integer()->min(1)->required()");
 });
@@ -114,13 +79,9 @@ test('mcp instructions and planning tool descriptions speak in current-plan term
         ->and($descriptions[SetTasksTool::class])->toContain('for non-Approved stories, it stays Draft')
         ->and($descriptions[ListTasksTool::class])->toContain('Tasks in a story\'s current Plan')
         ->and($descriptions[GetTaskTool::class])->toContain('Plan-owned Task')
-        ->and($descriptions[GetStoryTool::class])->toContain('current Plan metadata');
-
-    foreach ($descriptions as $description) {
-        expect($description)->not->toContain('tasks attached to a story')
-            ->and($description)->not->toContain('task list for a story')
-            ->and($description)->not->toContain('one acceptance_criterion_id');
-    }
+        ->and($descriptions[GetStoryTool::class])->toContain('current Plan metadata')
+        ->and($descriptions[SetTasksTool::class])->toContain('may link to an optional acceptance_criterion_id and/or scenario_id')
+        ->and($descriptions[ListTasksTool::class])->toContain('Each entry includes plan_id');
 });
 
 test('list-tasks exposes current plan ownership on every task row', function () {

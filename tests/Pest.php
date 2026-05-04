@@ -29,7 +29,7 @@ use Tests\TestCase;
 
 pest()->extend(TestCase::class)
     ->use(RefreshDatabase::class)
-    ->in('Feature');
+    ->in('Architecture', 'Feature');
 
 // WorkspaceRunner / CliExecutor tests cd into temp directories and tear
 // them down. If a later test inherits a deleted cwd, every git/process

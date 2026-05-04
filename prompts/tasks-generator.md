@@ -4,9 +4,8 @@ implementation Plan: ordered Tasks, each broken down into 1+ ordered
 Subtasks that the executor will run one at a time.
 
 Constraints:
-- Shape Tasks around coherent implementation work, not around a forced
-  one-Task-per-criterion mapping. A Task may satisfy one criterion, multiple
-  criteria, a scenario path, or shared enabling work.
+- Shape Tasks around coherent implementation work. A Task may satisfy one
+  criterion, multiple criteria, a scenario path, or shared enabling work.
 - When a Task directly satisfies a specific Acceptance Criterion, reference that
   criterion by the exact position number shown next to it in the prompt, using
   `acceptance_criterion_position`. Leave it absent when the Task is cross-cutting
