@@ -196,7 +196,7 @@ test('full pipeline records pull_request_error after a non-fatal PR failure on a
     ]);
 
     $ac = $story->acceptanceCriteria()->first() ?? AcceptanceCriterion::factory()->for($story)->create();
-    $task = Task::factory()->forStory($story)->create(['name' => 'add file', 'position' => 0, 'acceptance_criterion_id' => $ac->id]);
+    $task = Task::factory()->forCurrentPlanOf($story)->create(['name' => 'add file', 'position' => 0, 'acceptance_criterion_id' => $ac->id]);
     $subtask = Subtask::factory()->for($task)->create(['name' => 'add file', 'position' => 0]);
     $story->forceFill(['status' => StoryStatus::Draft->value])->save();
     $story->fresh()->submitForApproval();

@@ -197,7 +197,7 @@ test('full pipeline with cli driver: clone → branch → cli edits → commit �
     ]);
 
     $ac = $story->acceptanceCriteria()->first() ?? AcceptanceCriterion::factory()->for($story)->create();
-    $task = Task::factory()->forStory($story)->create(['name' => 'append', 'position' => 0, 'acceptance_criterion_id' => $ac->id]);
+    $task = Task::factory()->forCurrentPlanOf($story)->create(['name' => 'append', 'position' => 0, 'acceptance_criterion_id' => $ac->id]);
     $subtask = Subtask::factory()->for($task)->create(['name' => 'append', 'position' => 0]);
     $story->forceFill(['status' => StoryStatus::Draft->value])->save();
     $story->fresh()->submitForApproval();

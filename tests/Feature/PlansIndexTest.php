@@ -24,7 +24,7 @@ test('plans index lists current plans for the selected project', function () {
     $project = Project::factory()->for($team)->create();
     $feature = Feature::factory()->for($project)->create();
     $story = Story::factory()->for($feature)->create(['status' => StoryStatus::Approved]);
-    $task = Task::factory()->forStory($story)->create(['position' => 1]);
+    $task = Task::factory()->forCurrentPlanOf($story)->create(['position' => 1]);
     $task->plan->forceFill(['name' => 'Current plan', 'status' => PlanStatus::PendingApproval->value])->save();
 
     $this->actingAs($user);

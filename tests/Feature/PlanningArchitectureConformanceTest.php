@@ -131,7 +131,7 @@ test('list-tasks exposes current plan ownership on every task row', function () 
     $project = Project::factory()->for($team)->create();
     $feature = Feature::factory()->for($project)->create();
     $story = Story::factory()->for($feature)->create();
-    $supersededTask = Task::factory()->forStory($story)->create(['position' => 1, 'name' => 'old plan task']);
+    $supersededTask = Task::factory()->forCurrentPlanOf($story)->create(['position' => 1, 'name' => 'old plan task']);
     Subtask::factory()->for($supersededTask)->create(['position' => 1]);
     $supersededPlan = $supersededTask->plan;
 

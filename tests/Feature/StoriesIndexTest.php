@@ -59,8 +59,8 @@ test('status filter narrows the list', function () {
 test('story summary labels task progress as current-plan tasks', function () {
     ['user' => $user, 'project' => $project, 'feature' => $feature] = storyIndexScene();
     $story = Story::factory()->for($feature)->create(['name' => 'planned-story', 'status' => StoryStatus::Approved]);
-    Task::factory()->forStory($story)->create(['status' => TaskStatus::Done]);
-    Task::factory()->forStory($story)->create(['status' => TaskStatus::Pending]);
+    Task::factory()->forCurrentPlanOf($story)->create(['status' => TaskStatus::Done]);
+    Task::factory()->forCurrentPlanOf($story)->create(['status' => TaskStatus::Pending]);
 
     $this->actingAs($user);
 

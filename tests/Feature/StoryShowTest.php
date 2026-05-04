@@ -31,7 +31,7 @@ test('story show renders AC, tasks with subtasks, and runs', function () {
     $ac = AcceptanceCriterion::create([
         'story_id' => $story->id, 'position' => 0, 'statement' => 'must-render-AC',
     ]);
-    $task = Task::factory()->forStory($story)->create(['name' => 'task-name', 'position' => 0, 'acceptance_criterion_id' => $ac->id]);
+    $task = Task::factory()->forCurrentPlanOf($story)->create(['name' => 'task-name', 'position' => 0, 'acceptance_criterion_id' => $ac->id]);
     $sub = Subtask::factory()->for($task)->create(['name' => 'sub-name', 'position' => 0]);
     AgentRun::factory()->create([
         'runnable_type' => Subtask::class,

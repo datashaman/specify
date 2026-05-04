@@ -27,7 +27,7 @@ function taskShowScene(): array
         'position' => 1,
         'statement' => 'Users can edit a story.',
     ]);
-    $task = Task::factory()->forStory($story)->create([
+    $task = Task::factory()->forCurrentPlanOf($story)->create([
         'name' => 'Add edit form',
         'position' => 1,
         'status' => TaskStatus::InProgress,
@@ -63,7 +63,7 @@ test('task show 404s when task is outside the user accessible projects', functio
     $otherProject = Project::factory()->for($otherTeam)->create();
     $otherFeature = Feature::factory()->for($otherProject)->create();
     $otherStory = Story::factory()->for($otherFeature)->create();
-    $otherTask = Task::factory()->forStory($otherStory)->create();
+    $otherTask = Task::factory()->forCurrentPlanOf($otherStory)->create();
 
     $this->actingAs($user);
 

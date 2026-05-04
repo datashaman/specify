@@ -27,7 +27,7 @@ function makePlan(): Plan
 
     $story = Story::factory()->for($feature)->create(['status' => StoryStatus::Approved]);
     $criterion = AcceptanceCriterion::factory()->for($story)->create(['position' => 1]);
-    $task = Task::factory()->forStory($story)->create([
+    $task = Task::factory()->forCurrentPlanOf($story)->create([
         'position' => 1,
         'acceptance_criterion_id' => $criterion->id,
     ]);

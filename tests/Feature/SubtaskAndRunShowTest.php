@@ -25,7 +25,7 @@ function subtaskScene(): array
     $project = Project::factory()->for($team)->create();
     $feature = Feature::factory()->for($project)->create();
     $story = Story::factory()->for($feature)->create();
-    $task = Task::factory()->forStory($story)->create(['name' => 'parent-task', 'position' => 1]);
+    $task = Task::factory()->forCurrentPlanOf($story)->create(['name' => 'parent-task', 'position' => 1]);
     $subtask = Subtask::factory()->for($task)->create(['name' => 'parent-subtask', 'position' => 1]);
 
     return compact('user', 'project', 'feature', 'story', 'task', 'subtask');

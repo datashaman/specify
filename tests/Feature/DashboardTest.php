@@ -41,16 +41,16 @@ test('dashboard counts pending stories, pending plans, executing stories, and fa
 
     Story::factory()->count(2)->for($feature)->create(['status' => StoryStatus::PendingApproval]);
     $approved = Story::factory()->for($feature)->create(['status' => StoryStatus::Approved]);
-    $task = Task::factory()->forStory($approved)->create();
+    $task = Task::factory()->forCurrentPlanOf($approved)->create();
     $task->plan->forceFill(['status' => PlanStatus::Approved->value])->save();
 
     $planPendingStory = Story::factory()->for($feature)->create(['status' => StoryStatus::Approved]);
-    $planPendingTask = Task::factory()->forStory($planPendingStory)->create();
+    $planPendingTask = Task::factory()->forCurrentPlanOf($planPendingStory)->create();
     $planPendingTask->plan->forceFill(['status' => PlanStatus::PendingApproval->value])->save();
     Subtask::factory()->for($task)->create(['status' => TaskStatus::InProgress]);
 
     $approved2 = Story::factory()->for($feature)->create(['status' => StoryStatus::Approved]);
-    $taskWithFailedRun = Task::factory()->forStory($approved2)->create();
+    $taskWithFailedRun = Task::factory()->forCurrentPlanOf($approved2)->create();
     $taskWithFailedRun->plan->forceFill(['status' => PlanStatus::Approved->value])->save();
     $subtaskWithFailedRun = Subtask::factory()->for($taskWithFailedRun)->create();
     AgentRun::factory()->create([
@@ -118,7 +118,7 @@ test('awaiting your approval lists pending stories and pending current plans the
         'name' => 'Approve my plan',
         'status' => StoryStatus::Approved,
     ]);
-    $planTask = Task::factory()->forStory($planStory)->create();
+    $planTask = Task::factory()->forCurrentPlanOf($planStory)->create();
     $planTask->plan->forceFill(['status' => PlanStatus::PendingApproval->value])->save();
 
     $this->actingAs($user);
@@ -162,7 +162,7 @@ test('recent runs are clickable and link to the run console', function () {
     $project = Project::factory()->for($team)->create();
     $feature = Feature::factory()->for($project)->create();
     $story = Story::factory()->for($feature)->create();
-    $task = Task::factory()->forStory($story)->create();
+    $task = Task::factory()->forCurrentPlanOf($story)->create();
     $subtask = Subtask::factory()->for($task)->create();
     $run = AgentRun::factory()->create([
         'runnable_type' => Subtask::class,
