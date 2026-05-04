@@ -48,7 +48,7 @@ Description:
 Acceptance Criteria (position. text):
 {$criteria}
 
-Generate a task list that fully satisfies the acceptance criteria above. One Task per Acceptance Criterion, each with one or more Subtasks.
+Generate an implementation plan that fully satisfies the acceptance criteria above. Shape Tasks around coherent implementation work; do not force one Task per Acceptance Criterion. Each Task must have one or more Subtasks.
 PROMPT;
     }
 
@@ -62,7 +62,7 @@ PROMPT;
                         'name' => $schema->string()->required(),
                         'description' => $schema->string()->required(),
                         'position' => $schema->integer()->min(1)->required(),
-                        'acceptance_criterion_position' => $schema->integer()->min(1)->required(),
+                        'acceptance_criterion_position' => $schema->integer()->min(1),
                         'depends_on' => $schema->array()
                             ->items($schema->integer()->min(1)),
                         'subtasks' => $schema->array()

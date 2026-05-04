@@ -92,6 +92,27 @@ test('regeneration replaces the prior task list', function () {
         ->and($tasks[0]->name)->toBe('task-v2');
 });
 
+test('task generation allows cross-cutting tasks without a single acceptance criterion', function () {
+    $story = Story::factory()->create();
+    AcceptanceCriterion::factory()->for($story)->create(['position' => 0, 'statement' => 'AC one']);
+
+    TasksGenerator::fake(fn () => [
+        'summary' => 'plan it',
+        'tasks' => [[
+            'name' => 'shared setup',
+            'description' => 'Prepare shared infrastructure for multiple criteria.',
+            'position' => 0,
+            'subtasks' => [['name' => 'set up shared pieces', 'description' => 'Do the shared setup.', 'position' => 0]],
+        ]],
+    ]);
+
+    app(ExecutionService::class)->dispatchTaskGeneration($story);
+
+    $task = $story->fresh()->tasks()->sole();
+    expect($task->acceptance_criterion_id)->toBeNull()
+        ->and($task->subtasks()->count())->toBe(1);
+});
+
 test('agent failure marks the AgentRun failed with error message', function () {
     $story = Story::factory()->create();
     AcceptanceCriterion::factory()->for($story)->create(['position' => 0]);
