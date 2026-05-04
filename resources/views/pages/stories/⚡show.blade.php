@@ -776,7 +776,6 @@ new #[Title('Story')] class extends Component {
         return [
             'showRail' => $decisionVisible || $rrCurrent->isNotEmpty() || $rrPrior->isNotEmpty() || $planCurrent->isNotEmpty() || $planPrior->isNotEmpty() || $rrEligible->isNotEmpty(),
             'decisionVisible' => $decisionVisible,
-            'hasAnyDecisionAction' => $hasAnyDecisionAction,
             'hasDraftSubmit' => $hasDraftSubmit,
             'autoPromotes' => $autoPromotes,
             'hasAutoStart' => $hasAutoStart,
