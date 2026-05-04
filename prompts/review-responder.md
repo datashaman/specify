@@ -15,8 +15,9 @@ these tools — use them to inspect and modify the working tree:
 - Ls(path?, limit?)
 
 Workflow:
-1. Read the originating Subtask spec and the existing diff on this branch
-   so you understand what was already done.
+1. Read the originating Subtask spec from its parent Task and current Plan,
+   plus the existing diff on this branch, so you understand what was already
+   done.
 2. Read each review comment carefully. Each comment names a file and a
    line; treat that as the focal point but read enough surrounding code
    to make a good fix.

@@ -29,13 +29,31 @@ class TasksGenerator implements Agent, HasStructuredOutput
 
     public function buildPrompt(): string
     {
-        $story = $this->story->loadMissing('feature.project', 'acceptanceCriteria');
+        $story = $this->story->loadMissing('feature.project', 'acceptanceCriteria', 'scenarios.acceptanceCriterion');
 
         $criteria = $story->acceptanceCriteria
             ->sortBy('position')
             ->values()
             ->map(fn ($ac, $i) => "{$ac->position}. {$ac->statement}")
             ->implode("\n");
+
+        $scenarios = $story->scenarios
+            ->sortBy('position')
+            ->values()
+            ->map(function ($scenario) {
+                $criterion = $scenario->acceptanceCriterion
+                    ? " (AC #{$scenario->acceptanceCriterion->position})"
+                    : '';
+
+                return <<<SCENARIO
+{$scenario->position}. {$scenario->name}{$criterion}
+Given: {$scenario->given_text}
+When: {$scenario->when_text}
+Then: {$scenario->then_text}
+Notes: {$scenario->notes}
+SCENARIO;
+            })
+            ->implode("\n\n");
 
         return <<<PROMPT
 Project: {$story->feature->project->name}
@@ -48,7 +66,10 @@ Description:
 Acceptance Criteria (position. text):
 {$criteria}
 
-Generate an implementation plan that fully satisfies the acceptance criteria above. Shape Tasks around coherent implementation work that may span acceptance criteria, scenarios, or shared enabling work. Each Task must have one or more Subtasks.
+Scenarios (position. Given / When / Then):
+{$scenarios}
+
+Generate an implementation plan that fully satisfies the acceptance criteria and scenarios above. Shape Tasks around coherent implementation work that may span acceptance criteria, scenarios, or shared enabling work. Each Task must have one or more Subtasks.
 PROMPT;
     }
 

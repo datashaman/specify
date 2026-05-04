@@ -90,10 +90,18 @@ class ReviewResponder implements Agent, HasStructuredOutput, HasTools
     {
         $subtask = $this->subtask->loadMissing('task.plan.story.feature.project', 'task.acceptanceCriterion');
         $task = $subtask->task;
+        $plan = $task?->plan;
         $story = $task?->plan?->story;
         $criterion = $task?->acceptanceCriterion?->statement;
 
         $criterionBlock = $criterion ? "Acceptance Criterion: {$criterion}\n\n" : '';
+        $planBlock = $plan ? <<<PLAN
+Current Plan #{$plan->id} (version {$plan->version}, status {$plan->status?->value})
+Plan name: {$plan->name}
+Plan summary:
+{$plan->summary}
+
+PLAN : '';
         $taskBlock = $task ? "Parent Task #{$task->position}: {$task->name}\n" : '';
 
         $reviewBlock = trim($this->reviewSummary) === ''
@@ -119,7 +127,7 @@ Story: {$story?->name}
 Description:
 {$story?->description}
 
-{$criterionBlock}{$taskBlock}Subtask #{$subtask->position}: {$subtask->name}
+{$planBlock}{$criterionBlock}{$taskBlock}Subtask #{$subtask->position}: {$subtask->name}
 
 Subtask description:
 {$subtask->description}

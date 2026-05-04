@@ -109,8 +109,8 @@ class CreateStoryTool extends Tool
             'actor' => $schema->string()->description('Optional "As a ..." actor or role.'),
             'intent' => $schema->string()->description('Optional "I want ..." intent statement.'),
             'outcome' => $schema->string()->description('Optional "So that / in order to ..." outcome statement.'),
-            'description' => $schema->string()->description('Product-owner framing and extra context for the unit of value. No schemas, classes, file paths, or implementation steps — those go in tasks/subtasks via set-tasks. Markdown supported.'),
-            'notes' => $schema->string()->description('Anything that doesn’t fit the user-story format — caveats, links, scope reminders. Implementation steps belong in tasks/subtasks. Markdown supported.'),
+            'description' => $schema->string()->description('Product-owner framing and extra context for the unit of value. No schemas, classes, file paths, or implementation steps — those belong in Plans, Tasks, and Subtasks. Markdown supported.'),
+            'notes' => $schema->string()->description('Anything that doesn’t fit the user-story format — caveats, links, scope reminders. Implementation steps belong in Plans, Tasks, and Subtasks. Markdown supported.'),
             'status' => $schema->string()
                 ->description('Story status. Defaults to "draft". One of: '.implode(', ', $statuses)),
             'acceptance_criteria' => $schema->array()
