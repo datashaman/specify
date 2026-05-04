@@ -5,6 +5,7 @@ use App\Models\Feature;
 use App\Models\Plan;
 use App\Models\Scenario;
 use App\Models\Story;
+use App\Models\Subtask;
 use App\Models\Task;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\Schema;
@@ -73,4 +74,65 @@ test('scenario positions are unique within a story', function () {
 
     expect(fn () => Scenario::factory()->for($story)->create(['position' => 1]))
         ->toThrow(QueryException::class);
+});
+
+test('task positions are unique within a plan', function () {
+    $plan = Plan::factory()->create();
+    Task::factory()->for($plan)->create(['position' => 1]);
+
+    Task::factory()->for(Plan::factory())->create(['position' => 1]);
+
+    expect(fn () => Task::factory()->for($plan)->create(['position' => 1]))
+        ->toThrow(QueryException::class);
+});
+
+test('subtask positions are unique within a task', function () {
+    $task = Task::factory()->create();
+    Subtask::factory()->for($task)->create(['position' => 1]);
+
+    Subtask::factory()->for(Task::factory())->create(['position' => 1]);
+
+    expect(fn () => Subtask::factory()->for($task)->create(['position' => 1]))
+        ->toThrow(QueryException::class);
+});
+
+test('task and subtask positions are required', function () {
+    $plan = Plan::factory()->create();
+    $task = Task::factory()->for($plan)->create();
+
+    expect(fn () => Task::create([
+        'plan_id' => $plan->getKey(),
+        'name' => 'Unpositioned task',
+    ]))->toThrow(QueryException::class);
+
+    expect(fn () => Subtask::create([
+        'task_id' => $task->getKey(),
+        'name' => 'Unpositioned subtask',
+    ]))->toThrow(QueryException::class);
+});
+
+test('factories allocate scoped positions by default', function () {
+    $story = Story::factory()->create();
+    $plan = Plan::factory()->for($story)->create();
+    $task = Task::factory()->for($plan)->create();
+
+    expect([
+        AcceptanceCriterion::factory()->for($story)->create()->position,
+        AcceptanceCriterion::factory()->for($story)->create()->position,
+    ])->toBe([1, 2]);
+
+    expect([
+        Scenario::factory()->for($story)->create()->position,
+        Scenario::factory()->for($story)->create()->position,
+    ])->toBe([1, 2]);
+
+    expect([
+        $task->position,
+        Task::factory()->for($plan)->create()->position,
+    ])->toBe([1, 2]);
+
+    expect([
+        Subtask::factory()->for($task)->create()->position,
+        Subtask::factory()->for($task)->create()->position,
+    ])->toBe([1, 2]);
 });

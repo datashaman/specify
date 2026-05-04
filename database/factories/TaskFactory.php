@@ -52,7 +52,9 @@ class TaskFactory extends Factory
             'plan_id' => Plan::factory(),
             'acceptance_criterion_id' => null,
             'scenario_id' => null,
-            'position' => 1,
+            'position' => fn (array $attributes): int => ((int) Task::query()
+                ->where('plan_id', $attributes['plan_id'])
+                ->max('position')) + 1,
             'name' => fake()->sentence(4),
             'description' => fake()->paragraph(),
             'status' => TaskStatus::Pending,

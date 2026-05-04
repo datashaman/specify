@@ -17,7 +17,9 @@ class ScenarioFactory extends Factory
         return [
             'story_id' => Story::factory(),
             'acceptance_criterion_id' => null,
-            'position' => 1,
+            'position' => fn (array $attributes): int => ((int) Scenario::query()
+                ->where('story_id', $attributes['story_id'])
+                ->max('position')) + 1,
             'name' => fake()->sentence(4),
             'given_text' => fake()->sentence(),
             'when_text' => fake()->sentence(),

@@ -4,19 +4,23 @@ namespace App\Services\Stories;
 
 use App\Models\AcceptanceCriterion;
 use App\Models\Story;
+use App\Services\Ordering\ScopedPositionAllocator;
 use Illuminate\Support\Facades\DB;
 
 class AcceptanceCriteriaWriter
 {
-    public function __construct(private StoryRevisionLifecycle $revisions) {}
+    public function __construct(
+        private StoryRevisionLifecycle $revisions,
+        private ScopedPositionAllocator $positions,
+    ) {}
 
     public function add(Story $story, string $statement, ?int $position = null): AcceptanceCriterion
     {
-        return DB::transaction(function () use ($story, $statement, $position): AcceptanceCriterion {
-            $criterion = AcceptanceCriterion::withoutEvents(function () use ($story, $statement, $position): AcceptanceCriterion {
+        return $this->positions->withNextPosition($story, 'acceptanceCriteria', function (int $nextPosition, Story $story) use ($statement, $position): AcceptanceCriterion {
+            $criterion = AcceptanceCriterion::withoutEvents(function () use ($story, $statement, $position, $nextPosition): AcceptanceCriterion {
                 return $story->acceptanceCriteria()->create([
                     'statement' => $statement,
-                    'position' => $position ?? ((int) ($story->acceptanceCriteria()->max('position') ?? 0) + 1),
+                    'position' => $position ?? $nextPosition,
                 ]);
             });
 

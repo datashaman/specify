@@ -11,13 +11,13 @@ return new class extends Migration
         Schema::create('subtasks', function (Blueprint $table) {
             $table->id();
             $table->foreignId('task_id')->constrained()->cascadeOnDelete();
-            $table->unsignedInteger('position')->default(0);
+            $table->unsignedInteger('position');
             $table->string('name');
             $table->text('description')->nullable();
             $table->string('status')->default('pending');
             $table->timestamps();
 
-            $table->index(['task_id', 'position']);
+            $table->unique(['task_id', 'position']);
         });
     }
 
