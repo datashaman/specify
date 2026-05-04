@@ -22,26 +22,26 @@ beforeEach(function () {
 
 test('dispatching task generation runs the job, creates Tasks linked to ACs with Subtasks, marks AgentRun succeeded', function () {
     $story = Story::factory()->create();
-    $ac1 = AcceptanceCriterion::factory()->for($story)->create(['position' => 0, 'statement' => 'AC one']);
-    $ac2 = AcceptanceCriterion::factory()->for($story)->create(['position' => 1, 'statement' => 'AC two']);
+    $ac1 = AcceptanceCriterion::factory()->for($story)->create(['position' => 1, 'statement' => 'AC one']);
+    $ac2 = AcceptanceCriterion::factory()->for($story)->create(['position' => 2, 'statement' => 'AC two']);
 
     TasksGenerator::fake(fn () => [
         'summary' => 'plan it',
         'tasks' => [
             [
-                'name' => 't0', 'description' => 'desc0', 'position' => 0,
-                'acceptance_criterion_position' => 0,
+                'name' => 't0', 'description' => 'desc0', 'position' => 1,
+                'acceptance_criterion_position' => 1,
                 'subtasks' => [
-                    ['name' => 's0', 'description' => 'sd0', 'position' => 0],
-                    ['name' => 's1', 'description' => 'sd1', 'position' => 1],
+                    ['name' => 's0', 'description' => 'sd0', 'position' => 1],
+                    ['name' => 's1', 'description' => 'sd1', 'position' => 2],
                 ],
             ],
             [
-                'name' => 't1', 'description' => 'desc1', 'position' => 1,
-                'acceptance_criterion_position' => 1,
-                'depends_on' => [0],
+                'name' => 't1', 'description' => 'desc1', 'position' => 2,
+                'acceptance_criterion_position' => 2,
+                'depends_on' => [1],
                 'subtasks' => [
-                    ['name' => 's0', 'description' => 'sd0', 'position' => 0],
+                    ['name' => 's0', 'description' => 'sd0', 'position' => 1],
                 ],
             ],
         ],
@@ -63,14 +63,14 @@ test('dispatching task generation runs the job, creates Tasks linked to ACs with
 
 test('regeneration replaces the prior task list', function () {
     $story = Story::factory()->create();
-    AcceptanceCriterion::factory()->for($story)->create(['position' => 0, 'statement' => 'AC one']);
+    AcceptanceCriterion::factory()->for($story)->create(['position' => 1, 'statement' => 'AC one']);
 
     TasksGenerator::fake(fn () => [
         'summary' => 'v1',
         'tasks' => [[
-            'name' => 'task-v1', 'description' => 'd', 'position' => 0,
-            'acceptance_criterion_position' => 0,
-            'subtasks' => [['name' => 's', 'description' => 'sd', 'position' => 0]],
+            'name' => 'task-v1', 'description' => 'd', 'position' => 1,
+            'acceptance_criterion_position' => 1,
+            'subtasks' => [['name' => 's', 'description' => 'sd', 'position' => 1]],
         ]],
     ]);
 
@@ -80,9 +80,9 @@ test('regeneration replaces the prior task list', function () {
     TasksGenerator::fake(fn () => [
         'summary' => 'v2',
         'tasks' => [[
-            'name' => 'task-v2', 'description' => 'd', 'position' => 0,
-            'acceptance_criterion_position' => 0,
-            'subtasks' => [['name' => 's', 'description' => 'sd', 'position' => 0]],
+            'name' => 'task-v2', 'description' => 'd', 'position' => 1,
+            'acceptance_criterion_position' => 1,
+            'subtasks' => [['name' => 's', 'description' => 'sd', 'position' => 1]],
         ]],
     ]);
 
@@ -115,7 +115,7 @@ test('task generation allows cross-cutting tasks without a single acceptance cri
 
 test('agent failure marks the AgentRun failed with error message', function () {
     $story = Story::factory()->create();
-    AcceptanceCriterion::factory()->for($story)->create(['position' => 0]);
+    AcceptanceCriterion::factory()->for($story)->create(['position' => 1]);
 
     TasksGenerator::fake(function () {
         throw new RuntimeException('agent down');
@@ -134,7 +134,7 @@ test('agent failure marks the AgentRun failed with error message', function () {
 
 test('regeneration on an Approved story keeps story approval intact but reopens current plan approval', function () {
     $story = Story::factory()->create(['status' => StoryStatus::Approved, 'revision' => 1]);
-    AcceptanceCriterion::factory()->for($story)->create(['position' => 0]);
+    AcceptanceCriterion::factory()->for($story)->create(['position' => 1]);
     $story = $story->fresh();
     $approver = User::factory()->create();
     StoryApproval::create([
@@ -153,9 +153,9 @@ test('regeneration on an Approved story keeps story approval intact but reopens 
     TasksGenerator::fake(fn () => [
         'summary' => 'plan',
         'tasks' => [[
-            'name' => 't', 'description' => 'd', 'position' => 0,
-            'acceptance_criterion_position' => 0,
-            'subtasks' => [['name' => 's', 'description' => 'sd', 'position' => 0]],
+            'name' => 't', 'description' => 'd', 'position' => 1,
+            'acceptance_criterion_position' => 1,
+            'subtasks' => [['name' => 's', 'description' => 'sd', 'position' => 1]],
         ]],
     ]);
 

@@ -11,6 +11,7 @@ use App\Models\Story;
 use App\Models\Subtask;
 use App\Models\Task;
 use App\Services\Executors\ProposedSubtask;
+use App\Services\Plans\PlanInputNormalizer;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use InvalidArgumentException;
@@ -24,7 +25,7 @@ use InvalidArgumentException;
  */
 class PlanWriter
 {
-    public function __construct(public ApprovalService $approvals) {}
+    public function __construct(private PlanInputNormalizer $planInputs) {}
 
     /**
      * @param  list<array{
@@ -41,6 +42,8 @@ class PlanWriter
      */
     public function replacePlan(Story $story, array $tasks, array $attributes = []): array
     {
+        $tasks = $this->planInputs->forPlanWriter($tasks);
+
         $this->validate($story, $tasks);
 
         $result = DB::transaction(function () use ($story, $tasks, $attributes) {
