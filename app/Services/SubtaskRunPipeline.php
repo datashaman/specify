@@ -59,7 +59,7 @@ class SubtaskRunPipeline
             'executor_driver' => $agentRun->executor_driver,
         ]);
 
-        $emitter = $executor->supportsProgressEvents() ? new ProgressEmitter($agentRun) : null;
+        $emitter = new ProgressEmitter($agentRun);
 
         if ($this->cancelObserved($agentRun, 'before_prepare', $logCtx)) {
             return SubtaskRunOutcome::cancelled();
@@ -73,7 +73,7 @@ class SubtaskRunPipeline
                 throw new RuntimeException('Executor requires a repo, but none is bound to this AgentRun.');
             }
 
-            $emitter?->setPhase('prepare');
+            $emitter->setPhase('prepare');
             $branch = $this->branchFor($agentRun);
             $workingDir = $this->workspace->prepare($repo, $agentRun);
             $this->workspace->checkoutBranch($workingDir, $branch, baseBranch: $repo->default_branch);
@@ -100,7 +100,7 @@ class SubtaskRunPipeline
             ])->save();
         }
 
-        $emitter?->setPhase('execute');
+        $emitter->setPhase('execute');
         $result = $executor->execute($subtask, $workingDir, $repo, $agentRun->working_branch, $contextBrief !== '' ? $contextBrief : null, $emitter, null);
 
         if ($this->cancelObserved($agentRun, 'after_execute', $logCtx)) {
@@ -123,7 +123,7 @@ class SubtaskRunPipeline
             return SubtaskRunOutcome::succeeded($output, $diff);
         }
 
-        $emitter?->setPhase('commit');
+        $emitter->setPhase('commit');
         $commitSha = $this->workspace->commit($workingDir, $result->commitMessage ?: 'specify: agent run');
         $diff = $this->workspace->diff($workingDir);
 
@@ -185,14 +185,14 @@ class SubtaskRunPipeline
                 return SubtaskRunOutcome::cancelled();
             }
 
-            $emitter?->setPhase('push');
+            $emitter->setPhase('push');
             $branch = $this->branchFor($agentRun);
             $this->workspace->push($workingDir, $branch);
             $output['pushed'] = true;
             Log::info('specify.subtask.push', $logCtx);
 
             if (config('specify.workspace.open_pr_after_push', true) && $repo !== null) {
-                $emitter?->setPhase('open_pr');
+                $emitter->setPhase('open_pr');
                 $prResult = $this->openPullRequest($repo, $subtask, $branch, $output, $agentRun->executor_driver);
                 $output = array_merge($output, $prResult);
 

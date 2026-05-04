@@ -14,8 +14,6 @@ use App\Models\Workspace;
 use App\Services\ExecutionService;
 use App\Services\Executors\CliExecutor;
 use App\Services\Executors\Executor;
-use App\Services\Executors\FakeExecutor;
-use App\Services\Executors\LaravelAiExecutor;
 use App\Services\Progress\ProgressEmitter;
 use App\Services\WorkspaceRunner;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -113,12 +111,6 @@ test('CliExecutor emits stdout / stderr / sentinel events when an emitter is pas
     expect($stdoutLines)->toContain('hello');
     expect($events->where('type', 'stderr')->pluck('payload.line')->all())->toContain('oops');
     expect($events->where('type', 'sentinel')->first()->payload)->toBe(['name' => 'already_complete']);
-});
-
-test('CliExecutor.supportsProgressEvents()=true; LaravelAi/Fake=false', function () {
-    expect((new CliExecutor(['/bin/true']))->supportsProgressEvents())->toBeTrue();
-    expect((new LaravelAiExecutor)->supportsProgressEvents())->toBeFalse();
-    expect((new FakeExecutor)->supportsProgressEvents())->toBeFalse();
 });
 
 test('SubtaskRunPipeline tags events with the current phase and writes them under the run', function () {

@@ -131,7 +131,8 @@ class ResolveConflictsJob implements ShouldQueue
                     $unmerged,
                 );
 
-                $emitter = $executor->supportsProgressEvents() ? tap(new ProgressEmitter($run), fn (ProgressEmitter $e) => $e->setPhase('execute')) : null;
+                $emitter = new ProgressEmitter($run);
+                $emitter->setPhase('execute');
 
                 $result = $executor->execute($subtask, $workingDir, $repo, $branch, null, $emitter, $prompt);
 
