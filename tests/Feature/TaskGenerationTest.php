@@ -89,7 +89,9 @@ test('regeneration replaces the prior task list', function () {
     app(ExecutionService::class)->dispatchTaskGeneration($story);
     $tasks = $story->fresh()->tasks;
     expect($tasks)->toHaveCount(1)
-        ->and($tasks[0]->name)->toBe('task-v2');
+        ->and($tasks[0]->name)->toBe('task-v2')
+        ->and($story->fresh()->currentPlan->version)->toBe(2)
+        ->and($story->fresh()->currentPlan->name)->toBe('AI plan v2');
 });
 
 test('task generation allows cross-cutting tasks without a single acceptance criterion', function () {

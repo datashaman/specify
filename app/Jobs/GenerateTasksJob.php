@@ -48,7 +48,6 @@ class GenerateTasksJob implements ShouldQueue
 
             $tasks = $planInputs->fromGeneratedTasks($story, $output['tasks'] ?? []);
             $result = $planWriter->replacePlan($story, $tasks, [
-                'name' => 'AI plan v'.(((int) $story->plans()->max('version')) + 1),
                 'summary' => $output['summary'] ?? null,
                 'source' => PlanSource::Ai,
                 'source_label' => 'TasksGenerator',
