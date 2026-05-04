@@ -160,7 +160,7 @@ Migration ships in four slices behind individual PRs, each independently mergeab
 
 ### Neutral
 
-- **ADR-0001 unchanged** — Story is still the only approval gate; the IA change is shell-level.
+- **ADR-0001 unchanged** — Story and current Plan remain the approval gates; the IA change is shell-level.
 - **ADR-0006 unchanged** — multi-executor race mode is per-Subtask; the run console URL nests it under Subtask cleanly.
 - **MCP tools unchanged** — the MCP tool surface (`get-story`, `list-runs`, etc.) returns IDs, not URLs; the client stitches URLs from the active context. The IA change ripples through the web shell only.
 

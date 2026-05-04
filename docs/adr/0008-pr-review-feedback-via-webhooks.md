@@ -124,12 +124,12 @@ Concrete shape:
 
 ### Neutral
 
-- ADR-0001 (Story is the only approval gate) is preserved.
-  `respond_to_review` runs address feedback on **already-approved**
-  work; they do not introduce new spec, do not change the Story's
-  status, and never reset approval. The PR diff-review surface
-  (the same one ADR-0001 names) is exactly where the human notices
-  if a review-response run did the wrong thing.
+- ADR-0001 (Story and current Plan are the approval gates) is
+  preserved. `respond_to_review` runs address feedback on
+  **already-approved** work; they do not introduce new spec, do not
+  change Story or Plan approval state, and never add Task/Subtask gates.
+  The PR diff-review surface (the same one ADR-0001 names) is exactly
+  where the human notices if a review-response run did the wrong thing.
 - ADR-0004 (PR after push is non-fatal) is unchanged: review-response
   runs don't open a PR, so the PR-failure path doesn't apply.
 - ADR-0005 (executor may append follow-up subtasks) does not apply

@@ -2,7 +2,7 @@
 
 **Status:** Draft for review (rewritten 2026-05-02 after `/grill-with-docs` against ADRs 0001–0008)
 **Audience:** Implementer (senior eng, comfortable with Livewire Volt / Folio / Flux UI / Tailwind 4 / Reverb)
-**Scope:** End-to-end interface for a hybrid spec + execution system. `Workspace → Project → Feature → Story → Task → Subtask`, with autonomous executor runs, PR review-response runs, and race mode.
+**Scope:** End-to-end interface for a hybrid spec + execution system. `Workspace -> Project -> Feature -> Story -> AcceptanceCriterion / Scenario -> Plan -> Task -> Subtask`, with autonomous executor runs, PR review-response runs, and race mode.
 
 This brief is opinionated. Decisions taken during the grill are recorded in `CONTEXT.md` at the repo root — read that for the canonical glossary; this document is the implementation-shaped expansion.
 
@@ -10,7 +10,7 @@ This brief is opinionated. Decisions taken during the grill are recorded in `CON
 
 ## 1. Principles
 
-1. **Approval is the loudest signal.** Story approval gates everything (ADR-0001). Its visual state must be unmistakable from any list, document, or run view — not one chip among many.
+1. **Approval is the loudest signal.** Story approval gates the product contract and Plan approval gates execution (ADR-0001). Their visual states must be unmistakable from any list, document, or run view — not one chip among many.
 2. **Differentiate levels visually.** Same chrome at every level is Jira-fatigue. Project/Feature feel architectural; Story feels like a contract document; Task/Subtask feel like execution rows.
 3. **One live band, then hard navigate.** Stories show a single ambient band when work is in flight. The deep-dive console is its own page. Nothing in between.
 4. **Don't lie about capabilities the system doesn't have.** No fake SHAs (Story revision is an integer). No snapshot links (no snapshot table). No retry buttons (no retry job). No cancel buttons (no cooperative cancel). When the schema doesn't support it, the UI doesn't pretend it does.
@@ -223,11 +223,13 @@ Extended in place at `pages/stories/⚡show.blade.php` (already wires `Acceptanc
 
 - Inline edit on click for AC text and Story body. No modal.
 - **Plan editing** (adding/editing/removing ACs, Tasks, or Subtasks) opens an in-page editor with a persistent banner:
-  > **Saving will reset this Story to Pending Approval.** Current state: Approved · 2/2 · v7.
+  > **Saving will reopen current Plan approval.** Story: Approved · 2/2 · v7. Plan: Approved · 2/2 · p3.
   >
   > Plan delta: +2 subtasks, ~1 edited, −0 removed. [View diff]
-- Save button label flips to **"Save & request re-approval"** when the change resets approval. Cancel discards.
-- A `respond_to_review` run does *not* count as the kind of edit that resets approval (ADR-0008).
+- **Product contract editing** (Story body, AC text, scenarios) uses the same banner shape but says:
+  > **Saving will reopen Story approval and current Plan approval.** Story: Approved · 2/2 · v7. Plan: Approved · 2/2 · p3.
+- Save button label flips to **"Save & request re-approval"** when the change reopens approval. Cancel discards.
+- A `respond_to_review` run does *not* count as the kind of edit that reopens approval (ADR-0008).
 - While a run is executing the previous revision, edits queue as the next revision: banner says "Run #41 still executing against v7. Saving creates v8 and queues for re-approval."
 
 #### Decision log right rail
@@ -269,7 +271,7 @@ Scoped to **one** AgentRun. Same shell for both `kind`s, parameterised.
 ```
 ┌─────────────────────────────────────────────────────────────────────────┐
 │ ← Subtask  [Run #41 · v7 · running · 6m 12s]                           │
-│ kind: execute · driver: claude-code · branch: specify/story-11-v7-task-3 │
+│ kind: execute · driver: claude-code · branch: specify/{feature-slug}/{story-slug} │
 │ Started 12:04 · subtask step 2/4                                        │
 └─────────────────────────────────────────────────────────────────────────┘
 ```
@@ -307,7 +309,7 @@ For `respond_to_review`: **no spine** — there's no plan being walked. The spac
 | Comments      | (n/a)                                             | File/line groups of review comments being addressed  |
 
 **PR tab error states**:
-- Run completed but `pull_request_error` is set: shows the error, the pushed branch name (`specify/story-...-task-N`), and a host-VCS "compare branches" link so the operator can open the PR manually. **No retry button** in V1; ADR-0004's follow-up retry tool is a future ADR.
+- Run completed but `pull_request_error` is set: shows the error, the pushed branch name (`specify/{feature}/{story}` or race suffix), and a host-VCS "compare branches" link so the operator can open the PR manually. **No retry button** in V1; ADR-0004's follow-up retry tool is a future ADR.
 
 #### Right ambient (collapsible)
 

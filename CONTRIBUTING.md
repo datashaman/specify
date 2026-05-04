@@ -49,7 +49,7 @@ PHPDoc conventions:
 
 Add an ADR under `docs/adr/` (use `0000-template.md`) when you change:
 - An approval gate (who, when, threshold).
-- A model that other services depend on (especially the `Story → Task → Subtask` chain).
+- A model that other services depend on (especially the `Story -> Plan -> Task -> Subtask` delivery chain).
 - The `Executor` interface or its lifecycle.
 - How runs are dispatched, branched, or pushed.
 

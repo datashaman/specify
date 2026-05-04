@@ -16,8 +16,8 @@ use Throwable;
  *
  * Non-fatal by design (same posture as ADR-0004 for PR creation): any
  * failure logs and records `review_error` on the AgentRun output, never
- * mutates run status. The Story is the only approval gate (ADR-0001);
- * this job adds *signal*, not gates.
+ * mutates run status. Story and Plan approvals remain the gates
+ * (ADR-0001); this job adds *signal*, not gates.
  */
 class ReviewPullRequestJob implements ShouldQueue
 {

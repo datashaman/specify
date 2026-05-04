@@ -6,7 +6,7 @@ Source: AI strategy audit, Bucket 3 #3 (scoped to one persona)
 
 ## Premise
 
-ADR-0001 says "Story is the only approval gate." ADR-0002 says "Plan is retired; never reintroduce it." ADR-0003 says the executor interface is pluggable. None of these rules are checked anywhere — they live in prose and depend on humans remembering them at PR review time. AI can read prose and code together at a price that makes per-PR enforcement viable.
+ADR-0001 says StoryApproval gates the product contract and PlanApproval gates the current implementation plan, with no per-Task or per-Subtask approval gates. ADR-0002 says Tasks belong to Plans, not directly to Stories. ADR-0003 says the executor interface is pluggable. None of these rules are checked anywhere — they live in prose and depend on humans remembering them at PR review time. AI can read prose and code together at a price that makes per-PR enforcement viable.
 
 This proposal carves a single, narrow Bucket-3 idea out of the broader "multi-persona review" concept: one reviewer, one job — flag PRs whose diffs contradict an accepted ADR.
 

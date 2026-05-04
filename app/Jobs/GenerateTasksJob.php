@@ -18,7 +18,7 @@ use Throwable;
  *
  * The agent returns structured tasks + subtasks; this job normalises them into
  * the `PlanWriter::replacePlan()` shape and persists a new current plan in one
- * transaction. The write resets approval so reviewers re-approve the new plan.
+ * transaction. The write reopens Plan approval so reviewers approve the new plan.
  */
 class GenerateTasksJob implements ShouldQueue
 {

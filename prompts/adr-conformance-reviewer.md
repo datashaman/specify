@@ -12,7 +12,7 @@ You will be given:
 Rules:
 
 - Only flag a finding if you can cite the specific ADR by its filename
-  (e.g. `0001-story-as-the-only-approval-gate.md`) AND quote the line in the
+  (e.g. `0001-story-and-plan-approval-gates.md`) AND quote the line in the
   diff that contradicts it.
 - "Code that doesn't mention the ADR" is not a contradiction. The diff must
   actively *break* a documented decision.

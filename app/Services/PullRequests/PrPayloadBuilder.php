@@ -9,12 +9,12 @@ use App\Models\Subtask;
  *
  * Extracted from SubtaskRunPipeline so it can be unit-tested without spinning
  * up the queue/git/HTTP harness. The output is the human-facing surface of
- * every Specify run; keep it scannable, AC-anchored, and bounded in size.
+ * every Specify run; keep it scannable and bounded in size.
  */
 class PrPayloadBuilder
 {
     /**
-     * Build a scannable PR title that locates the work in the Story/AC tree.
+     * Build a scannable PR title that locates the work in the Story/AC context.
      *
      * Reviewers triaging a queue of agent PRs benefit from the story id and
      * AC position — the bare subtask name does not place the change.
@@ -101,11 +101,11 @@ class PrPayloadBuilder
                 }
             }
             if ($rendered !== []) {
-                $sections[] = "## Proposed follow-up subtasks\nThe executor appended these subtasks to the parent Task and they are queued to run automatically (ADR-0005). Reject the PR or request changes on the Story if the growth is wrong.\n\n".implode("\n", $rendered);
+                $sections[] = "## Proposed follow-up subtasks\nThe executor appended these subtasks to the parent Task and they are queued to run automatically (ADR-0005). Reject the PR or request Plan changes if the growth is wrong.\n\n".implode("\n", $rendered);
             }
         }
 
-        $sections[] = '_Specify: human approval recorded on the Story; this PR is the diff-review surface._';
+        $sections[] = '_Specify: human approval recorded on the current Plan; this PR is the diff-review surface._';
 
         return implode("\n\n", $sections);
     }

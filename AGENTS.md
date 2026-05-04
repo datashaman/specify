@@ -8,8 +8,8 @@ Specify is a Laravel 13 system where humans approve AI actions on code repos. **
 
 | You're about to... | Read first |
 |---|---|
-| Touch the approval state machine | [ADR-0001](docs/adr/0001-story-as-the-only-approval-gate.md), `app/Services/ApprovalService.php` |
-| Edit Story / Task / Subtask | [ADR-0002](docs/adr/0002-story-task-subtask-hierarchy.md) |
+| Touch the approval state machine | [ADR-0001](docs/adr/0001-story-and-plan-approval-gates.md), `app/Services/ApprovalService.php` |
+| Edit Story / criteria / scenarios / Plan / Task / Subtask | [ADR-0002](docs/adr/0002-story-scenario-plan-task-subtask-hierarchy.md), `app/Services/PlanWriter.php` |
 | Add or change an Executor | [ADR-0003](docs/adr/0003-pluggable-executor-interface.md), `app/Services/Executors/` |
 | Race executors against each other | [ADR-0006](docs/adr/0006-multi-executor-race-mode.md), `config/specify.php` (`executor.race`), `App\Services\Executors\ExecutorFactory` |
 | Touch PR creation | [ADR-0004](docs/adr/0004-pr-after-push-is-non-fatal.md), `app/Services/PullRequests/` |
@@ -21,11 +21,12 @@ Specify is a Laravel 13 system where humans approve AI actions on code repos. **
 
 ## Specify-specific rules
 
-- **Story is the only approval gate.** Don't add per-Task or per-Subtask approval flows — see ADR-0001.
-- **Plan is retired.** Tasks attach to Stories; Subtasks live under Tasks. Don't reintroduce a `Plan` model.
-- **Editing tasks/subtasks resets Story approval.** Route changes through `PlanWriter::replacePlan()` so the invariant lives in one place.
+- **StoryApproval gates the product contract.** Story body, criteria, and scenarios are approved at Story level — see ADR-0001.
+- **PlanApproval gates the current implementation plan.** Execution requires an approved Story and approved current Plan. Don't add per-Task or per-Subtask approval flows.
+- **Plan is active.** Tasks attach to Plans; Subtasks live under Tasks. Resolve Story through `Task -> Plan -> Story`, not `Task -> Story`.
+- **Editing product contract reopens Story and Plan approval.** Editing the current Plan, Tasks, or Subtasks reopens Plan approval. Route plan replacements through `PlanWriter::replacePlan()` so the invariant lives in one place.
 - **PR opening is non-fatal.** A failed PR creation must record `pull_request_error` on the AgentRun and let the run still succeed (ADR-0004). Don't fail the run on PR errors.
-- **`AgentRun` is append-only.** `StoryApproval` is immutable. Treat both as audit logs — corrections happen by writing new rows, never by mutating old ones.
+- **`AgentRun` is append-only.** `StoryApproval` and `PlanApproval` are immutable. Treat them as audit logs — corrections happen by writing new rows, never by mutating old ones.
 - **"The database" means the Laravel app DB.** Per-run git working directories under `storage/app/runs/...` are filesystem state, not database state.
 
 ## Framework guidance — ask Boost
@@ -39,4 +40,3 @@ For framework questions, use Boost's MCP tools rather than a pre-loaded cheat-sh
 - `get-absolute-url` — correct scheme/host/port for project URLs.
 
 Project-specific conventions (PHPDoc style, test discipline, what changes need an ADR) live in [CONTRIBUTING.md](CONTRIBUTING.md). Domain skills under `**/skills/**` activate automatically when relevant.
-

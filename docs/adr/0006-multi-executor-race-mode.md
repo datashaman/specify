@@ -42,7 +42,7 @@ Concrete shape:
 
 ### Neutral
 
-- `ADR-0001` (Story is the only approval gate) is preserved. The reviewer's choice of which sibling PR to merge is the same diff-review surface that already existed; race mode just gives them N options instead of one.
+- `ADR-0001` (Story and current Plan are the approval gates) is preserved. The reviewer's choice of which sibling PR to merge is the same diff-review surface that already existed; race mode just gives them N options instead of one and does not add per-Task or per-Subtask approval.
 - `ADR-0004` (PR after push is non-fatal) carries through unchanged — each sibling can fail to open its PR independently and record `pull_request_error` on its own AgentRun.
 
 ## Open questions (future work, not blocking)
