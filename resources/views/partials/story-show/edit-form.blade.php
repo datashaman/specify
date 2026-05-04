@@ -33,7 +33,7 @@
     </div>
 
     <div class="flex items-center gap-2">
-        @php $saveLabel = $this->acDelta ? __('Save & request re-approval') : __('Save'); @endphp
+        @php $saveLabel = $delta ? __('Save & request re-approval') : __('Save'); @endphp
         <flux:button wire:click="saveEdit" wire:target="saveEdit" wire:loading.attr="disabled" variant="primary">
             <span wire:loading.remove wire:target="saveEdit">{{ $saveLabel }}</span>
             <span wire:loading wire:target="saveEdit">{{ __('Saving…') }}</span>

@@ -5,7 +5,7 @@
                 <flux:badge size="sm">{{ $story->kind->value }}</flux:badge>
             @endif
             @if ($story->currentPlan)
-                <flux:badge size="sm">{{ __('current plan') }} v{{ $story->currentPlan->version }}</flux:badge>
+                <flux:badge size="sm">{{ __('Current plan') }} v{{ $story->currentPlan->version }}</flux:badge>
                 <x-state-pill :state="$planPill['state']" :tally="$planPill['tally']" :label="__('Plan').' · '.$planPill['label']" />
             @endif
         </div>
