@@ -39,7 +39,7 @@ new #[Title('Plan')] class extends Component {
                 'story.acceptanceCriteria',
                 'story.scenarios.acceptanceCriterion',
                 'approvals.approver',
-                'tasks.story.feature.project',
+                'tasks.plan.story.feature.project',
                 'tasks.acceptanceCriterion',
                 'tasks.scenario',
                 'tasks.dependencies',
@@ -107,7 +107,7 @@ new #[Title('Plan')] class extends Component {
                                 <flux:badge variant="solid">{{ __('current plan') }}</flux:badge>
                             @endif
                             <flux:badge>{{ count($effective) }}/{{ $policy->required_approvals }} {{ __('approvals') }}</flux:badge>
-                            <flux:badge>{{ $tasks->count() }} {{ __('tasks') }} · {{ $subtaskCount }} {{ __('subtasks') }}</flux:badge>
+                            <flux:badge>{{ $tasks->count() }} {{ __('plan tasks') }} · {{ $subtaskCount }} {{ __('subtasks') }}</flux:badge>
                         </div>
                         <flux:heading size="xl" class="mt-2">{{ $plan->name ?? __('Plan') }}</flux:heading>
                         <flux:text class="mt-1 text-sm text-zinc-500">{{ $feature->name }} · <a href="{{ route('stories.show', ['project' => $project->id, 'story' => $story->id]) }}" wire:navigate class="underline">{{ $story->name }}</a></flux:text>
@@ -152,9 +152,9 @@ new #[Title('Plan')] class extends Component {
 
             <section class="flex flex-col gap-3" data-section="plan-body">
                 <div class="flex flex-wrap items-center gap-x-3 gap-y-1">
-                    <flux:heading size="lg">{{ __('Tasks') }}</flux:heading>
+                    <flux:heading size="lg">{{ __('Plan tasks') }}</flux:heading>
                     <flux:text class="text-xs text-zinc-500">
-                        {{ $acs->count() }} {{ __('ACs') }} · {{ $subtaskCount }} {{ __('subtasks') }}
+                        {{ $acs->count() }} {{ __('ACs') }} · {{ $tasks->count() }} {{ __('plan tasks') }} · {{ $subtaskCount }} {{ __('subtasks') }}
                         @if ($repo)
                             · {{ $repo->name }}
                         @endif
@@ -175,7 +175,7 @@ new #[Title('Plan')] class extends Component {
                             </summary>
 
                             @if ($acTasks->isEmpty())
-                                <flux:text class="mt-2 text-xs text-zinc-500">{{ __('No task mapped to this AC in this plan.') }}</flux:text>
+                                <flux:text class="mt-2 text-xs text-zinc-500">{{ __('No plan task mapped to this AC.') }}</flux:text>
                             @else
                                 @foreach ($acTasks as $task)
                                     @include('partials.story-task', ['task' => $task])
@@ -190,7 +190,7 @@ new #[Title('Plan')] class extends Component {
                 @if ($unmappedTasks->isNotEmpty())
                     <flux:card data-ac="unmapped">
                         <details open>
-                            <summary class="cursor-pointer text-sm font-medium">{{ __('Unmapped tasks') }} ({{ $unmappedTasks->count() }})</summary>
+                            <summary class="cursor-pointer text-sm font-medium">{{ __('Plan tasks not mapped to an AC') }} ({{ $unmappedTasks->count() }})</summary>
                             @foreach ($unmappedTasks as $task)
                                 @include('partials.story-task', ['task' => $task])
                             @endforeach
