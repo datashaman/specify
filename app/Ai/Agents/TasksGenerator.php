@@ -48,7 +48,7 @@ Description:
 Acceptance Criteria (position. text):
 {$criteria}
 
-Generate an implementation plan that fully satisfies the acceptance criteria above. Shape Tasks around coherent implementation work; do not force one Task per Acceptance Criterion. Each Task must have one or more Subtasks.
+Generate an implementation plan that fully satisfies the acceptance criteria above. Shape Tasks around coherent implementation work that may span acceptance criteria, scenarios, or shared enabling work. Each Task must have one or more Subtasks.
 PROMPT;
     }
 

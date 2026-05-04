@@ -61,5 +61,5 @@ test('TasksGenerator::instructions() pulls from the prompts/tasks-generator.md f
         ->toContain('You are the planning agent for Specify')
         ->toContain('implementation Plan')
         ->toContain('Shape Tasks around coherent implementation work')
-        ->not->toContain('one Task per Acceptance Criterion');
+        ->toContain('shared enabling work');
 });
