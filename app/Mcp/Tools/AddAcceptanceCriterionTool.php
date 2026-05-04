@@ -3,6 +3,7 @@
 namespace App\Mcp\Tools;
 
 use App\Mcp\Concerns\ResolvesProjectAccess;
+use App\Services\Stories\AcceptanceCriteriaWriter;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Laravel\Mcp\Request;
 use Laravel\Mcp\Response;
@@ -22,7 +23,7 @@ class AddAcceptanceCriterionTool extends Tool
     /**
      * Handle the MCP tool invocation.
      */
-    public function handle(Request $request): Response
+    public function handle(Request $request, AcceptanceCriteriaWriter $criteria): Response
     {
         $user = $this->resolveUser($request);
         if ($user instanceof Response) {
@@ -45,13 +46,7 @@ class AddAcceptanceCriterionTool extends Tool
             return $story;
         }
 
-        $position = $validated['position']
-            ?? (int) ($story->acceptanceCriteria()->max('position') ?? 0) + 1;
-
-        $ac = $story->acceptanceCriteria()->create([
-            'statement' => $statement,
-            'position' => $position,
-        ]);
+        $ac = $criteria->add($story, $statement, $validated['position'] ?? null);
 
         return Response::json([
             'id' => $ac->id,

@@ -5,6 +5,7 @@ namespace App\Mcp\Tools;
 use App\Enums\StoryKind;
 use App\Enums\StoryStatus;
 use App\Mcp\Concerns\ResolvesProjectAccess;
+use App\Services\Stories\AcceptanceCriteriaWriter;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Illuminate\Support\Facades\DB;
 use Laravel\Mcp\Request;
@@ -25,7 +26,7 @@ class UpdateStoryTool extends Tool
     /**
      * Handle the MCP tool invocation.
      */
-    public function handle(Request $request): Response
+    public function handle(Request $request, AcceptanceCriteriaWriter $criteria): Response
     {
         $user = $this->resolveUser($request);
         if ($user instanceof Response) {
@@ -68,21 +69,17 @@ class UpdateStoryTool extends Tool
             return Response::error('Provide at least one of: name, kind, actor, intent, outcome, description, notes, status, acceptance_criteria.');
         }
 
-        DB::transaction(function () use ($story, $changes, $validated, $hasCriteriaUpdate) {
+        DB::transaction(function () use ($story, $changes, $validated, $hasCriteriaUpdate, $criteria) {
             if ($changes) {
                 $story->fill($changes)->save();
             }
 
             if ($hasCriteriaUpdate) {
-                $story->acceptanceCriteria()->delete();
-                foreach ($validated['acceptance_criteria'] as $i => $criterion) {
-                    $story->acceptanceCriteria()->create([
-                        'statement' => $criterion,
-                        'position' => $i + 1,
-                    ]);
-                }
+                $criteria->replace($story, $validated['acceptance_criteria']);
             }
         });
+
+        $story->refresh();
 
         return Response::json([
             'id' => $story->id,
