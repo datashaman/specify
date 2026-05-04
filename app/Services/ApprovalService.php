@@ -72,6 +72,9 @@ class ApprovalService
         ApprovalDecision $decision,
         ?string $notes = null,
     ): PlanApproval {
+        if (! $target->isCurrent()) {
+            throw new RuntimeException('Only the story\'s current plan can receive approval decisions.');
+        }
         if ($target->status === PlanStatus::Draft) {
             throw new RuntimeException('Plan must be submitted before review decisions can be recorded.');
         }

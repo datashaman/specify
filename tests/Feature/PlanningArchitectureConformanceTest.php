@@ -2,11 +2,17 @@
 
 use App\Enums\PlanStatus;
 use App\Mcp\Servers\SpecifyServer;
+use App\Mcp\Tools\ApprovePlanTool;
+use App\Mcp\Tools\ApproveStoryTool;
 use App\Mcp\Tools\GenerateTasksTool;
 use App\Mcp\Tools\GetStoryTool;
 use App\Mcp\Tools\GetTaskTool;
 use App\Mcp\Tools\ListTasksTool;
+use App\Mcp\Tools\RejectPlanTool;
+use App\Mcp\Tools\RequestPlanChangesTool;
+use App\Mcp\Tools\RequestStoryChangesTool;
 use App\Mcp\Tools\SetTasksTool;
+use App\Mcp\Tools\SubmitPlanTool;
 use App\Models\Feature;
 use App\Models\Plan;
 use App\Models\PlanApproval;
@@ -71,6 +77,12 @@ test('mcp instructions and planning tool descriptions speak in current-plan term
         ListTasksTool::class => descriptionFor(ListTasksTool::class),
         GetTaskTool::class => descriptionFor(GetTaskTool::class),
         GetStoryTool::class => descriptionFor(GetStoryTool::class),
+        SubmitPlanTool::class => descriptionFor(SubmitPlanTool::class),
+        ApprovePlanTool::class => descriptionFor(ApprovePlanTool::class),
+        RejectPlanTool::class => descriptionFor(RejectPlanTool::class),
+        RequestPlanChangesTool::class => descriptionFor(RequestPlanChangesTool::class),
+        ApproveStoryTool::class => descriptionFor(ApproveStoryTool::class),
+        RequestStoryChangesTool::class => descriptionFor(RequestStoryChangesTool::class),
     ];
 
     expect($descriptions[GenerateTasksTool::class])->toContain('fresh current Plan')
@@ -81,7 +93,13 @@ test('mcp instructions and planning tool descriptions speak in current-plan term
         ->and($descriptions[GetTaskTool::class])->toContain('Plan-owned Task')
         ->and($descriptions[GetStoryTool::class])->toContain('current Plan metadata')
         ->and($descriptions[SetTasksTool::class])->toContain('may link to an optional acceptance_criterion_id and/or scenario_id')
-        ->and($descriptions[ListTasksTool::class])->toContain('Each entry includes plan_id');
+        ->and($descriptions[ListTasksTool::class])->toContain('Each entry includes plan_id')
+        ->and($descriptions[SubmitPlanTool::class])->toContain('current plan for approval')
+        ->and($descriptions[ApprovePlanTool::class])->toContain('current plan')
+        ->and($descriptions[RejectPlanTool::class])->toContain('current plan')
+        ->and($descriptions[RequestPlanChangesTool::class])->toContain('current plan')
+        ->and($descriptions[ApproveStoryTool::class])->toContain('story product contract')
+        ->and($descriptions[RequestStoryChangesTool::class])->toContain('story product contract');
 });
 
 test('list-tasks exposes current plan ownership on every task row', function () {

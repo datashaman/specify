@@ -9,7 +9,7 @@ use Laravel\Mcp\Response;
 use Laravel\Mcp\Server\Attributes\Description;
 use Laravel\Mcp\Server\Tool;
 
-#[Description('Submit a plan for approval (Draft → PendingApproval). Errors if the plan has been rejected or has no tasks.')]
+#[Description('Submit the story’s current plan for approval (Draft → PendingApproval). Errors if the plan is not current, has been rejected, or has no tasks.')]
 class SubmitPlanTool extends Tool
 {
     use ResolvesProjectAccess;

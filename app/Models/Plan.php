@@ -51,6 +51,15 @@ class Plan extends Model
         return $this->status === PlanStatus::Approved;
     }
 
+    public function isCurrent(): bool
+    {
+        if (! $this->exists) {
+            return false;
+        }
+
+        return (int) $this->story()->value('current_plan_id') === (int) $this->getKey();
+    }
+
     public function submitForApproval(): void
     {
         app(PlanApprovalLifecycle::class)->submit($this);
