@@ -18,7 +18,7 @@ class StoryContractEditor
     {
         abort_if(in_array($story->status, [StoryStatus::Done, StoryStatus::Cancelled, StoryStatus::Rejected], true), 422, 'Story is read-only.');
 
-        $changed = DB::transaction(function () use ($story, $name, $description, $criteria): bool {
+        return DB::transaction(function () use ($story, $name, $description, $criteria): bool {
             $changed = false;
 
             $trimmedName = trim($name);
@@ -32,14 +32,14 @@ class StoryContractEditor
                 $changed = true;
             }
 
-            return $this->syncCriteria($story, $criteria) || $changed;
+            $changed = $this->syncCriteria($story, $criteria) || $changed;
+
+            if ($changed) {
+                $this->revisions->recordContentArtifactChanged($story->fresh());
+            }
+
+            return $changed;
         });
-
-        if ($changed) {
-            $this->revisions->recordContentArtifactChanged($story->fresh());
-        }
-
-        return $changed;
     }
 
     /**
@@ -57,7 +57,9 @@ class StoryContractEditor
                 $text = trim((string) ($row['statement'] ?? ''));
                 $id = $row['id'] ?? null;
 
-                if ($id !== null && $existing->has($id)) {
+                abort_unless($id === null || $existing->has($id), 422, 'Acceptance criterion does not belong to this story.');
+
+                if ($id !== null) {
                     $criterion = $existing[$id];
                     if ($criterion->statement !== $text || $criterion->position !== $position) {
                         $criterion->update(['statement' => $text, 'position' => $position]);

@@ -19,6 +19,9 @@ use App\Models\Task;
 use App\Models\Team;
 use App\Models\User;
 use App\Models\Workspace;
+use App\Services\ApprovalService;
+use App\Services\Stories\StoryContractEditor;
+use App\Services\Stories\StoryRevisionLifecycle;
 use Livewire\Livewire;
 
 function showPageScene(array $opts = []): array
@@ -589,6 +592,74 @@ test('saving edited story contract preserves acceptance criterion ids and reopen
         ->and($freshCriterion->getKey())->toBe($criterion->getKey())
         ->and($task->fresh()->acceptance_criterion_id)->toBe($criterion->getKey())
         ->and($task->plan->fresh()->status)->toBe(PlanStatus::PendingApproval);
+});
+
+test('saving story contract rejects forged acceptance criterion ids without deleting existing links', function () {
+    $s = showPageScene(['status' => StoryStatus::Draft, 'revision' => 3]);
+    $other = showPageScene(['status' => StoryStatus::Draft]);
+    attachPolicy($s['ws'], required: 1);
+
+    $criterion = AcceptanceCriterion::withoutEvents(fn () => AcceptanceCriterion::create([
+        'story_id' => $s['story']->id,
+        'position' => 1,
+        'statement' => 'owned-ac',
+    ]));
+    $foreign = AcceptanceCriterion::withoutEvents(fn () => AcceptanceCriterion::create([
+        'story_id' => $other['story']->id,
+        'position' => 1,
+        'statement' => 'foreign-ac',
+    ]));
+    $task = Task::factory()->forCurrentPlanOf($s['story'])->create([
+        'acceptance_criterion_id' => $criterion->id,
+    ]);
+    forceStoryStatus($s['story'], StoryStatus::Approved, revision: 3);
+
+    $this->actingAs($s['user']);
+
+    Livewire::test('pages::stories.show', ['story' => $s['story']->id])
+        ->call('startEdit')
+        ->set('editCriteria', [
+            ['id' => $foreign->id, 'statement' => 'forged-ac'],
+        ])
+        ->call('saveEdit')
+        ->assertStatus(422);
+
+    expect($criterion->fresh()->statement)->toBe('owned-ac')
+        ->and($foreign->fresh()->statement)->toBe('foreign-ac')
+        ->and($task->fresh()->acceptance_criterion_id)->toBe($criterion->id)
+        ->and($s['story']->fresh()->revision)->toBe(3);
+});
+
+test('story contract edit rolls back when lifecycle reopening fails', function () {
+    $s = showPageScene(['status' => StoryStatus::Draft, 'revision' => 5]);
+    attachPolicy($s['ws'], required: 1);
+
+    $criterion = AcceptanceCriterion::withoutEvents(fn () => AcceptanceCriterion::create([
+        'story_id' => $s['story']->id,
+        'position' => 1,
+        'statement' => 'original-ac',
+    ]));
+    forceStoryStatus($s['story'], StoryStatus::Approved, revision: 5);
+
+    app()->bind(StoryRevisionLifecycle::class, fn () => new class(app(ApprovalService::class)) extends StoryRevisionLifecycle
+    {
+        public function recordContentArtifactChanged(Story $story): void
+        {
+            throw new RuntimeException('Lifecycle failed.');
+        }
+    });
+
+    expect(fn () => app(StoryContractEditor::class)->update(
+        $s['story']->fresh(),
+        'new name',
+        'new description',
+        [['id' => $criterion->id, 'statement' => 'edited-ac']],
+    ))->toThrow(RuntimeException::class, 'Lifecycle failed.');
+
+    expect($s['story']->fresh()->name)->toBe('show-page-story')
+        ->and($s['story']->fresh()->description)->not->toBe('new description')
+        ->and($s['story']->fresh()->revision)->toBe(5)
+        ->and($criterion->fresh()->statement)->toBe('original-ac');
 });
 
 test('plan section renders with compact/expanded toggle controls', function () {
