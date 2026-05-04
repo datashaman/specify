@@ -13,7 +13,7 @@ uses(RefreshDatabase::class);
 function storyWithSubtaskAndRun(array $output, array $runOverrides = []): array
 {
     $story = Story::factory()->create();
-    $task = Task::factory()->for($story)->create();
+    $task = Task::factory()->forStory($story)->create();
     $subtask = Subtask::factory()->for($task)->create();
     $run = AgentRun::factory()->create(array_merge([
         'runnable_type' => Subtask::class,
@@ -51,7 +51,7 @@ test('pullRequests surfaces a single-driver PR as primary', function () {
 
 test('pullRequests deduplicates retries that adopted the same upstream PR', function () {
     $story = Story::factory()->create();
-    $task = Task::factory()->for($story)->create();
+    $task = Task::factory()->forStory($story)->create();
     $subtask = Subtask::factory()->for($task)->create();
 
     // Two AgentRuns on the same Subtask both adopting the same PR — e.g.
@@ -77,7 +77,7 @@ test('pullRequests deduplicates retries that adopted the same upstream PR', func
 
 test('pullRequests in race mode surfaces every sibling and primary is null until merge', function () {
     $story = Story::factory()->create();
-    $task = Task::factory()->for($story)->create();
+    $task = Task::factory()->forStory($story)->create();
     $subtask = Subtask::factory()->for($task)->create();
 
     foreach (['cli' => 21, 'specify' => 22, 'codex' => 23] as $driver => $number) {
@@ -107,7 +107,7 @@ test('pullRequests in race mode surfaces every sibling and primary is null until
 
 test('primaryPullRequest hoists the merged sibling and pullRequests sorts it first', function () {
     $story = Story::factory()->create();
-    $task = Task::factory()->for($story)->create();
+    $task = Task::factory()->forStory($story)->create();
     $subtask = Subtask::factory()->for($task)->create();
 
     AgentRun::factory()->create([
@@ -148,7 +148,7 @@ test('pullRequests preserves run-id-desc order within the unmerged partition whe
     // non-merged candidates can drift across PHP/Laravel versions —
     // reviewers reading the candidate list would see entries shuffle.
     $story = Story::factory()->create();
-    $task = Task::factory()->for($story)->create();
+    $task = Task::factory()->forStory($story)->create();
     $subtask = Subtask::factory()->for($task)->create();
 
     foreach ([
@@ -182,7 +182,7 @@ test('pullRequests entries expose run_finished_at, not opened_at', function () {
     // Renamed in review feedback: opened_at implied an authoritative PR
     // open timestamp; we only have the AgentRun's terminal time.
     $story = Story::factory()->create();
-    $task = Task::factory()->for($story)->create();
+    $task = Task::factory()->forStory($story)->create();
     $subtask = Subtask::factory()->for($task)->create();
     AgentRun::factory()->create([
         'runnable_type' => Subtask::class,
@@ -200,7 +200,7 @@ test('pullRequests entries expose run_finished_at, not opened_at', function () {
 
 test('pullRequests excludes RespondToReview-kind runs (those just push commits, not PRs)', function () {
     $story = Story::factory()->create();
-    $task = Task::factory()->for($story)->create();
+    $task = Task::factory()->forStory($story)->create();
     $subtask = Subtask::factory()->for($task)->create();
 
     AgentRun::factory()->create([

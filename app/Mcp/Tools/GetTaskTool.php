@@ -36,20 +36,20 @@ class GetTaskTool extends Tool
         }
 
         $task = Task::query()
-            ->with(['story.feature', 'plan', 'acceptanceCriterion', 'scenario', 'subtasks', 'dependencies:id,position'])
+            ->with(['plan.story.feature', 'acceptanceCriterion', 'scenario', 'subtasks', 'dependencies:id,position'])
             ->find($taskId);
 
         if (! $task) {
             return Response::error('Task not found.');
         }
 
-        if (! $this->canAccessProject($user, (int) $task->story->feature->project_id)) {
+        if (! $this->canAccessProject($user, (int) $task->plan->story->feature->project_id)) {
             return Response::error('Task not accessible.');
         }
 
         return Response::json([
             'id' => $task->id,
-            'story_id' => $task->story_id,
+            'story_id' => $task->plan->story_id,
             'plan_id' => $task->plan_id,
             'position' => $task->position,
             'name' => $task->name,

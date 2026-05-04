@@ -34,14 +34,14 @@ new #[Title('Runs')] class extends Component {
         return AgentRun::query()
             ->where(function ($q) use ($projectIds) {
                 $q->whereHasMorph('runnable', [Subtask::class], function ($qq) use ($projectIds) {
-                    $qq->whereHas('task.story.feature', fn ($qqq) => $qqq->whereIn('project_id', $projectIds));
+                    $qq->whereHas('task.plan.story.feature', fn ($qqq) => $qqq->whereIn('project_id', $projectIds));
                 })
                 ->orWhereHasMorph('runnable', [Story::class], function ($qq) use ($projectIds) {
                     $qq->whereHas('feature', fn ($qqq) => $qqq->whereIn('project_id', $projectIds));
                 });
             })
             ->when($this->status, fn ($q, $s) => $q->where('status', $s))
-            ->with('runnable.task.plan', 'runnable.task.story.feature.project', 'repo')
+            ->with('runnable.task.plan', 'runnable.task.plan.story.feature.project', 'repo')
             ->latest('id')
             ->paginate(25);
     }

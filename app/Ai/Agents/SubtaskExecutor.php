@@ -53,7 +53,7 @@ class SubtaskExecutor implements Agent, HasStructuredOutput, HasTools
         $sandbox = new Sandbox($this->workingDir);
         $context = [
             'subtask_id' => $this->subtask->getKey(),
-            'story_id' => $this->subtask->task?->story_id,
+            'story_id' => $this->subtask->task?->plan?->story_id,
             'branch' => $this->workingBranch,
         ];
 
@@ -75,9 +75,9 @@ class SubtaskExecutor implements Agent, HasStructuredOutput, HasTools
 
     public function buildPrompt(): string
     {
-        $subtask = $this->subtask->loadMissing('task.story.feature.project', 'task.acceptanceCriterion');
+        $subtask = $this->subtask->loadMissing('task.plan.story.feature.project', 'task.acceptanceCriterion');
         $task = $subtask->task;
-        $story = $task?->story;
+        $story = $task?->plan?->story;
         $criterion = $task?->acceptanceCriterion?->statement;
 
         $repoBlock = $this->repo

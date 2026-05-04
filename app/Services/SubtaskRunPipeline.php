@@ -411,7 +411,7 @@ class SubtaskRunPipeline
         return [
             'run_id' => $agentRun->getKey(),
             'subtask_id' => $subtask->getKey(),
-            'story_id' => $subtask->task?->story_id,
+            'story_id' => $subtask->task?->plan?->story_id,
             'branch' => $agentRun->working_branch,
         ];
     }

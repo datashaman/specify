@@ -43,12 +43,12 @@ class UpdateTaskTool extends Tool
             'depends_on_positions.*' => ['integer', 'min:1'],
         ]);
 
-        $task = Task::query()->with('story.feature', 'story.acceptanceCriteria:id,story_id', 'story.scenarios:id,story_id')->find($validated['task_id']);
+        $task = Task::query()->with('plan.story.feature', 'plan.story.acceptanceCriteria:id,story_id', 'plan.story.scenarios:id,story_id')->find($validated['task_id']);
         if (! $task) {
             return Response::error('Task not found.');
         }
 
-        if (! $this->canAccessProject($user, (int) $task->story->feature->project_id)) {
+        if (! $this->canAccessProject($user, (int) $task->plan->story->feature->project_id)) {
             return Response::error('Task not accessible.');
         }
 
@@ -74,7 +74,7 @@ class UpdateTaskTool extends Tool
             }
             if (array_key_exists('acceptance_criterion_id', $validated)) {
                 $acId = $validated['acceptance_criterion_id'];
-                if ($acId !== null && ! $task->story->acceptanceCriteria->contains('id', $acId)) {
+                if ($acId !== null && ! $task->plan->story->acceptanceCriteria->contains('id', $acId)) {
                     throw new \RuntimeException("acceptance_criterion_id {$acId} does not belong to this story.");
                 }
                 $updates['acceptance_criterion_id'] = $acId;
@@ -82,7 +82,7 @@ class UpdateTaskTool extends Tool
             }
             if (array_key_exists('scenario_id', $validated)) {
                 $scenarioId = $validated['scenario_id'];
-                if ($scenarioId !== null && ! $task->story->scenarios->contains('id', $scenarioId)) {
+                if ($scenarioId !== null && ! $task->plan->story->scenarios->contains('id', $scenarioId)) {
                     throw new \RuntimeException("scenario_id {$scenarioId} does not belong to this story.");
                 }
                 $updates['scenario_id'] = $scenarioId;
@@ -95,7 +95,6 @@ class UpdateTaskTool extends Tool
 
             if (array_key_exists('depends_on_positions', $validated) && is_array($validated['depends_on_positions'])) {
                 $byPosition = Task::query()
-                    ->where('story_id', $task->story_id)
                     ->where('plan_id', $task->plan_id)
                     ->get(['id', 'position'])
                     ->keyBy('position');
@@ -122,7 +121,7 @@ class UpdateTaskTool extends Tool
 
         return Response::json([
             'id' => $task->id,
-            'story_id' => $task->story_id,
+            'story_id' => $task->plan->story_id,
             'plan_id' => $task->plan_id,
             'position' => $task->position,
             'name' => $task->name,

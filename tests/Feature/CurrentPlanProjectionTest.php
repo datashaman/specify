@@ -14,7 +14,7 @@ test('acceptance criterion met only reflects done tasks in the current plan', fu
     $story = Story::factory()->create();
     $ac = AcceptanceCriterion::factory()->for($story)->create(['position' => 1]);
 
-    $oldTask = Task::factory()->for($story)->create([
+    $oldTask = Task::factory()->forStory($story)->create([
         'acceptance_criterion_id' => $ac->id,
         'status' => TaskStatus::Done,
         'position' => 1,
@@ -26,7 +26,6 @@ test('acceptance criterion met only reflects done tasks in the current plan', fu
         'status' => PlanStatus::PendingApproval,
     ]);
     $newTask = Task::factory()->create([
-        'story_id' => $story->id,
         'plan_id' => $newPlan->id,
         'acceptance_criterion_id' => $ac->id,
         'status' => TaskStatus::Pending,

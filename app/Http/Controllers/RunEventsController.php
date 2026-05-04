@@ -62,10 +62,10 @@ class RunEventsController extends Controller
         }
 
         if ($run->runnable_type === Subtask::class) {
-            $subtask = Subtask::with('task.plan', 'task.story.feature')->find($run->runnable_id);
+            $subtask = Subtask::with('task.plan', 'task.plan.story.feature')->find($run->runnable_id);
 
-            return $subtask?->task?->story !== null
-                && in_array($subtask->task->story->feature->project_id, $accessible, true);
+            return $subtask?->task?->plan?->story !== null
+                && in_array($subtask->task->plan->story->feature->project_id, $accessible, true);
         }
 
         return false;

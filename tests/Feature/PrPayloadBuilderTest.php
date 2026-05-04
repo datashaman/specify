@@ -14,9 +14,9 @@ function makeSubtaskWithCriterion(int $acPosition = 3, ?string $criterion = 'Use
     $story = Story::factory()->create(['name' => 'Add CSV export']);
     $ac = AcceptanceCriterion::factory()->for($story)->create([
         'position' => $acPosition,
-        'criterion' => $criterion,
+        'statement' => $criterion,
     ]);
-    $task = Task::factory()->for($story)->create([
+    $task = Task::factory()->forStory($story)->create([
         'name' => 'Wire export endpoint',
         'position' => 1,
         'acceptance_criterion_id' => $ac->id,
@@ -32,7 +32,7 @@ test('title locates the subtask in the Story / AC tree', function () {
     $subtask = makeSubtaskWithCriterion(acPosition: 3);
 
     expect(PrPayloadBuilder::title($subtask))
-        ->toBe(sprintf('Specify [Story #%d AC#%d]: Add export route and controller', $subtask->task->story_id, 3));
+        ->toBe(sprintf('Specify [Story #%d AC#%d]: Add export route and controller', $subtask->task->plan->story_id, 3));
 });
 
 test('title renders AC#0 instead of dropping the AC tag (regression: truthiness check)', function () {
@@ -44,7 +44,7 @@ test('title renders AC#0 instead of dropping the AC tag (regression: truthiness 
 
 test('title falls back to Story-only tag when AC position is null', function () {
     $story = Story::factory()->create();
-    $task = Task::factory()->for($story)->create([
+    $task = Task::factory()->forStory($story)->create([
         'name' => 'task',
         'position' => 1,
         'acceptance_criterion_id' => null,

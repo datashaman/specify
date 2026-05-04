@@ -130,11 +130,8 @@ class Story extends Model
 
     public function tasks(): HasMany
     {
-        return $this->hasMany(Task::class)
-            ->join('stories as story_task_scope', 'story_task_scope.id', '=', 'tasks.story_id')
-            ->whereColumn('tasks.plan_id', 'story_task_scope.current_plan_id')
-            ->select('tasks.*')
-            ->orderBy('tasks.position');
+        return $this->hasMany(Task::class, 'plan_id', 'current_plan_id')
+            ->orderBy('position');
     }
 
     /**

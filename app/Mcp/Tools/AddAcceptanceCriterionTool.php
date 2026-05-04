@@ -31,19 +31,18 @@ class AddAcceptanceCriterionTool extends Tool
 
         $validated = $request->validate([
             'story_id' => ['required', 'integer'],
-            'criterion' => ['nullable', 'string'],
-            'statement' => ['nullable', 'string'],
+            'statement' => ['required', 'string', 'max:1000'],
             'position' => ['nullable', 'integer'],
         ]);
+
+        $statement = trim($validated['statement']);
+        if ($statement === '') {
+            return Response::error('statement is required.');
+        }
 
         $story = $this->resolveAccessibleStory($validated['story_id'], $user);
         if ($story instanceof Response) {
             return $story;
-        }
-
-        $statement = $validated['statement'] ?? $validated['criterion'] ?? null;
-        if (! is_string($statement) || trim($statement) === '') {
-            return Response::error('statement is required.');
         }
 
         $position = $validated['position']
@@ -70,8 +69,7 @@ class AddAcceptanceCriterionTool extends Tool
     {
         return [
             'story_id' => $schema->integer()->description('Story to add the criterion to.')->required(),
-            'criterion' => $schema->string()->description('Deprecated alias for statement. Observable behaviour the story must satisfy as one atomic rule statement.'),
-            'statement' => $schema->string()->description('Observable behaviour the story must satisfy. Use one atomic rule statement, not a full Given/When/Then scenario.'),
+            'statement' => $schema->string()->description('Observable behaviour the story must satisfy. Use one atomic rule statement, not a full Given/When/Then scenario.')->required(),
             'position' => $schema->integer()->description('Position in the list. Defaults to last + 1.'),
         ];
     }

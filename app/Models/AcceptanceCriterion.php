@@ -16,7 +16,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 /**
  * Atomic observable rule a Story must satisfy.
  */
-#[Fillable(['story_id', 'position', 'statement', 'criterion'])]
+#[Fillable(['story_id', 'position', 'statement'])]
 class AcceptanceCriterion extends Model
 {
     /** @use HasFactory<AcceptanceCriterionFactory> */
@@ -64,14 +64,6 @@ class AcceptanceCriterion extends Model
     public function tasks(): HasMany
     {
         return $this->hasMany(Task::class);
-    }
-
-    protected function criterion(): Attribute
-    {
-        return Attribute::make(
-            get: fn () => $this->statement,
-            set: fn (?string $value) => ['statement' => $value],
-        );
     }
 
     protected function met(): Attribute

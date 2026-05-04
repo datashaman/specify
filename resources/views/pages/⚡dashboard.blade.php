@@ -50,8 +50,9 @@ new #[Title('Dashboard')] class extends Component {
             ->whereExists(function ($q) {
                 $q->selectRaw('1')
                     ->from('tasks')
+                    ->join('plans', 'plans.id', '=', 'tasks.plan_id')
                     ->join('subtasks', 'subtasks.task_id', '=', 'tasks.id')
-                    ->whereColumn('tasks.story_id', 'stories.id')
+                    ->whereColumn('plans.story_id', 'stories.id')
                     ->whereColumn('tasks.plan_id', 'stories.current_plan_id')
                     ->whereIn('subtasks.status', [TaskStatus::InProgress->value, TaskStatus::Pending->value]);
             })
@@ -64,7 +65,7 @@ new #[Title('Dashboard')] class extends Component {
         return AgentRun::query()
             ->where('status', AgentRunStatus::Failed)
             ->whereHasMorph('runnable', [Subtask::class], function ($q) {
-                $q->whereHas('task.story.feature', fn ($qq) => $qq->whereIn('project_id', $this->projectIds));
+                $q->whereHas('task.plan.story.feature', fn ($qq) => $qq->whereIn('project_id', $this->projectIds));
             })
             ->count();
     }
@@ -74,9 +75,9 @@ new #[Title('Dashboard')] class extends Component {
     {
         return AgentRun::query()
             ->whereHasMorph('runnable', [Subtask::class], function ($q) {
-                $q->whereHas('task.story.feature', fn ($qq) => $qq->whereIn('project_id', $this->projectIds));
+                $q->whereHas('task.plan.story.feature', fn ($qq) => $qq->whereIn('project_id', $this->projectIds));
             })
-            ->with('runnable.task.plan', 'runnable.task.story.feature.project', 'repo')
+            ->with('runnable.task.plan', 'runnable.task.plan.story.feature.project', 'repo')
             ->latest('id')
             ->limit(5)
             ->get();
@@ -252,10 +253,10 @@ new #[Title('Dashboard')] class extends Component {
             </div>
             @forelse ($this->recentRuns as $run)
                 @php
-                    $runHref = $run->runnable && $run->runnable->task?->story
+                    $runHref = $run->runnable && $run->runnable->task?->plan?->story
                         ? route('runs.show', [
-                            'project' => $run->runnable->task->story->feature->project_id,
-                            'story' => $run->runnable->task->story->id,
+                            'project' => $run->runnable->task->plan->story->feature->project_id,
+                            'story' => $run->runnable->task->plan->story->id,
                             'subtask' => $run->runnable->id,
                             'run' => $run->id,
                         ])

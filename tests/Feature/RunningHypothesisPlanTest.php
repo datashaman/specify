@@ -31,7 +31,7 @@ function makeApprovedTask(): Task
     $story = Story::factory()->create(['status' => StoryStatus::Approved, 'revision' => 1]);
     $ac = AcceptanceCriterion::factory()->for($story)->create(['position' => 1]);
 
-    return Task::factory()->for($story)->create([
+    return Task::factory()->forStory($story)->create([
         'name' => 'wire CSV export',
         'position' => 1,
         'acceptance_criterion_id' => $ac->id,
@@ -41,7 +41,7 @@ function makeApprovedTask(): Task
 test('PlanWriter::appendProposedSubtasks appends without resetting Story approval (ADR-0005 carve-out)', function () {
     $task = makeApprovedTask();
     Subtask::factory()->for($task)->create(['position' => 1, 'name' => 'first', 'status' => TaskStatus::Done]);
-    $story = $task->story;
+    $story = $task->plan->story;
 
     $run = AgentRun::create([
         'runnable_type' => Subtask::class,
@@ -139,7 +139,7 @@ test('SubtaskRunPipeline does NOT append proposed subtasks when the run ends in 
     // would be orphaned under a Task whose run was marked Failed.
     $task = makeApprovedTask();
     $subtask = Subtask::factory()->for($task)->create(['name' => 'main', 'position' => 1]);
-    $repo = Repo::factory()->for($task->story->feature->project->team->workspace)->create();
+    $repo = Repo::factory()->for($task->plan->story->feature->project->team->workspace)->create();
     $run = AgentRun::create([
         'runnable_type' => Subtask::class,
         'runnable_id' => $subtask->getKey(),
@@ -208,7 +208,7 @@ test('SubtaskRunPipeline does NOT append proposed subtasks when the run ends in 
 test('alreadyComplete returns the Succeeded-class outcome when evidence SHAs are reachable from HEAD (ADR-0007)', function () {
     $task = makeApprovedTask();
     $subtask = Subtask::factory()->for($task)->create(['name' => 'already-done', 'position' => 1]);
-    $repo = Repo::factory()->for($task->story->feature->project->team->workspace)->create();
+    $repo = Repo::factory()->for($task->plan->story->feature->project->team->workspace)->create();
     $run = AgentRun::create([
         'runnable_type' => Subtask::class,
         'runnable_id' => $subtask->getKey(),
@@ -281,7 +281,7 @@ test('alreadyComplete returns the Succeeded-class outcome when evidence SHAs are
 test('alreadyComplete falls through to noDiff when evidence is empty (ADR-0007 safety net)', function () {
     $task = makeApprovedTask();
     $subtask = Subtask::factory()->for($task)->create(['name' => 'sus-claim', 'position' => 1]);
-    $repo = Repo::factory()->for($task->story->feature->project->team->workspace)->create();
+    $repo = Repo::factory()->for($task->plan->story->feature->project->team->workspace)->create();
     $run = AgentRun::create([
         'runnable_type' => Subtask::class,
         'runnable_id' => $subtask->getKey(),
@@ -350,7 +350,7 @@ test('alreadyComplete falls through to noDiff when evidence is empty (ADR-0007 s
 test('alreadyComplete falls through to noDiff when ANY cited SHA is unreachable, even if others verify (ADR-0007 all-or-nothing)', function () {
     $task = makeApprovedTask();
     $subtask = Subtask::factory()->for($task)->create(['name' => 'partial-claim', 'position' => 1]);
-    $repo = Repo::factory()->for($task->story->feature->project->team->workspace)->create();
+    $repo = Repo::factory()->for($task->plan->story->feature->project->team->workspace)->create();
     $run = AgentRun::create([
         'runnable_type' => Subtask::class,
         'runnable_id' => $subtask->getKey(),
@@ -421,7 +421,7 @@ test('alreadyComplete falls through to noDiff when ANY cited SHA is unreachable,
 test('alreadyComplete falls through to noDiff when none of the cited SHAs are reachable (ADR-0007 safety net)', function () {
     $task = makeApprovedTask();
     $subtask = Subtask::factory()->for($task)->create(['name' => 'hallucinated', 'position' => 1]);
-    $repo = Repo::factory()->for($task->story->feature->project->team->workspace)->create();
+    $repo = Repo::factory()->for($task->plan->story->feature->project->team->workspace)->create();
     $run = AgentRun::create([
         'runnable_type' => Subtask::class,
         'runnable_id' => $subtask->getKey(),
@@ -513,7 +513,7 @@ test('CliExecutor returns false/empty when the sentinel is absent', function () 
 test('context_brief is persisted on AgentRun.output even when the run ends in noDiff', function () {
     $task = makeApprovedTask();
     $subtask = Subtask::factory()->for($task)->create(['name' => 'main', 'position' => 1]);
-    $repo = Repo::factory()->for($task->story->feature->project->team->workspace)->create();
+    $repo = Repo::factory()->for($task->plan->story->feature->project->team->workspace)->create();
     $run = AgentRun::create([
         'runnable_type' => Subtask::class,
         'runnable_id' => $subtask->getKey(),

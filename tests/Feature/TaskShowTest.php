@@ -25,9 +25,9 @@ function taskShowScene(): array
     $ac = AcceptanceCriterion::create([
         'story_id' => $story->id,
         'position' => 1,
-        'criterion' => 'Users can edit a story.',
+        'statement' => 'Users can edit a story.',
     ]);
-    $task = Task::factory()->for($story)->create([
+    $task = Task::factory()->forStory($story)->create([
         'name' => 'Add edit form',
         'position' => 1,
         'status' => TaskStatus::InProgress,
@@ -63,7 +63,7 @@ test('task show 404s when task is outside the user accessible projects', functio
     $otherProject = Project::factory()->for($otherTeam)->create();
     $otherFeature = Feature::factory()->for($otherProject)->create();
     $otherStory = Story::factory()->for($otherFeature)->create();
-    $otherTask = Task::factory()->for($otherStory)->create();
+    $otherTask = Task::factory()->forStory($otherStory)->create();
 
     $this->actingAs($user);
 

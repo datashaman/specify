@@ -38,7 +38,7 @@ function approvedSubtaskForRace(): Subtask
     ]);
 
     $ac = $story->acceptanceCriteria()->first() ?? AcceptanceCriterion::factory()->for($story)->create();
-    $task = Task::factory()->for($story)->create(['acceptance_criterion_id' => $ac->id, 'position' => 0]);
+    $task = Task::factory()->forStory($story)->create(['acceptance_criterion_id' => $ac->id, 'position' => 0]);
     Subtask::factory()->for($task)->create(['position' => 0, 'name' => 'race-me']);
 
     $story->forceFill(['status' => StoryStatus::Draft->value])->save();

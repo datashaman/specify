@@ -22,9 +22,9 @@ final class ConflictResolutionPrompt
         int $pullRequestNumber,
         array $unmergedPaths,
     ): string {
-        $subtask->loadMissing('task.story', 'task.acceptanceCriterion');
+        $subtask->loadMissing('task.plan.story', 'task.acceptanceCriterion');
         $task = $subtask->task;
-        $story = $task?->story;
+        $story = $task?->plan?->story;
         $criterion = $task?->acceptanceCriterion?->statement;
 
         $criterionBlock = $criterion ? "Acceptance Criterion: {$criterion}\n\n" : '';

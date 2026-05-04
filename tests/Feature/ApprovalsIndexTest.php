@@ -39,7 +39,7 @@ test('approvals board shows separate story and plan queues', function () {
         'status' => StoryStatus::Approved,
         'name' => 'Plan queue item',
     ]);
-    $task = Task::factory()->for($planStory)->create(['position' => 1]);
+    $task = Task::factory()->forStory($planStory)->create(['position' => 1]);
     $task->plan->forceFill(['status' => PlanStatus::PendingApproval->value, 'name' => 'Execution plan'])->save();
 
     $this->actingAs($user);

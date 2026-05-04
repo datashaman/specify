@@ -15,10 +15,6 @@ return new class extends Migration
             $table->text('outcome')->nullable()->after('intent');
         });
 
-        Schema::table('acceptance_criteria', function (Blueprint $table) {
-            $table->renameColumn('criterion', 'statement');
-        });
-
         Schema::create('scenarios', function (Blueprint $table) {
             $table->id();
             $table->foreignId('story_id')->constrained()->cascadeOnDelete();
@@ -45,8 +41,7 @@ return new class extends Migration
         });
 
         Schema::table('tasks', function (Blueprint $table) {
-            $table->foreignId('story_id')->after('plan_id')->constrained()->cascadeOnDelete();
-            $table->foreignId('acceptance_criterion_id')->nullable()->after('story_id')
+            $table->foreignId('acceptance_criterion_id')->nullable()->after('plan_id')
                 ->constrained('acceptance_criteria')->nullOnDelete();
             $table->foreignId('scenario_id')->nullable()->after('acceptance_criterion_id')
                 ->constrained('scenarios')->nullOnDelete();
@@ -58,7 +53,6 @@ return new class extends Migration
         Schema::table('tasks', function (Blueprint $table) {
             $table->dropConstrainedForeignId('scenario_id');
             $table->dropConstrainedForeignId('acceptance_criterion_id');
-            $table->dropConstrainedForeignId('story_id');
         });
 
         Schema::table('plans', function (Blueprint $table) {
@@ -66,10 +60,6 @@ return new class extends Migration
         });
 
         Schema::dropIfExists('scenarios');
-
-        Schema::table('acceptance_criteria', function (Blueprint $table) {
-            $table->renameColumn('statement', 'criterion');
-        });
 
         Schema::table('stories', function (Blueprint $table) {
             $table->dropColumn(['kind', 'actor', 'intent', 'outcome']);

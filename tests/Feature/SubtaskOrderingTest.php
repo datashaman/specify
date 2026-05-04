@@ -11,7 +11,7 @@ uses(RefreshDatabase::class);
 
 test('a subtask is only actionable when all lower-position siblings in the same task are Done', function () {
     $story = Story::factory()->create();
-    $task = Task::factory()->for($story)->create(['position' => 0]);
+    $task = Task::factory()->forStory($story)->create(['position' => 0]);
     $a = Subtask::factory()->for($task)->create(['position' => 0, 'status' => TaskStatus::Pending]);
     $b = Subtask::factory()->for($task)->create(['position' => 1, 'status' => TaskStatus::Pending]);
     $c = Subtask::factory()->for($task)->create(['position' => 2, 'status' => TaskStatus::Pending]);
@@ -32,10 +32,10 @@ test('a subtask is only actionable when all lower-position siblings in the same 
 
 test('subtasks of a task with unfinished dependencies are not actionable', function () {
     $story = Story::factory()->create();
-    $blocker = Task::factory()->for($story)->create(['position' => 0, 'status' => TaskStatus::Pending]);
+    $blocker = Task::factory()->forStory($story)->create(['position' => 0, 'status' => TaskStatus::Pending]);
     Subtask::factory()->for($blocker)->create(['position' => 0]);
 
-    $dependent = Task::factory()->for($story)->create(['position' => 1, 'status' => TaskStatus::Pending]);
+    $dependent = Task::factory()->forStory($story)->create(['position' => 1, 'status' => TaskStatus::Pending]);
     Subtask::factory()->for($dependent)->create(['position' => 0]);
     $dependent->addDependency($blocker);
 
