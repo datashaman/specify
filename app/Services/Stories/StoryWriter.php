@@ -12,6 +12,10 @@ use Illuminate\Support\Facades\DB;
 
 class StoryWriter
 {
+    public function __construct(
+        private readonly AcceptanceCriteriaWriter $criteria,
+    ) {}
+
     /**
      * @param  array{
      *     name: string,
@@ -41,16 +45,56 @@ class StoryWriter
                 'revision' => 1,
             ]);
 
-            AcceptanceCriterion::withoutEvents(function () use ($story, $attributes): void {
-                foreach (array_values($attributes['acceptance_criteria'] ?? []) as $i => $criterion) {
-                    $story->acceptanceCriteria()->create([
-                        'statement' => $criterion,
-                        'position' => $i + 1,
-                    ]);
-                }
-            });
+            $this->createInitialAcceptanceCriteria($story, $attributes['acceptance_criteria'] ?? []);
 
             return $story;
+        });
+    }
+
+    /**
+     * @param  array{
+     *     name?: string,
+     *     kind?: StoryKind,
+     *     actor?: string|null,
+     *     intent?: string|null,
+     *     outcome?: string|null,
+     *     description?: string|null,
+     *     notes?: string|null,
+     *     status?: StoryStatus
+     * }  $changes
+     * @param  list<string>|null  $acceptanceCriteria
+     */
+    public function update(Story $story, array $changes = [], ?array $acceptanceCriteria = null): void
+    {
+        DB::transaction(function () use ($story, $changes, $acceptanceCriteria): void {
+            if ($changes !== []) {
+                if ($acceptanceCriteria !== null) {
+                    Story::withoutRevisionBump(function () use ($story, $changes): void {
+                        $story->fill($changes)->save();
+                    });
+                } else {
+                    $story->fill($changes)->save();
+                }
+            }
+
+            if ($acceptanceCriteria !== null) {
+                $this->criteria->replaceInsideTransaction($story, $acceptanceCriteria);
+            }
+        });
+    }
+
+    /**
+     * @param  array<int|string, string>  $criteria
+     */
+    private function createInitialAcceptanceCriteria(Story $story, array $criteria): void
+    {
+        AcceptanceCriterion::withoutEvents(function () use ($story, $criteria): void {
+            foreach (array_values($criteria) as $i => $criterion) {
+                $story->acceptanceCriteria()->create([
+                    'statement' => $criterion,
+                    'position' => $i + 1,
+                ]);
+            }
         });
     }
 }

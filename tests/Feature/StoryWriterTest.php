@@ -1,9 +1,13 @@
 <?php
 
+use App\Enums\PlanStatus;
 use App\Enums\StoryStatus;
 use App\Mcp\Tools\CreateStoryTool;
+use App\Models\ApprovalPolicy;
 use App\Models\Feature;
+use App\Models\Plan;
 use App\Models\Project;
+use App\Models\Story;
 use App\Models\Team;
 use App\Models\User;
 use App\Models\Workspace;
@@ -59,4 +63,59 @@ test('story writer normalizes keyed initial acceptance criteria before assigning
     expect($story->fresh()->revision)->toBe(1)
         ->and($story->acceptanceCriteria()->orderBy('position')->pluck('position')->all())
         ->toBe([1, 2]);
+});
+
+test('story writer updates story contract fields as one content revision', function () {
+    $workspace = Workspace::factory()->create();
+    $team = Team::factory()->for($workspace)->create();
+    $story = Story::factory()
+        ->for(Feature::factory()->for(Project::factory()->for($team)))
+        ->create(['status' => StoryStatus::Approved, 'revision' => 1]);
+    ApprovalPolicy::create([
+        'scope_type' => ApprovalPolicy::SCOPE_PROJECT,
+        'scope_id' => $story->feature->project_id,
+        'required_approvals' => 1,
+    ]);
+    $plan = Plan::factory()->for($story)->create(['status' => PlanStatus::Approved]);
+    $story->forceFill(['current_plan_id' => $plan->getKey()])->save();
+
+    app(StoryWriter::class)->update($story, [
+        'name' => 'Renamed story',
+        'description' => 'Updated product contract.',
+    ]);
+
+    $fresh = $story->fresh()->load('currentPlan');
+
+    expect($fresh->name)->toBe('Renamed story')
+        ->and($fresh->description)->toBe('Updated product contract.')
+        ->and($fresh->revision)->toBe(2)
+        ->and($fresh->status)->toBe(StoryStatus::PendingApproval)
+        ->and($fresh->currentPlan->status)->toBe(PlanStatus::PendingApproval);
+});
+
+test('story writer combines field updates and criteria replacement into one content revision', function () {
+    $workspace = Workspace::factory()->create();
+    $team = Team::factory()->for($workspace)->create();
+    $story = Story::factory()
+        ->for(Feature::factory()->for(Project::factory()->for($team)))
+        ->create(['status' => StoryStatus::Approved, 'revision' => 1]);
+    ApprovalPolicy::create([
+        'scope_type' => ApprovalPolicy::SCOPE_PROJECT,
+        'scope_id' => $story->feature->project_id,
+        'required_approvals' => 1,
+    ]);
+
+    app(StoryWriter::class)->update(
+        $story,
+        ['name' => 'Renamed story'],
+        ['New one', 'New two'],
+    );
+
+    $fresh = $story->fresh();
+
+    expect($fresh->name)->toBe('Renamed story')
+        ->and($fresh->revision)->toBe(2)
+        ->and($fresh->status)->toBe(StoryStatus::PendingApproval)
+        ->and($fresh->acceptanceCriteria()->orderBy('position')->pluck('statement')->all())
+        ->toBe(['New one', 'New two']);
 });
