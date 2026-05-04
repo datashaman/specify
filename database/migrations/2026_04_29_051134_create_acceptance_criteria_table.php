@@ -17,6 +17,7 @@ return new class extends Migration
             $table->unsignedInteger('position')->default(0);
             $table->text('statement');
             $table->timestamps();
+            $table->unique(['story_id', 'position']);
         });
     }
 

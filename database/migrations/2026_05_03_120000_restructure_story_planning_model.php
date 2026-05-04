@@ -27,7 +27,7 @@ return new class extends Migration
             $table->text('notes')->nullable();
             $table->timestamps();
 
-            $table->index(['story_id', 'position']);
+            $table->unique(['story_id', 'position']);
         });
 
         Schema::table('plans', function (Blueprint $table) {

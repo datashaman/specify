@@ -24,11 +24,16 @@ return new class extends Migration
                     DB::table('stories')->where('id', $row->id)->update(['position' => $i + 1]);
                 });
             });
+
+        Schema::table('stories', function (Blueprint $table) {
+            $table->unique(['feature_id', 'position']);
+        });
     }
 
     public function down(): void
     {
         Schema::table('stories', function (Blueprint $table) {
+            $table->dropUnique(['feature_id', 'position']);
             $table->dropColumn('position');
         });
     }
