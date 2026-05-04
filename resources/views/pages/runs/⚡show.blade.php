@@ -228,7 +228,7 @@ new #[Title('Run')] class extends Component {
                             variant="primary"
                             icon="arrow-path"
                             wire:click="retry"
-                            wire:confirm="{{ __('Dispatch a fresh AgentRun for this subtask? The new run is authorised against the current StoryApproval.') }}"
+                            wire:confirm="{{ __('Dispatch a fresh AgentRun for this subtask? The new run is authorised against the current PlanApproval.') }}"
                             class="ml-auto"
                             data-action="retry-run"
                         >{{ __('Retry') }}</flux:button>

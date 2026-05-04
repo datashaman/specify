@@ -17,9 +17,9 @@ use RuntimeException;
  * Append-only record of one AI dispatch — task generation or subtask execution.
  *
  * `runnable` is polymorphic over Story (for task generation) and Subtask
- * (for execution). `authorizing_approval` ties the run back to the
- * StoryApproval that authorised it. Stores the agent's input, output, diff,
- * token usage, and timing for audit and replay.
+ * (for execution). `authorizing_approval` ties task generation to a
+ * StoryApproval and subtask execution to a PlanApproval. Stores the agent's
+ * input, output, diff, token usage, and timing for audit and replay.
  *
  * `kind` distinguishes the historical `Execute` run (produces the Subtask
  * diff and opens a PR) from `RespondToReview` (ADR-0008 — pushes a
