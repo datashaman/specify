@@ -2,12 +2,12 @@
 
 namespace App\Models;
 
-use App\Enums\AgentRunKind;
 use App\Enums\StoryKind;
 use App\Enums\StoryStatus;
 use App\Models\Concerns\HasSlug;
 use App\Services\ApprovalService;
 use App\Services\Stories\StoryPullRequestProjection;
+use App\Services\Stories\StoryRunProjection;
 use Database\Factories\StoryFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -140,13 +140,7 @@ class Story extends Model
      */
     public function hasActiveSubtaskRun(): bool
     {
-        return AgentRun::query()
-            ->where('runnable_type', Subtask::class)
-            ->whereIn('runnable_id', Subtask::query()
-                ->whereIn('task_id', $this->tasks()->select('tasks.id'))
-                ->select('id'))
-            ->active()
-            ->exists();
+        return app(StoryRunProjection::class)->hasActiveSubtaskRun($this);
     }
 
     /**
@@ -154,16 +148,7 @@ class Story extends Model
      */
     public function activeConflictResolutionAgentRun(): ?AgentRun
     {
-        return AgentRun::query()
-            ->where('runnable_type', Subtask::class)
-            ->whereIn('runnable_id', Subtask::query()
-                ->whereIn('task_id', $this->tasks()->select('tasks.id'))
-                ->select('id'))
-            ->where('kind', AgentRunKind::ResolveConflicts->value)
-            ->active()
-            ->with('runnable')
-            ->latest('id')
-            ->first();
+        return app(StoryRunProjection::class)->activeConflictResolutionRun($this);
     }
 
     public function creator(): BelongsTo
