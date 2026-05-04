@@ -50,6 +50,22 @@ class StoryRevisionLifecycle
         $story->revision = ($story->revision ?? 1) + 1;
     }
 
+    public function recordContentArtifactChanged(Story $story): void
+    {
+        Story::withoutRevisionBump(function () use ($story): void {
+            $story->forceFill([
+                'status' => $story->status === StoryStatus::Draft
+                    ? StoryStatus::Draft
+                    : StoryStatus::PendingApproval,
+                'revision' => ($story->revision ?? 1) + 1,
+            ])->save();
+        });
+
+        $story->currentPlan()->first()?->reopenForApproval();
+
+        $this->approvals->recompute($story->fresh());
+    }
+
     /**
      * @param  callable(callable(): void): void  $withoutRevisionBump
      */
