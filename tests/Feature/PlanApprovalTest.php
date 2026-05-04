@@ -109,6 +109,27 @@ test('draft plans cannot be pre-approved before submission', function () {
         ->toThrow(RuntimeException::class, 'submitted');
 });
 
+test('only the current plan can be submitted for approval', function () {
+    $currentPlan = makePlan();
+    $otherPlan = Plan::factory()->for($currentPlan->story)->create(['version' => 2]);
+    Task::factory()->for($otherPlan)->create(['position' => 1]);
+
+    expect(fn () => $otherPlan->submitForApproval())
+        ->toThrow(RuntimeException::class, 'current plan');
+});
+
+test('only the current plan can receive approval decisions', function () {
+    $currentPlan = makePlan();
+    $otherPlan = Plan::factory()->for($currentPlan->story)->create([
+        'version' => 2,
+        'status' => PlanStatus::PendingApproval,
+    ]);
+    $approver = User::factory()->create();
+
+    expect(fn () => app(ApprovalService::class)->recordPlanDecision($otherPlan, $approver, ApprovalDecision::Approve))
+        ->toThrow(RuntimeException::class, 'current plan');
+});
+
 test('plan approval rows are immutable', function () {
     $plan = makePlan();
     policyForPlan(ApprovalPolicy::SCOPE_PROJECT, $plan->story->feature->project_id, ['required_approvals' => 1]);

@@ -13,6 +13,10 @@ class PlanApprovalLifecycle
 
     public function submit(Plan $plan): void
     {
+        if (! $plan->isCurrent()) {
+            throw new RuntimeException('Only the story\'s current plan can be submitted for approval.');
+        }
+
         if ($plan->status === PlanStatus::Rejected) {
             throw new RuntimeException('Cannot submit a rejected plan.');
         }

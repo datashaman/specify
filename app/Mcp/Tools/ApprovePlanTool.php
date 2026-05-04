@@ -3,6 +3,7 @@
 namespace App\Mcp\Tools;
 
 use App\Enums\ApprovalDecision;
+use App\Mcp\Concerns\RecordsApprovalDecisions;
 use App\Mcp\Concerns\ResolvesProjectAccess;
 use App\Services\ApprovalService;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
@@ -11,9 +12,10 @@ use Laravel\Mcp\Response;
 use Laravel\Mcp\Server\Attributes\Description;
 use Laravel\Mcp\Server\Tool;
 
-#[Description('Record an Approve decision on a plan. Authorisation: user must have approver rights in the plan’s project. Notes optional.')]
+#[Description('Record an Approve decision on the story’s current plan. Authorisation: user must have approver rights in the plan’s project. Notes optional.')]
 class ApprovePlanTool extends Tool
 {
+    use RecordsApprovalDecisions;
     use ResolvesProjectAccess;
 
     protected string $name = 'approve-plan';
@@ -30,37 +32,25 @@ class ApprovePlanTool extends Tool
             'notes' => ['nullable', 'string'],
         ]);
 
-        $plan = $this->resolveAccessiblePlan($validated['plan_id'], $user);
+        $plan = $this->resolveCurrentPlanForApproval($validated['plan_id'], $user);
         if ($plan instanceof Response) {
             return $plan;
         }
 
-        $project = $plan->story?->feature?->project;
-        if (! $project || ! $user->canApproveInProject($project)) {
-            return Response::error('You do not have approver rights in this project.');
-        }
-
         try {
-            $approval = $approvals->recordPlanDecision($plan, $user, ApprovalDecision::Approve, $validated['notes'] ?? null);
+            $decision = ApprovalDecision::Approve;
+            $approval = $approvals->recordPlanDecision($plan, $user, $decision, $validated['notes'] ?? null);
         } catch (\Throwable $e) {
             return Response::error($e->getMessage());
         }
 
-        $plan->refresh();
-
-        return Response::json([
-            'approval_id' => $approval->id,
-            'plan_id' => $plan->id,
-            'story_id' => $plan->story_id,
-            'plan_status' => $plan->status?->value,
-            'decision' => 'approve',
-        ]);
+        return $this->planApprovalResponse($plan, $approval, $decision);
     }
 
     public function schema(JsonSchema $schema): array
     {
         return [
-            'plan_id' => $schema->integer()->description('Plan to approve.')->required(),
+            'plan_id' => $schema->integer()->description('Current plan to approve.')->required(),
             'notes' => $schema->string()->description('Optional approval notes.'),
         ];
     }
