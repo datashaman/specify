@@ -56,7 +56,7 @@ test('status filter narrows the list', function () {
         ->assertDontSee('draft-story');
 });
 
-test('story summary labels task progress as current-plan tasks', function () {
+test('story summary labels task progress as current Plan Tasks', function () {
     ['user' => $user, 'project' => $project, 'feature' => $feature] = storyIndexScene();
     $story = Story::factory()->for($feature)->create(['name' => 'planned-story', 'status' => StoryStatus::Approved]);
     Task::factory()->forCurrentPlanOf($story)->create(['status' => TaskStatus::Done]);
@@ -66,7 +66,7 @@ test('story summary labels task progress as current-plan tasks', function () {
 
     Livewire::test('pages::stories.index', ['project' => $project->id])
         ->assertSee('planned-story')
-        ->assertSee('1/2 current-plan tasks')
+        ->assertSee('1/2 current Plan Tasks')
         ->assertDontSee('1/2 tasks');
 });
 

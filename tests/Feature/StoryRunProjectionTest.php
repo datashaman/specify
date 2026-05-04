@@ -60,3 +60,62 @@ test('story run projection returns latest active conflict resolution run', funct
     expect($result)->not->toBeNull()
         ->and($result->id)->toBe($running->id);
 });
+
+test('story run projection prepares current plan activity view data', function () {
+    $story = Story::factory()->create();
+    $ac = $story->acceptanceCriteria()->create([
+        'position' => 1,
+        'statement' => 'The current plan maps work to this AC.',
+    ]);
+    $task = Task::factory()->forCurrentPlanOf($story)->create([
+        'acceptance_criterion_id' => $ac->getKey(),
+    ]);
+    $subtask = Subtask::factory()->for($task)->create();
+    $older = AgentRun::factory()->create([
+        'runnable_type' => Subtask::class,
+        'runnable_id' => $subtask->id,
+        'status' => AgentRunStatus::Succeeded,
+        'working_branch' => 'specify/older',
+    ]);
+    $latest = AgentRun::factory()->create([
+        'runnable_type' => Subtask::class,
+        'runnable_id' => $subtask->id,
+        'status' => AgentRunStatus::Running,
+        'working_branch' => 'specify/latest',
+    ]);
+    $planRun = AgentRun::factory()->create([
+        'runnable_type' => Story::class,
+        'runnable_id' => $story->id,
+        'status' => AgentRunStatus::Succeeded,
+    ]);
+
+    $data = app(StoryRunProjection::class)->currentPlanViewData($story->fresh()->load([
+        'acceptanceCriteria',
+        'currentPlanTasks.subtasks.agentRuns.repo',
+    ]));
+
+    expect($data['tasksByAc']->get($ac->getKey())->first()->id)->toBe($task->id)
+        ->and($data['branch'])->toBe('specify/latest')
+        ->and($data['planGenRuns']->pluck('id')->all())->toBe([$planRun->id])
+        ->and($older->id)->toBeLessThan($latest->id);
+});
+
+test('story run projection limits plan generation run payload', function () {
+    $story = Story::factory()->create();
+
+    foreach (range(1, 30) as $i) {
+        AgentRun::factory()->create([
+            'runnable_type' => Story::class,
+            'runnable_id' => $story->id,
+            'status' => AgentRunStatus::Succeeded,
+            'output' => ['large' => str_repeat('x', 100)],
+            'diff' => str_repeat('y', 100),
+        ]);
+    }
+
+    $runs = app(StoryRunProjection::class)->planGenerationRuns($story);
+
+    expect($runs)->toHaveCount(25)
+        ->and($runs->first()->getAttributes())->toHaveKeys(['id', 'status', 'finished_at', 'error_message'])
+        ->and($runs->first()->getAttributes())->not->toHaveKeys(['output', 'diff']);
+});

@@ -65,7 +65,7 @@ Voice and scope, very important:
 - An ACCEPTANCE CRITERION is a short, atomic, observable rule. Do not put whole Given/When/Then scenarios here.
 - A SCENARIO holds Given/When/Then behaviour examples.
 - A PLAN is the implementation interpretation of a story.
-- Plans have their own approval lifecycle. Story approval gates the product contract; current-plan approval gates execution.
+- Plans have their own approval lifecycle. Story approval gates the product contract; current plan approval gates execution.
 - A TASK is an actionable work item under a plan. A SUBTASK is the executor-sized engineering step.
 
 Never put schemas, class names, file paths, or migration steps in a feature or story description — that belongs in plans, tasks, or subtasks.

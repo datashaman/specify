@@ -7,9 +7,12 @@ use App\Models\AgentRun;
 use App\Models\Story;
 use App\Models\Subtask;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Collection;
 
 class StoryRunProjection
 {
+    private const PLAN_GENERATION_RUN_LIMIT = 25;
+
     public function hasActiveSubtaskRun(Story $story): bool
     {
         return AgentRun::query()
@@ -29,6 +32,60 @@ class StoryRunProjection
             ->with('runnable')
             ->latest('id')
             ->first();
+    }
+
+    /**
+     * Story-runnable AgentRuns: plan-generation runs, latest first.
+     *
+     * @return Collection<int, AgentRun>
+     */
+    public function planGenerationRuns(Story $story): Collection
+    {
+        return AgentRun::query()
+            ->where('runnable_type', Story::class)
+            ->where('runnable_id', $story->getKey())
+            ->latest('id')
+            ->limit(self::PLAN_GENERATION_RUN_LIMIT)
+            ->get(['id', 'runnable_type', 'runnable_id', 'status', 'finished_at', 'error_message']);
+    }
+
+    public function latestCurrentPlanRun(Story $story): ?AgentRun
+    {
+        return AgentRun::query()
+            ->where('runnable_type', Subtask::class)
+            ->whereIn('runnable_id', $this->subtaskIdQueryFor($story))
+            ->with('repo')
+            ->latest('id')
+            ->first(['id', 'runnable_type', 'runnable_id', 'repo_id', 'working_branch']);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function currentPlanViewData(Story $story): array
+    {
+        $story->loadMissing([
+            'acceptanceCriteria',
+            'currentPlanTasks.acceptanceCriterion',
+            'currentPlanTasks.scenario',
+            'currentPlanTasks.dependencies',
+            'currentPlanTasks.subtasks.agentRuns.repo',
+        ]);
+
+        $tasksByAc = $story->currentPlanTasks->groupBy('acceptance_criterion_id');
+        $latestRun = $this->latestCurrentPlanRun($story);
+
+        return [
+            'story' => $story,
+            'tasksByAc' => $tasksByAc,
+            'unmappedTasks' => $tasksByAc->get(null, collect())->sortBy('position')->values(),
+            'acs' => $story->acceptanceCriteria->sortBy('position')->values(),
+            'subtaskCount' => $story->currentPlanTasks->reduce(fn ($acc, $task) => $acc + $task->subtasks->count(), 0),
+            'shouldRunMode' => $this->hasActiveSubtaskRun($story),
+            'branch' => $latestRun?->working_branch,
+            'repo' => $latestRun?->repo,
+            'planGenRuns' => $this->planGenerationRuns($story),
+        ];
     }
 
     private function subtaskIdQueryFor(Story $story): Builder
