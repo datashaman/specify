@@ -3,7 +3,7 @@
         <div class="flex flex-wrap items-center gap-x-3 gap-y-1">
             <flux:heading size="lg">{{ __('Current plan') }}</flux:heading>
             <flux:text class="text-xs text-zinc-500">
-                {{ $acs->count() }} {{ __('ACs') }} · {{ $story->currentPlanTasks->count() }} {{ __('current-plan tasks') }} · {{ $subtaskCount }} {{ __('subtasks') }}
+                {{ $acs->count() }} {{ __('ACs') }} · {{ $story->currentPlanTasks->count() }} {{ __('current Plan Tasks') }} · {{ $subtaskCount }} {{ __('Subtasks') }}
                 @if ($story->currentPlan)
                     · {{ __('current') }} {{ $story->currentPlan->name ?? ('v'.$story->currentPlan->version) }}
                 @endif
@@ -69,7 +69,7 @@
                 </summary>
 
                 @if ($acTasks->isEmpty())
-                    <flux:text class="mt-2 text-xs text-zinc-500">{{ __('No current-plan task is mapped to this AC yet.') }}</flux:text>
+                    <flux:text class="mt-2 text-xs text-zinc-500">{{ __('No current Plan Task is mapped to this AC yet.') }}</flux:text>
                 @else
                     @foreach ($acTasks as $task)
                         @include('partials.story-task', ['task' => $task])
@@ -89,7 +89,7 @@
         <flux:card data-ac="unmapped">
             <details :open="planRunMode">
                 <summary class="cursor-pointer text-sm font-medium">
-                    {{ __('Current-plan tasks not mapped to an AC') }} ({{ $unmappedTasks->count() }})
+                    {{ __('Current Plan Tasks not mapped to an AC') }} ({{ $unmappedTasks->count() }})
                 </summary>
                 @foreach ($unmappedTasks as $task)
                     @include('partials.story-task', ['task' => $task])

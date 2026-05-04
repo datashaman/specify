@@ -9,6 +9,7 @@ use App\Models\AgentRun;
 use App\Models\Story;
 use App\Services\Stories\StoryContractEditor;
 use App\Services\Stories\StoryPageWorkflow;
+use App\Services\Stories\StoryRunProjection;
 use Illuminate\Support\Facades\Auth;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Title;
@@ -579,23 +580,6 @@ new #[Title('Story')] class extends Component {
     }
 
     /**
-     * Story-runnable AgentRuns: plan-generation runs, latest first.
-     */
-    #[Computed]
-    public function planGenerationRuns()
-    {
-        if (! $this->story) {
-            return collect();
-        }
-
-        return AgentRun::query()
-            ->where('runnable_type', Story::class)
-            ->where('runnable_id', $this->story_id)
-            ->latest('id')
-            ->get();
-    }
-
-    /**
      * @return array<string, mixed>
      */
     #[Computed]
@@ -606,20 +590,7 @@ new #[Title('Story')] class extends Component {
             return [];
         }
 
-        $tasksByAc = $story->currentPlanTasks->groupBy('acceptance_criterion_id');
-        $latestRun = $story->currentPlanTasks->flatMap->subtasks->flatMap->agentRuns->sortByDesc('id')->first();
-
-        return [
-            'story' => $story,
-            'tasksByAc' => $tasksByAc,
-            'unmappedTasks' => $tasksByAc->get(null, collect())->sortBy('position')->values(),
-            'acs' => $story->acceptanceCriteria->sortBy('position')->values(),
-            'subtaskCount' => $story->currentPlanTasks->reduce(fn ($acc, $task) => $acc + $task->subtasks->count(), 0),
-            'shouldRunMode' => $this->hasActiveSubtaskRun,
-            'branch' => $latestRun?->working_branch,
-            'repo' => $latestRun?->repo,
-            'planGenRuns' => $this->planGenerationRuns,
-        ];
+        return app(StoryRunProjection::class)->currentPlanViewData($story);
     }
 
     /**
