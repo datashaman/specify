@@ -13,7 +13,7 @@ use Laravel\Mcp\Server\Tool;
 /**
  * MCP tool: get-story
  */
-#[Description('Get a story in detail, including its acceptance criteria and task progress counts.')]
+#[Description('Get a story in detail, including product framing, acceptance criteria, scenarios, current Plan metadata, and current-Plan Task progress counts.')]
 class GetStoryTool extends Tool
 {
     use ResolvesProjectAccess;

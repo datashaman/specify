@@ -1,12 +1,28 @@
 <?php
 
+use App\Mcp\Servers\SpecifyServer;
+use App\Mcp\Tools\GenerateTasksTool;
+use App\Mcp\Tools\GetStoryTool;
+use App\Mcp\Tools\GetTaskTool;
+use App\Mcp\Tools\ListTasksTool;
+use App\Mcp\Tools\SetTasksTool;
 use App\Models\AcceptanceCriterion;
+use App\Models\Feature;
 use App\Models\Plan;
 use App\Models\PlanApproval;
+use App\Models\Project;
+use App\Models\Story;
 use App\Models\StoryApproval;
+use App\Models\Subtask;
 use App\Models\Task;
+use App\Models\Team;
+use App\Models\User;
+use App\Models\Workspace;
 use App\Services\ExecutionService;
 use Illuminate\Support\Facades\Schema;
+use Laravel\Mcp\Request;
+use Laravel\Mcp\Server\Attributes\Description;
+use Laravel\Mcp\Server\Attributes\Instructions;
 
 test('tasks are owned by plans and do not carry direct story ownership', function () {
     expect(Schema::hasColumn('tasks', 'plan_id'))->toBeTrue()
@@ -76,6 +92,56 @@ test('task generation prompt allows cross-cutting plan tasks', function () {
         ->and($agent)->not->toContain("'acceptance_criterion_position' => \$schema->integer()->min(1)->required()");
 });
 
+test('mcp instructions and planning tool descriptions speak in current-plan terms', function () {
+    $instructions = serverAttribute(SpecifyServer::class, Instructions::class);
+
+    expect($instructions)->toContain('Project → Feature → Story → AcceptanceCriterion / Scenario → Plan → Task → Subtask')
+        ->and($instructions)->toContain('the current plan owns tasks')
+        ->and($instructions)->toContain('current-plan approval gates execution');
+
+    $descriptions = [
+        GenerateTasksTool::class => descriptionFor(GenerateTasksTool::class),
+        SetTasksTool::class => descriptionFor(SetTasksTool::class),
+        ListTasksTool::class => descriptionFor(ListTasksTool::class),
+        GetTaskTool::class => descriptionFor(GetTaskTool::class),
+        GetStoryTool::class => descriptionFor(GetStoryTool::class),
+    ];
+
+    expect($descriptions[GenerateTasksTool::class])->toContain('fresh current Plan')
+        ->and($descriptions[SetTasksTool::class])->toContain('Replace the story\'s current implementation Plan')
+        ->and($descriptions[ListTasksTool::class])->toContain('Tasks in a story\'s current Plan')
+        ->and($descriptions[GetTaskTool::class])->toContain('Plan-owned Task')
+        ->and($descriptions[GetStoryTool::class])->toContain('current Plan metadata');
+
+    foreach ($descriptions as $description) {
+        expect($description)->not->toContain('tasks attached to a story')
+            ->and($description)->not->toContain('task list for a story')
+            ->and($description)->not->toContain('one acceptance_criterion_id');
+    }
+});
+
+test('list-tasks exposes current plan ownership on every task row', function () {
+    $user = User::factory()->create();
+    $workspace = Workspace::factory()->create();
+    $team = Team::factory()->for($workspace)->create();
+    $team->addMember($user);
+    $project = Project::factory()->for($team)->create();
+    $feature = Feature::factory()->for($project)->create();
+    $story = Story::factory()->for($feature)->create();
+    $task = Task::factory()->forStory($story)->create(['position' => 1]);
+    Subtask::factory()->for($task)->create(['position' => 1]);
+
+    $this->actingAs($user);
+
+    $response = (new ListTasksTool)->handle(new Request(['story_id' => $story->getKey()]));
+    $payload = json_decode((string) $response->content(), true, flags: JSON_THROW_ON_ERROR);
+
+    expect($payload['story_id'])->toBe($story->getKey())
+        ->and($payload['current_plan_id'])->toBe($task->plan_id)
+        ->and($payload['tasks'][0]['id'])->toBe($task->getKey())
+        ->and($payload['tasks'][0]['plan_id'])->toBe($task->plan_id);
+});
+
 function namedParameterType(ReflectionMethod $method, string $parameterName): string
 {
     foreach ($method->getParameters() as $parameter) {
@@ -92,4 +158,25 @@ function namedParameterType(ReflectionMethod $method, string $parameterName): st
     }
 
     return '';
+}
+
+/**
+ * @param  class-string  $class
+ */
+function descriptionFor(string $class): string
+{
+    return serverAttribute($class, Description::class);
+}
+
+/**
+ * @template T of object
+ *
+ * @param  class-string  $class
+ * @param  class-string<T>  $attribute
+ */
+function serverAttribute(string $class, string $attribute): string
+{
+    $attributes = (new ReflectionClass($class))->getAttributes($attribute);
+
+    return $attributes === [] ? '' : $attributes[0]->newInstance()->value;
 }
