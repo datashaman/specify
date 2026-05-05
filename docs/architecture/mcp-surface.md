@@ -63,12 +63,13 @@ checks for:
 - Plan
 
 Tools that start from Task, Subtask, AgentRun, Repo, or WebhookEvent resolve
-the owning Project manually and then call the same `canAccessProject()` rule.
+the owning Project or attached Projects manually, then verify access through
+`canAccessProject()` or the same `accessibleProjectIds()` set.
 
-Approval and repo-management tools add role checks:
+Approval and repo-management tools add Owner/Admin role checks:
 
-- approval decisions require approver rights in the owning Project
-- repo management requires manage rights in the owning Project
+- approval decisions require `User::canApproveInProject()` for the owning Project
+- repo management currently uses the same `User::canApproveInProject()` check
 - project creation requires Owner or Admin in the selected Team
 
 Current role authority comes from `User::canApproveInProject()`, which allows
