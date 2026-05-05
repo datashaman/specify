@@ -123,8 +123,10 @@ independent Tasks, not inside one ordered Task.
 
 `executor_driver` is stamped on every Execute run. `ExecuteSubtaskJob` resolves
 that driver through `ExecutorFactory` immediately before running the pipeline.
-The factory also enforces executor locality: hosted runtime only runs drivers
-declared as remote-safe in `config/specify.php`.
+The factory also enforces executor locality: hosted runtime runs drivers
+declared as remote-safe in `config/specify.php`, plus any local driver names
+explicitly listed in `specify.runtime.remote_executors` for deployments where
+the operator has provided a remote-safe worker.
 
 Single-driver mode creates one Execute run per Subtask using the default
 driver. Race mode creates one sibling Execute run per configured race driver.
