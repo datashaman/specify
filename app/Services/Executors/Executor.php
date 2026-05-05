@@ -10,7 +10,7 @@ use App\Services\Progress\ProgressEmitter;
  * Strategy that performs the engineering work for one Subtask.
  *
  * Implementations are registered in `specify.executor.drivers` and resolved
- * by name via `ExecutorFactory` (see ADR-0003).
+ * by name via `ExecutorFactory` (see ADR-0014).
  * `LaravelAiExecutor`, `CliExecutor`, and `FakeExecutor` cover the in-tree
  * cases; new drivers register a name and implement this contract.
  */

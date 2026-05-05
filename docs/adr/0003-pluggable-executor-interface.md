@@ -1,7 +1,7 @@
 # 0003. Pluggable Executor interface
 
 Date: 2026-05-01
-Status: Accepted
+Status: Superseded by [0014](0014-executor-contract-and-runtime-locality.md)
 
 ## Context
 

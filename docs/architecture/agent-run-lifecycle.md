@@ -6,7 +6,7 @@ which approval context applied, which executor ran, which branch was used,
 what changed, and how the run terminated.
 
 This page describes the current implementation shape. The load-bearing
-decisions are [ADR-0003](../adr/0003-pluggable-executor-interface.md),
+decisions are [ADR-0014](../adr/0014-executor-contract-and-runtime-locality.md),
 [ADR-0004](../adr/0004-pr-after-push-is-non-fatal.md),
 [ADR-0006](../adr/0006-multi-executor-race-mode.md),
 [ADR-0007](../adr/0007-already-complete-subtasks.md),
