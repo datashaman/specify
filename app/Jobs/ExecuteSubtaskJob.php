@@ -60,7 +60,7 @@ class ExecuteSubtaskJob implements ShouldQueue
         $driver = $run->executor_driver ?? $executors->defaultDriver();
 
         try {
-            $executor = $executors->make($driver);
+            $executor = $executors->make($driver, $run);
             $outcome = $pipeline->run($run, $executor);
         } catch (Throwable $e) {
             Log::error('specify.subtask.run.failed', [

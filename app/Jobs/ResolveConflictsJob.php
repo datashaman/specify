@@ -65,7 +65,7 @@ class ResolveConflictsJob implements ShouldQueue
         $driver = $run->executor_driver !== null && $run->executor_driver !== ''
             ? (string) $run->executor_driver
             : $executors->defaultDriver();
-        $executor = $executors->make($driver);
+        $executor = $executors->make($driver, $run);
 
         if (! $executor->needsWorkingDirectory()) {
             $execution->markFailed($run, 'Conflict resolution requires an executor with a working directory (configure a cli or laravel-ai driver in specify.executor).');

@@ -17,6 +17,7 @@ use App\Models\Story;
 use App\Models\StoryApproval;
 use App\Models\Subtask;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
 
@@ -45,6 +46,7 @@ class ExecutionService
         $run = AgentRun::create([
             'runnable_type' => $story->getMorphClass(),
             'runnable_id' => $story->getKey(),
+            'user_id' => Auth::id(),
             'authorizing_approval_type' => $approval?->getMorphClass(),
             'authorizing_approval_id' => $approval?->getKey(),
             'status' => AgentRunStatus::Queued,
@@ -111,6 +113,7 @@ class ExecutionService
             $run = AgentRun::create([
                 'runnable_type' => $originRun->runnable_type,
                 'runnable_id' => $originRun->runnable_id,
+                'user_id' => $originRun->user_id,
                 'repo_id' => $repo->getKey(),
                 'working_branch' => $originRun->working_branch,
                 'executor_driver' => $originRun->executor_driver,
@@ -174,6 +177,7 @@ class ExecutionService
             $run = AgentRun::create([
                 'runnable_type' => $executeRun->runnable_type,
                 'runnable_id' => $executeRun->runnable_id,
+                'user_id' => $executeRun->user_id,
                 'repo_id' => $repo->getKey(),
                 'working_branch' => $executeRun->working_branch,
                 'executor_driver' => $executeRun->executor_driver,
@@ -426,6 +430,7 @@ class ExecutionService
             $repo,
             $driver ?? $fromRun->executor_driver,
             $fromRun->getKey(),
+            $fromRun->user_id,
         );
     }
 

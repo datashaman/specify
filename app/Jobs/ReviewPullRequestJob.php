@@ -4,6 +4,7 @@ namespace App\Jobs;
 
 use App\Ai\Agents\AdrConformanceReviewer;
 use App\Models\AgentRun;
+use App\Services\Ai\ByokProviderResolver;
 use App\Services\Reviews\ReviewComment;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
@@ -27,7 +28,7 @@ class ReviewPullRequestJob implements ShouldQueue
 
     public function __construct(public int $agentRunId) {}
 
-    public function handle(): void
+    public function handle(?ByokProviderResolver $byok = null): void
     {
         $run = AgentRun::find($this->agentRunId);
         if ($run === null) {
@@ -56,7 +57,8 @@ class ReviewPullRequestJob implements ShouldQueue
 
             $files = array_values(array_filter(array_map('strval', $output['files_changed'] ?? [])));
             $reviewer = new AdrConformanceReviewer($adrs, $this->clamp($diff, 32_768), $files);
-            $response = $reviewer->prompt($reviewer->buildPrompt())->toArray();
+            $aiProvider = ($byok ?? app(ByokProviderResolver::class))->forRun($run, AdrConformanceReviewer::class);
+            $response = $reviewer->prompt($reviewer->buildPrompt(), provider: $aiProvider?->provider, model: $aiProvider?->model)->toArray();
 
             $violations = is_array($response['violations'] ?? null) ? $response['violations'] : [];
             $comments = $this->violationsToComments($violations);

@@ -29,6 +29,7 @@ use RuntimeException;
  */
 #[Fillable([
     'runnable_type', 'runnable_id',
+    'user_id',
     'repo_id', 'working_branch', 'executor_driver', 'kind',
     'authorizing_approval_type', 'authorizing_approval_id',
     'status', 'agent_name', 'model_id',
@@ -75,6 +76,11 @@ class AgentRun extends Model
     public function repo(): BelongsTo
     {
         return $this->belongsTo(Repo::class);
+    }
+
+    public function user(): BelongsTo
+    {
+        return $this->belongsTo(User::class);
     }
 
     public function isTerminal(): bool

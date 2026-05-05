@@ -6,6 +6,7 @@ use App\Ai\Agents\TasksGenerator;
 use App\Enums\PlanSource;
 use App\Models\AgentRun;
 use App\Models\Story;
+use App\Services\Ai\ByokProviderResolver;
 use App\Services\ExecutionService;
 use App\Services\Plans\PlanInputNormalizer;
 use App\Services\PlanWriter;
@@ -28,7 +29,7 @@ class GenerateTasksJob implements ShouldQueue
     public function __construct(public int $agentRunId) {}
 
     /** Queue handler — see class docblock. */
-    public function handle(ExecutionService $execution, PlanInputNormalizer $planInputs, PlanWriter $planWriter): void
+    public function handle(ExecutionService $execution, PlanInputNormalizer $planInputs, PlanWriter $planWriter, ?ByokProviderResolver $byok = null): void
     {
         $run = AgentRun::findOrFail($this->agentRunId);
         $story = $run->runnable;
@@ -43,7 +44,8 @@ class GenerateTasksJob implements ShouldQueue
 
         try {
             $agent = new TasksGenerator($story);
-            $response = $agent->prompt($agent->buildPrompt());
+            $provider = ($byok ?? app(ByokProviderResolver::class))->forRun($run, TasksGenerator::class);
+            $response = $agent->prompt($agent->buildPrompt(), provider: $provider?->provider, model: $provider?->model);
             $output = $response->toArray();
 
             $tasks = $planInputs->fromGeneratedTasks($story, $output['tasks'] ?? []);

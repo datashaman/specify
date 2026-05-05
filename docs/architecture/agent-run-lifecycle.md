@@ -26,6 +26,7 @@ Primary fields:
 - `repo_id` points at the repository used by workspace-backed runs.
 - `working_branch` is the branch the executor writes to.
 - `executor_driver` records the concrete executor used for this run.
+- `user_id` records the user whose BYOK credential funds the run.
 - `kind` records why the run exists.
 - `authorizing_approval_type` and `authorizing_approval_id` optionally point
   at the approval row that allowed the run. They may be null when approval was
@@ -122,6 +123,8 @@ independent Tasks, not inside one ordered Task.
 
 `executor_driver` is stamped on every Execute run. `ExecuteSubtaskJob` resolves
 that driver through `ExecutorFactory` immediately before running the pipeline.
+The factory also enforces executor locality: hosted runtime only runs drivers
+declared as remote-safe in `config/specify.php`.
 
 Single-driver mode creates one Execute run per Subtask using the default
 driver. Race mode creates one sibling Execute run per configured race driver.
@@ -129,6 +132,7 @@ Each sibling:
 
 - has the same Subtask runnable
 - records its own `executor_driver`
+- records the triggering `user_id`
 - uses its own branch suffix
 - opens its own PR
 - terminates independently
@@ -204,6 +208,15 @@ about to touch.
 
 The brief is capped and failure-tolerant. If context generation fails, the run
 continues without a brief.
+
+## BYOK
+
+Laravel AI SDK-backed runs resolve credentials from the AgentRun owner. The
+user stores encrypted Anthropic or OpenAI keys in Settings, and each AI job
+registers an explicit per-run provider config before prompting the agent.
+Missing user ownership or missing enabled credentials fails the run before a
+provider call is made. Hosted user-triggered work does not fall back to
+app-global AI provider keys.
 
 ## Progress events
 

@@ -40,6 +40,10 @@ return [
         'api_base' => env('SPECIFY_GITHUB_API_BASE', 'https://api.github.com'),
     ],
 
+    'runtime' => [
+        'environment' => env('SPECIFY_RUNTIME_ENV', 'local'),
+    ],
+
     'gitlab' => [
         'api_base' => env('SPECIFY_GITLAB_API_BASE', 'https://gitlab.com/api/v4'),
     ],
@@ -104,24 +108,29 @@ return [
         'drivers' => [
             'laravel-ai' => [
                 'class' => LaravelAiExecutor::class,
+                'environment' => 'remote',
             ],
             'cli' => [
                 'class' => CliExecutor::class,
+                'environment' => 'local',
                 'command' => array_values(array_filter(explode(' ', (string) env('SPECIFY_CLI_COMMAND', 'claude -p')))),
                 'timeout' => (int) env('SPECIFY_CLI_TIMEOUT', 1800),
             ],
             'cli-claude' => [
                 'class' => CliExecutor::class,
+                'environment' => 'local',
                 'command' => ['claude', '-p'],
                 'timeout' => (int) env('SPECIFY_CLI_TIMEOUT', 1800),
             ],
             'cli-codex' => [
                 'class' => CliExecutor::class,
+                'environment' => 'local',
                 'command' => ['codex', 'exec'],
                 'timeout' => (int) env('SPECIFY_CLI_TIMEOUT', 1800),
             ],
             'fake' => [
                 'class' => FakeExecutor::class,
+                'environment' => 'local',
             ],
         ],
     ],

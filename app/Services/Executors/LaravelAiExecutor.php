@@ -3,8 +3,10 @@
 namespace App\Services\Executors;
 
 use App\Ai\Agents\SubtaskExecutor;
+use App\Models\AgentRun;
 use App\Models\Repo;
 use App\Models\Subtask;
+use App\Services\Ai\ByokProviderResolver;
 use App\Services\Progress\ProgressEmitter;
 use Illuminate\Http\Client\RequestException;
 use Illuminate\Support\Facades\Log;
@@ -21,6 +23,11 @@ use Throwable;
  */
 class LaravelAiExecutor implements Executor
 {
+    public function __construct(
+        private ?ByokProviderResolver $byok = null,
+        private ?AgentRun $run = null,
+    ) {}
+
     public function needsWorkingDirectory(): bool
     {
         return true;
@@ -61,7 +68,15 @@ class LaravelAiExecutor implements Executor
         }
 
         try {
-            $response = $agent->prompt($prompt);
+            if ($this->run === null && ! SubtaskExecutor::isFaked()) {
+                throw new RuntimeException('Laravel AI execution requires an AgentRun owner for BYOK credential resolution.');
+            }
+
+            $byok = $this->run !== null
+                ? ($this->byok ?? app(ByokProviderResolver::class))->forRun($this->run, SubtaskExecutor::class)
+                : null;
+
+            $response = $agent->prompt($prompt, provider: $byok?->provider, model: $byok?->model);
         } catch (RequestException $e) {
             $status = $e->response?->status();
             $body = $e->response?->body();
