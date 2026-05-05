@@ -47,8 +47,10 @@ return [
     | represents an AI provider and API key combination which can be used
     | to perform tasks like text, image, and audio creation via agents.
     |
-    | Specify uses SPECIFY_* env names for Anthropic so CLI tools (e.g. Claude
-    | Code) can keep using ANTHROPIC_API_KEY without colliding with this app.
+    | Specify resolves user-triggered agent calls through per-run BYOK provider
+    | config. BYOK overrides `key` on a temporary per-run provider. These base
+    | provider entries may still read env keys for non-BYOK usage, and supply
+    | shared defaults such as endpoint URLs.
     |
     */
 

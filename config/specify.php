@@ -58,10 +58,10 @@ return [
     |--------------------------------------------------------------------------
     |
     | Drives subtask execution. "laravel-ai" uses the laravel/ai SubtaskExecutor
-    | agent and is describe-only (no filesystem mutation). "cli" spawns an
+    | agent with repo-editing tools and user BYOK credentials. "cli" spawns an
     | external agent CLI in the working directory and observes filesystem
     | changes via git afterward. Any CLI that supports one-shot prompting
-    | works (claude, codex, gemini, aider, …) — supply binary + args.
+    | works (claude, codex, gemini, aider, ...) — supply binary + args.
     |
     */
 
