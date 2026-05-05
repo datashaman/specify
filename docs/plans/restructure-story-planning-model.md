@@ -7,9 +7,18 @@ Related:
 
 ## Status
 
-Implemented by PR #49 and subsequent cleanup through PR #91. This document is retained as historical implementation context; the canonical decisions now live in ADR-0001 and ADR-0002, and the current implementation shape is documented in [`docs/architecture/story-planning-model.md`](../architecture/story-planning-model.md).
+Historical. Implemented by PR #49 and subsequent cleanup through PR #91.
+This document is retained to explain the implementation campaign that moved
+Specify to the current Story/Plan/Task/Subtask structure.
 
-The implementation checklist below is archived, not a live TODO list. Unchecked boxes preserve the original planning shape and should not be read as remaining work after PR #49.
+Do not use this file as a backlog. The canonical decisions now live in
+[ADR-0001](../adr/0001-story-and-plan-approval-gates.md) and
+[ADR-0002](../adr/0002-story-scenario-plan-task-subtask-hierarchy.md), and the
+current implementation shape is documented in
+[`docs/architecture/story-planning-model.md`](../architecture/story-planning-model.md).
+
+The historical implementation targets below preserve the original planning
+shape. They are not open tasks.
 
 Important constraint:
 - Existing Specify data is **not sacred**.
@@ -298,21 +307,21 @@ This avoids mixing durable product structure with archived change history.
 
 ---
 
-## Archived implementation checklist
+## Historical implementation targets
 
 ## 1. Reset the foundational schema
 
 Because existing data is disposable, prefer a clean reset over compatibility work.
 
 ### Tasks
-- [ ] Rewrite or replace the foundational migrations for stories, plans, tasks, and acceptance criteria.
-- [ ] Reintroduce plans as first-class records.
-- [ ] Move tasks back to `plan_id` ownership.
-- [ ] Add `stories.current_plan_id`.
-- [ ] Add the new `scenarios` table.
-- [ ] Add `stories.kind`, `actor`, `intent`, and `outcome`.
-- [ ] Rename acceptance criterion content from `criterion` to `statement`.
-- [ ] Rebuild any task-related FK assumptions around `plan_id` instead of `story_id`.
+- Historical target: Rewrite or replace the foundational migrations for stories, plans, tasks, and acceptance criteria.
+- Historical target: Reintroduce plans as first-class records.
+- Historical target: Move tasks back to `plan_id` ownership.
+- Historical target: Add `stories.current_plan_id`.
+- Historical target: Add the new `scenarios` table.
+- Historical target: Add `stories.kind`, `actor`, `intent`, and `outcome`.
+- Historical target: Rename acceptance criterion content from `criterion` to `statement`.
+- Historical target: Rebuild any task-related FK assumptions around `plan_id` instead of `story_id`.
 
 ### Files affected
 - `database/migrations/2026_04_29_050714_create_stories_table.php`
@@ -327,33 +336,33 @@ Because existing data is disposable, prefer a clean reset over compatibility wor
 ## 2. Add and refactor Eloquent models
 
 ### Story
-- [ ] Add fillable/casts for `kind`, `actor`, `intent`, `outcome`.
-- [ ] Add relations: `acceptanceCriteria`, `scenarios`, `plans`, `currentPlan`.
-- [ ] Remove assumptions that tasks belong directly to stories.
-- [ ] Route story task access through `currentPlan`.
-- [ ] Rewrite helper methods that traverse `story -> tasks` directly.
+- Historical target: Add fillable/casts for `kind`, `actor`, `intent`, `outcome`.
+- Historical target: Add relations: `acceptanceCriteria`, `scenarios`, `plans`, `currentPlan`.
+- Historical target: Remove assumptions that tasks belong directly to stories.
+- Historical target: Route story task access through `currentPlan`.
+- Historical target: Rewrite helper methods that traverse `story -> tasks` directly.
 
 ### AcceptanceCriterion
-- [ ] Rename payload field to `statement`.
-- [ ] Remove the assumption that criteria map 1:1 to tasks.
-- [ ] Add `scenarios()` and `tasks()` relations.
-- [ ] Remove or simplify implicit revision-bump hooks if they become misleading.
+- Historical target: Rename payload field to `statement`.
+- Historical target: Remove the assumption that criteria map 1:1 to tasks.
+- Historical target: Add `scenarios()` and `tasks()` relations.
+- Historical target: Remove or simplify implicit revision-bump hooks if they become misleading.
 
 ### Scenario
-- [ ] Create `app/Models/Scenario.php`.
-- [ ] Add relations to `Story`, optional `AcceptanceCriterion`, and optional `Task` links.
+- Historical target: Create `app/Models/Scenario.php`.
+- Historical target: Add relations to `Story`, optional `AcceptanceCriterion`, and optional `Task` links.
 
 ### Plan
-- [ ] Create or restore `app/Models/Plan.php`.
-- [ ] Add relations to `Story`, `Task`, and `PlanApproval`.
+- Historical target: Create or restore `app/Models/Plan.php`.
+- Historical target: Add relations to `Story`, `Task`, and `PlanApproval`.
 
 ### Task
-- [ ] Replace `story()` with `plan()`.
-- [ ] Add optional `scenario()` relation.
-- [ ] Update dependency guards to compare `plan_id` rather than `story_id`.
+- Historical target: Replace `story()` with `plan()`.
+- Historical target: Add optional `scenario()` relation.
+- Historical target: Update dependency guards to compare `plan_id` rather than `story_id`.
 
 ### Subtask
-- [ ] Update traversal assumptions from `task->story` to `task->plan->story`.
+- Historical target: Update traversal assumptions from `task->story` to `task->plan->story`.
 
 ### Files affected
 - `app/Models/Story.php`
@@ -367,10 +376,10 @@ Because existing data is disposable, prefer a clean reset over compatibility wor
 
 ## 3. Add or update enums
 
-- [ ] Add `StoryKind` enum with `user_story`, `requirement`, `enabler`.
-- [ ] Add `PlanStatus` enum.
-- [ ] Add `PlanSource` enum.
-- [ ] Keep or later simplify existing `StoryStatus` and `FeatureStatus`.
+- Historical target: Add `StoryKind` enum with `user_story`, `requirement`, `enabler`.
+- Historical target: Add `PlanStatus` enum.
+- Historical target: Add `PlanSource` enum.
+- Historical target: Keep or later simplify existing `StoryStatus` and `FeatureStatus`.
 
 ### Files affected
 - new `app/Enums/StoryKind.php`
@@ -386,38 +395,38 @@ Because existing data is disposable, prefer a clean reset over compatibility wor
 
 Previous code assumed the story owned tasks directly. PR #49 changed this to `Task -> Plan -> Story`.
 
-- [ ] Rewrite `PlanWriter` so it writes tasks under a real `Plan`.
-- [ ] Decide whether plan replacement creates a new version or overwrites in place.
-- [ ] Prefer: create a new plan version, mark the old one `superseded`, and point `story.current_plan_id` at the new plan.
+- Historical target: Rewrite `PlanWriter` so it writes tasks under a real `Plan`.
+- Historical target: Decide whether plan replacement creates a new version or overwrites in place.
+- Historical target: Prefer: create a new plan version, mark the old one `superseded`, and point `story.current_plan_id` at the new plan.
 
 ## Approval services
 
-- [ ] Keep story approval for product contract.
-- [ ] Add plan approval handling.
-- [ ] Ensure execution is gated by both story approval and plan approval.
+- Historical target: Keep story approval for product contract.
+- Historical target: Add plan approval handling.
+- Historical target: Ensure execution is gated by both story approval and plan approval.
 
 ## ExecutionService
 
-- [ ] Rewrite task traversal to use `story.currentPlan->tasks`.
-- [ ] Update next-actionable-subtask resolution.
-- [ ] Update retry and follow-up execution paths.
-- [ ] Update story completion logic to use current-plan tasks.
+- Historical target: Rewrite task traversal to use `story.currentPlan->tasks`.
+- Historical target: Update next-actionable-subtask resolution.
+- Historical target: Update retry and follow-up execution paths.
+- Historical target: Update story completion logic to use current-plan tasks.
 
 ## GenerateTasksJob
 
-- [ ] Generate a plan, not just naked story tasks.
-- [ ] Attach tasks to `plan_id`.
-- [ ] Keep links to criteria and scenarios optional.
+- Historical target: Generate a plan, not just naked story tasks.
+- Historical target: Attach tasks to `plan_id`.
+- Historical target: Keep links to criteria and scenarios optional.
 
 ## SubtaskRunPipeline
 
-- [ ] Update story resolution paths from `task->story_id` to `task->plan->story_id`.
-- [ ] Keep append-proposed-subtasks logic aligned with plan-owned tasks.
+- Historical target: Update story resolution paths from `task->story_id` to `task->plan->story_id`.
+- Historical target: Keep append-proposed-subtasks logic aligned with plan-owned tasks.
 
 ## Pull request payloads / run surfaces
 
-- [ ] Recheck PR payload copy and execution assumptions.
-- [ ] Ensure any references to the temporary collapsed approval model reflect the new Story/Plan split.
+- Historical target: Recheck PR payload copy and execution assumptions.
+- Historical target: Ensure any references to the temporary collapsed approval model reflect the new Story/Plan split.
 
 ### Files affected
 - `app/Services/PlanWriter.php`
@@ -435,40 +444,40 @@ Previous code assumed the story owned tasks directly. PR #49 changed this to `Ta
 The MCP server instructions and tool payloads need to reflect the new truth.
 
 ## Server instructions
-- [ ] Update `SpecifyServer` instructions to describe the hierarchy as feature → story → criteria/scenarios + plan → task → subtask.
-- [ ] Remove the claim that a Task is always one acceptance criterion.
-- [ ] Explicitly say Given / When / Then belongs in scenarios.
+- Historical target: Update `SpecifyServer` instructions to describe the hierarchy as feature → story → criteria/scenarios + plan → task → subtask.
+- Historical target: Remove the claim that a Task is always one acceptance criterion.
+- Historical target: Explicitly say Given / When / Then belongs in scenarios.
 
 ## Story tools
-- [ ] `CreateStoryTool`: accept `kind`, `actor`, `intent`, `outcome`.
-- [ ] `UpdateStoryTool`: same.
-- [ ] `GetStoryTool`: return framing fields, criteria, scenarios, and current plan summary.
-- [ ] `ListStoriesTool`: optionally include `kind` and framing summary.
+- Historical target: `CreateStoryTool`: accept `kind`, `actor`, `intent`, `outcome`.
+- Historical target: `UpdateStoryTool`: same.
+- Historical target: `GetStoryTool`: return framing fields, criteria, scenarios, and current plan summary.
+- Historical target: `ListStoriesTool`: optionally include `kind` and framing summary.
 
 ## Acceptance criteria tools
-- [ ] Change `criterion` payloads to `statement`.
-- [ ] Update serializers and docs accordingly.
+- Historical target: Change `criterion` payloads to `statement`.
+- Historical target: Update serializers and docs accordingly.
 
 ## Scenario tools
 Add:
-- [ ] `CreateScenarioTool`
-- [ ] `UpdateScenarioTool`
-- [ ] `ListScenariosTool`
-- [ ] optional `DeleteScenarioTool`
+- Historical target: `CreateScenarioTool`
+- Historical target: `UpdateScenarioTool`
+- Historical target: `ListScenariosTool`
+- Historical target: optional `DeleteScenarioTool`
 
 ## Plan tools
 Add:
-- [ ] `CreatePlanTool`
-- [ ] `GetPlanTool`
-- [ ] `UpdatePlanTool`
-- [ ] `SetCurrentPlanTool`
+- Historical target: `CreatePlanTool`
+- Historical target: `GetPlanTool`
+- Historical target: `UpdatePlanTool`
+- Historical target: `SetCurrentPlanTool`
 
 ## Task tools
-- [ ] Rewrite `SetTasksTool` so it writes through plans.
-- [ ] Return `plan_id` in task-plan responses.
-- [ ] Update `ListTasksTool`, `GetTaskTool`, and `UpdateTaskTool` to operate on plan-owned tasks.
-- [ ] Update `GenerateTasksTool` so it generates a plan.
-- [ ] Update `StartRunTool` so it requires an approved current plan.
+- Historical target: Rewrite `SetTasksTool` so it writes through plans.
+- Historical target: Return `plan_id` in task-plan responses.
+- Historical target: Update `ListTasksTool`, `GetTaskTool`, and `UpdateTaskTool` to operate on plan-owned tasks.
+- Historical target: Update `GenerateTasksTool` so it generates a plan.
+- Historical target: Update `StartRunTool` so it requires an approved current plan.
 
 ### Files affected
 - `routes/ai.php` (likely no structural change)
@@ -492,24 +501,24 @@ Add:
 ## 6. Update web UI
 
 ## Story create page
-- [ ] Add story kind.
-- [ ] Add `actor`, `intent`, and `outcome` fields.
-- [ ] Keep acceptance criteria as short rule statements.
-- [ ] Do not encourage Given / When / Then inside acceptance-criteria inputs.
+- Historical target: Add story kind.
+- Historical target: Add `actor`, `intent`, and `outcome` fields.
+- Historical target: Keep acceptance criteria as short rule statements.
+- Historical target: Do not encourage Given / When / Then inside acceptance-criteria inputs.
 
 ## Story show page
-- [ ] Add sections for story framing.
-- [ ] Add acceptance criteria section.
-- [ ] Add scenarios section.
-- [ ] Add current plan section.
-- [ ] Render tasks and subtasks under the current plan, not directly under the story.
-- [ ] Rework approval rail if plan approval is shown separately.
+- Historical target: Add sections for story framing.
+- Historical target: Add acceptance criteria section.
+- Historical target: Add scenarios section.
+- Historical target: Add current plan section.
+- Historical target: Render tasks and subtasks under the current plan, not directly under the story.
+- Historical target: Rework approval rail if plan approval is shown separately.
 
 ## Story index page
-- [ ] Update counts, eager loads, and summary chips to use current plan information.
+- Historical target: Update counts, eager loads, and summary chips to use current plan information.
 
 ## Task partials and links
-- [ ] Replace direct `$task->story` assumptions with `$task->plan->story`.
+- Historical target: Replace direct `$task->story` assumptions with `$task->plan->story`.
 
 ### Files affected
 - `resources/views/pages/stories/⚡create.blade.php`
@@ -523,24 +532,24 @@ Add:
 ## 7. Factories and tests
 
 ## Factories
-- [ ] Update `StoryFactory` for `kind`, `actor`, `intent`, `outcome`.
-- [ ] Update `AcceptanceCriterionFactory` for `statement`.
-- [ ] Update `TaskFactory` for `plan_id` ownership.
-- [ ] Add `PlanFactory`.
-- [ ] Add `ScenarioFactory`.
+- Historical target: Update `StoryFactory` for `kind`, `actor`, `intent`, `outcome`.
+- Historical target: Update `AcceptanceCriterionFactory` for `statement`.
+- Historical target: Update `TaskFactory` for `plan_id` ownership.
+- Historical target: Add `PlanFactory`.
+- Historical target: Add `ScenarioFactory`.
 
 ## Feature tests
-- [ ] Story authoring supports structured framing.
-- [ ] Acceptance criteria remain atomic statements.
-- [ ] Scenarios can be created, updated, listed, and ordered.
-- [ ] Plans can be created and replaced cleanly.
-- [ ] Tasks execute through the current plan.
-- [ ] Execution requires an approved story and approved plan.
+- Historical target: Story authoring supports structured framing.
+- Historical target: Acceptance criteria remain atomic statements.
+- Historical target: Scenarios can be created, updated, listed, and ordered.
+- Historical target: Plans can be created and replaced cleanly.
+- Historical target: Tasks execute through the current plan.
+- Historical target: Execution requires an approved story and approved plan.
 
 ## MCP tests
-- [ ] Story tools accept and return the new framing fields.
-- [ ] Scenario tools work.
-- [ ] Task tools operate on plan-backed tasks.
+- Historical target: Story tools accept and return the new framing fields.
+- Historical target: Scenario tools work.
+- Historical target: Task tools operate on plan-backed tasks.
 
 ## Existing tests likely affected
 - `tests/Feature/SubtaskOrderingTest.php`
