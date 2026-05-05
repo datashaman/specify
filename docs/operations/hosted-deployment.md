@@ -20,9 +20,11 @@ SPECIFY_EXECUTOR_DRIVER=laravel-ai
 SPECIFY_EXECUTOR_RACE=
 ```
 
-`SPECIFY_RUNTIME_ENV=hosted` makes `ExecutorFactory` reject local-only drivers
-such as `cli`, `cli-claude`, `cli-codex`, and `fake`. Hosted execution should
-use `laravel-ai` unless a separate remote-worker deployment has been designed.
+By default, `SPECIFY_RUNTIME_ENV=hosted` makes `ExecutorFactory` reject
+local-only drivers such as `cli`, `cli-claude`, `cli-codex`, and `fake`.
+Hosted execution should use `laravel-ai` unless a separate remote-worker
+deployment has been designed and the driver is explicitly listed in
+`SPECIFY_REMOTE_EXECUTORS`.
 
 If a hosted deployment intentionally runs a CLI driver on an isolated remote
 worker with its own credentials and binaries, name that driver explicitly:

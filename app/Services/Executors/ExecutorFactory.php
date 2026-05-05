@@ -100,7 +100,7 @@ class ExecutorFactory
         $environment = (string) ($driver['environment'] ?? 'local');
 
         if ($runtime === 'hosted' && $environment !== 'remote' && ! $this->isExplicitlyRemoteEnabled($name)) {
-            throw new InvalidArgumentException("Executor driver [{$name}] is local-only and cannot run in hosted runtime.");
+            throw new InvalidArgumentException("Executor driver [{$name}] is local-only and cannot run in hosted runtime unless it is explicitly listed in SPECIFY_REMOTE_EXECUTORS for a remote-safe worker deployment.");
         }
 
         if (app()->isProduction() && (($driver['class'] ?? null) === FakeExecutor::class)) {
