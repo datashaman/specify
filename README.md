@@ -46,7 +46,7 @@ Product edits reopen Story approval and current Plan approval. Plan/Task/Subtask
 - `CliExecutor` — local-only; runs any one-shot agent CLI (claude, codex, gemini, aider) in cwd, observes via `git status`.
 - `FakeExecutor` — test double.
 
-Bound by `specify.executor.default`. In hosted runtime (`SPECIFY_RUNTIME_ENV=hosted`), only remote executors are allowed. User-triggered Laravel AI calls are BYOK: users configure their own Anthropic/OpenAI key at `/settings/ai`; the app does not need an operator-paid provider key for execution.
+Bound by `specify.executor.default`. In hosted runtime (`SPECIFY_RUNTIME_ENV=hosted`), only remote executors are allowed unless a local driver is explicitly named in `SPECIFY_REMOTE_EXECUTORS` for a deployment with a remote-safe worker. User-triggered Laravel AI calls are BYOK: users configure their own Anthropic/OpenAI key at `/settings/ai`; the app does not need an operator-paid provider key for execution.
 
 See `config/specify.php` for all knobs (`runs_path`, `git.{name,email}`, `workspace.{push_after_commit, open_pr_after_push}`, `github.api_base`, `runtime.environment`, `executor.{default,race,drivers}`).
 
@@ -56,11 +56,12 @@ For a live server, start from `.env.example`, set `APP_ENV=production`, use a du
 
 ```dotenv
 SPECIFY_RUNTIME_ENV=hosted
+SPECIFY_REMOTE_EXECUTORS=
 SPECIFY_EXECUTOR_DRIVER=laravel-ai
 SPECIFY_EXECUTOR_RACE=
 ```
 
-Do not configure local CLI executors on the hosted app unless that deployment is explicitly a remote worker with its own isolated credentials and binaries. See `docs/operations/hosted-deployment.md` for the operational checklist.
+Do not configure local CLI executors on the hosted app unless that deployment is explicitly a remote worker with its own isolated credentials and binaries, and the driver is named in `SPECIFY_REMOTE_EXECUTORS`. See `docs/operations/hosted-deployment.md` for the operational checklist.
 
 ## Repos
 

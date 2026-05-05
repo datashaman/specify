@@ -20,6 +20,7 @@ use App\Models\UserAiCredential;
 use App\Models\Workspace;
 use App\Services\Ai\ByokProviderResolver;
 use App\Services\ExecutionService;
+use App\Services\Executors\CliExecutor;
 use App\Services\Executors\ExecutorFactory;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Queue;
@@ -188,7 +189,7 @@ test('hosted runtime blocks local-only executor drivers', function () {
     config(['specify.runtime.environment' => 'hosted']);
 
     expect(fn () => app(ExecutorFactory::class)->make('cli'))
-        ->toThrow(InvalidArgumentException::class, 'local-only');
+        ->toThrow(InvalidArgumentException::class, 'SPECIFY_REMOTE_EXECUTORS');
 });
 
 test('hosted runtime fails race config containing local-only drivers', function () {
@@ -198,7 +199,19 @@ test('hosted runtime fails race config containing local-only drivers', function 
     ]);
 
     expect(fn () => app(ExecutorFactory::class)->raceDrivers())
-        ->toThrow(InvalidArgumentException::class, 'local-only');
+        ->toThrow(InvalidArgumentException::class, 'SPECIFY_REMOTE_EXECUTORS');
+});
+
+test('hosted runtime allows local drivers only when explicitly configured as remote', function () {
+    config([
+        'specify.runtime.environment' => 'hosted',
+        'specify.runtime.remote_executors' => ['cli-codex'],
+        'specify.executor.race' => ['laravel-ai', 'cli-codex'],
+    ]);
+
+    expect(app(ExecutorFactory::class)->make('cli-codex'))
+        ->toBeInstanceOf(CliExecutor::class)
+        ->and(app(ExecutorFactory::class)->raceDrivers())->toBe(['laravel-ai', 'cli-codex']);
 });
 
 function byokMcpStoryScene(StoryStatus $status): array

@@ -42,6 +42,10 @@ return [
 
     'runtime' => [
         'environment' => env('SPECIFY_RUNTIME_ENV', 'local'),
+        'remote_executors' => array_values(array_filter(array_map(
+            'trim',
+            explode(',', (string) env('SPECIFY_REMOTE_EXECUTORS', ''))
+        ))),
     ],
 
     'gitlab' => [
@@ -92,8 +96,12 @@ return [
     | driver in the list, each on its own branch, each opening its own PR.
     | The reviewer picks one to merge; the choice is the data.
     |
-    | Race driver names must exist in `drivers`. Single-driver mode
-    | (race=[]) is the default and matches pre-race behaviour.
+    | Race driver names must exist in `drivers`. In hosted runtime, local
+    | drivers are rejected unless their driver name appears in
+    | `runtime.remote_executors`, which is the operator's explicit statement
+    | that this deployment has a remote-safe worker for that driver.
+    | Single-driver mode (race=[]) is the default and matches pre-race
+    | behaviour.
     |
     */
 

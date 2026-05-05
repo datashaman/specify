@@ -99,12 +99,19 @@ class ExecutorFactory
         $runtime = (string) config('specify.runtime.environment', 'local');
         $environment = (string) ($driver['environment'] ?? 'local');
 
-        if ($runtime === 'hosted' && $environment !== 'remote') {
-            throw new InvalidArgumentException("Executor driver [{$name}] is local-only and cannot run in hosted runtime.");
+        if ($runtime === 'hosted' && $environment !== 'remote' && ! $this->isExplicitlyRemoteEnabled($name)) {
+            throw new InvalidArgumentException("Executor driver [{$name}] is local-only and cannot run in hosted runtime unless it is explicitly listed in SPECIFY_REMOTE_EXECUTORS for a remote-safe worker deployment.");
         }
 
         if (app()->isProduction() && (($driver['class'] ?? null) === FakeExecutor::class)) {
             throw new InvalidArgumentException("Executor driver [{$name}] is not available in production.");
         }
+    }
+
+    private function isExplicitlyRemoteEnabled(string $name): bool
+    {
+        $names = (array) config('specify.runtime.remote_executors', []);
+
+        return in_array($name, array_map('strval', $names), true);
     }
 }
