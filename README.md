@@ -14,9 +14,9 @@ Requires PHP `^8.4`, Node, and SQLite by default. `composer setup` creates `data
 
 ## Domain at a glance
 
-`Workspace -> Project -> Feature -> Story -> AcceptanceCriterion / Scenario -> Plan -> Task -> Subtask`.
+`Workspace -> Team -> Project -> Feature -> Story -> AcceptanceCriterion / Scenario -> Plan -> Task -> Subtask`.
 
-- **Workspace** — tenant boundary, owned by a User. `Team` is workspace-scoped (M:N via `team_user`).
+- **Workspace** — tenant boundary, owned by a User. `Team` is workspace-scoped (M:N via `team_user`); Projects belong to Teams.
 - **Story** — product-owner unit of value; carries kind, actor, intent, outcome, `revision` (auto-bumps on product edits), `description`, `notes`, acceptance criteria, and scenarios.
 - **Plan** — implementation interpretation of a Story. `stories.current_plan_id` points at the active Plan; previous Plans remain history.
 - **Task** — delivery work item under a Plan. A Task may reference an acceptance criterion or scenario, but it is not defined as one acceptance criterion. Subtasks are the executor's step list.
@@ -42,11 +42,25 @@ Product edits reopen Story approval and current Plan approval. Plan/Task/Subtask
 
 `Executor` interface — `needsWorkingDirectory()`, `execute(Subtask, ?workingDir, ?Repo, ?workingBranch): ExecutionResult`.
 
-- `LaravelAiExecutor` — describe-only, wraps the `TaskExecutor` agent (no fs mutation).
-- `CliExecutor` — generic; runs any one-shot agent CLI (claude, codex, gemini, aider) in cwd, observes via `git status`.
+- `LaravelAiExecutor` — remote-capable; wraps the `SubtaskExecutor` agent, uses repo-editing tools, and resolves the run owner's BYOK credential.
+- `CliExecutor` — local-only; runs any one-shot agent CLI (claude, codex, gemini, aider) in cwd, observes via `git status`.
 - `FakeExecutor` — test double.
 
-Bound by `specify.executor.driver`. See `config/specify.php` for all knobs (`runs_path`, `git.{name,email}`, `workspace.{push_after_commit, open_pr_after_push}`, `github.api_base`, `executor.{driver, cli.{command, timeout}}`).
+Bound by `specify.executor.default`. In hosted runtime (`SPECIFY_RUNTIME_ENV=hosted`), only remote executors are allowed. User-triggered Laravel AI calls are BYOK: users configure their own Anthropic/OpenAI key at `/settings/ai`; the app does not need an operator-paid provider key for execution.
+
+See `config/specify.php` for all knobs (`runs_path`, `git.{name,email}`, `workspace.{push_after_commit, open_pr_after_push}`, `github.api_base`, `runtime.environment`, `executor.{default,race,drivers}`).
+
+## Hosted deployment
+
+For a live server, start from `.env.example`, set `APP_ENV=production`, use a durable queue connection, and set:
+
+```dotenv
+SPECIFY_RUNTIME_ENV=hosted
+SPECIFY_EXECUTOR_DRIVER=laravel-ai
+SPECIFY_EXECUTOR_RACE=
+```
+
+Do not configure local CLI executors on the hosted app unless that deployment is explicitly a remote worker with its own isolated credentials and binaries. See `docs/operations/hosted-deployment.md` for the operational checklist.
 
 ## Repos
 
