@@ -19,5 +19,6 @@ except to mark them Superseded.
 | [0010](0010-cancel-and-retry-for-agent-runs.md) | Cancel and retry semantics for AgentRuns | Accepted |
 | [0011](0011-streaming-progress-events-from-executors.md) | Streaming progress events from executors | Proposed |
 | [0012](0012-project-first-information-architecture.md) | Project-first information architecture | Accepted |
+| [0013](0013-byok-and-executor-locality.md) | BYOK and executor locality for hosted deployments | Accepted |
 
 Use [`0000-template.md`](0000-template.md) when adding a new ADR. Number sequentially and update this index.

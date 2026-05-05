@@ -52,7 +52,7 @@ class GenerateTasksTool extends Tool
             return Response::error('Story already has Tasks in its current Plan. Use set-tasks / update-task to replace or edit the current Plan.');
         }
 
-        $run = $execution->dispatchTaskGeneration($story);
+        $run = $execution->dispatchTaskGeneration($story, userId: $user->getKey());
 
         return Response::json([
             'story_id' => $story->id,

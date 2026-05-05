@@ -2,6 +2,8 @@
 
 namespace App\Services\Executors;
 
+use App\Models\AgentRun;
+use App\Services\Ai\ByokProviderResolver;
 use Illuminate\Contracts\Container\Container;
 use InvalidArgumentException;
 
@@ -23,9 +25,10 @@ class ExecutorFactory
 {
     public function __construct(public Container $container) {}
 
-    public function make(string $name): Executor
+    public function make(string $name, ?AgentRun $run = null): Executor
     {
         $driver = $this->driverConfig($name);
+        $this->assertRunnableInCurrentRuntime($name, $driver);
         $class = (string) ($driver['class'] ?? '');
 
         if ($class === '' || ! is_subclass_of($class, Executor::class)) {
@@ -36,6 +39,10 @@ class ExecutorFactory
             CliExecutor::class => new CliExecutor(
                 command: array_values((array) ($driver['command'] ?? [])),
                 timeout: (int) ($driver['timeout'] ?? 1800),
+            ),
+            LaravelAiExecutor::class => new LaravelAiExecutor(
+                byok: $this->container->make(ByokProviderResolver::class),
+                run: $run,
             ),
             default => $this->container->make($class),
         };
@@ -60,6 +67,7 @@ class ExecutorFactory
                     "Race driver [{$name}] is not registered in specify.executor.drivers."
                 );
             }
+            $this->assertRunnableInCurrentRuntime($name, (array) $drivers[$name]);
         }
 
         return $names;
@@ -81,5 +89,22 @@ class ExecutorFactory
         }
 
         return $drivers[$name];
+    }
+
+    /**
+     * @param  array<string, mixed>  $driver
+     */
+    private function assertRunnableInCurrentRuntime(string $name, array $driver): void
+    {
+        $runtime = (string) config('specify.runtime.environment', 'local');
+        $environment = (string) ($driver['environment'] ?? 'local');
+
+        if ($runtime === 'hosted' && $environment !== 'remote') {
+            throw new InvalidArgumentException("Executor driver [{$name}] is local-only and cannot run in hosted runtime.");
+        }
+
+        if (app()->isProduction() && (($driver['class'] ?? null) === FakeExecutor::class)) {
+            throw new InvalidArgumentException("Executor driver [{$name}] is not available in production.");
+        }
     }
 }

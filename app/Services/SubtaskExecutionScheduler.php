@@ -17,6 +17,7 @@ use App\Models\Subtask;
 use App\Models\Task;
 use App\Services\Executors\ExecutorFactory;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
 
@@ -34,18 +35,22 @@ class SubtaskExecutionScheduler
      * creates one sibling AgentRun per configured driver and returns the
      * first sibling for the caller's convenience.
      */
-    public function dispatch(Subtask $subtask, ?PlanApproval $approval = null, ?Repo $repo = null): AgentRun
+    public function dispatch(Subtask $subtask, ?PlanApproval $approval = null, ?Repo $repo = null, ?int $userId = null): AgentRun
+    {
+        return $this->dispatchForUser($subtask, $approval, $repo, $userId ?? Auth::id());
+    }
+
+    private function dispatchForUser(Subtask $subtask, ?PlanApproval $approval, ?Repo $repo, ?int $userId): AgentRun
     {
         $repo ??= $subtask->task?->plan?->story?->feature?->project?->primaryRepo();
-
         $race = $this->executors->raceDrivers();
         if ($race === []) {
-            return $this->dispatchDriverRun($subtask, $approval, $repo, $this->executors->defaultDriver(), null);
+            return $this->dispatchDriverRun($subtask, $approval, $repo, $this->executors->defaultDriver(), null, userId: $userId);
         }
 
         $first = null;
         foreach ($race as $driver) {
-            $run = $this->dispatchDriverRun($subtask, $approval, $repo, $driver, $driver);
+            $run = $this->dispatchDriverRun($subtask, $approval, $repo, $driver, $driver, userId: $userId);
             $first ??= $run;
         }
 
@@ -61,11 +66,12 @@ class SubtaskExecutionScheduler
         ?Repo $repo,
         ?string $driver,
         int $retryOfId,
+        ?int $userId = null,
     ): AgentRun {
         $resolvedDriver = $driver ?? $this->executors->defaultDriver();
         $branchSuffix = in_array($resolvedDriver, $this->executors->raceDrivers(), true) ? $resolvedDriver : null;
 
-        return $this->dispatchDriverRun($subtask, $approval, $repo, $resolvedDriver, $branchSuffix, $retryOfId);
+        return $this->dispatchDriverRun($subtask, $approval, $repo, $resolvedDriver, $branchSuffix, $retryOfId, $userId);
     }
 
     /**
@@ -73,7 +79,7 @@ class SubtaskExecutionScheduler
      *
      * @throws RuntimeException When the Story or current Plan is not ready for execution.
      */
-    public function startStory(Story $story, ?PlanApproval $approval = null): void
+    public function startStory(Story $story, ?PlanApproval $approval = null, ?int $userId = null): void
     {
         if (in_array($story->status, [StoryStatus::Done, StoryStatus::Cancelled, StoryStatus::Rejected], true)) {
             return;
@@ -98,13 +104,15 @@ class SubtaskExecutionScheduler
             ->latest('created_at')
             ->first();
 
-        DB::transaction(function () use ($story, $approval) {
+        $userId ??= Auth::id();
+
+        DB::transaction(function () use ($story, $approval, $userId) {
             foreach ($this->nextActionableSubtasks($story) as $subtask) {
                 if ($subtask->agentRuns()->active()->exists()) {
                     continue;
                 }
 
-                $this->dispatch($subtask, $approval);
+                $this->dispatchForUser($subtask, $approval, null, $userId);
             }
         });
     }
@@ -161,7 +169,7 @@ class SubtaskExecutionScheduler
 
             if ($anySucceeded) {
                 $subtask->forceFill(['status' => TaskStatus::Done->value])->save();
-                $this->advanceFromSubtask($subtask->fresh(), $run->authorizingApproval);
+                $this->advanceFromSubtask($subtask->fresh(), $run->authorizingApproval, $run->user_id);
 
                 return;
             }
@@ -177,10 +185,12 @@ class SubtaskExecutionScheduler
         string $driver,
         ?string $branchSuffix,
         ?int $retryOfId = null,
+        ?int $userId = null,
     ): AgentRun {
         $run = AgentRun::create([
             'runnable_type' => $subtask->getMorphClass(),
             'runnable_id' => $subtask->getKey(),
+            'user_id' => $userId,
             'repo_id' => $repo?->getKey(),
             'working_branch' => $this->workingBranchFor($subtask, $branchSuffix),
             'executor_driver' => $driver,
@@ -211,7 +221,7 @@ class SubtaskExecutionScheduler
         return $branch;
     }
 
-    private function advanceFromSubtask(?Subtask $subtask, $authorizingApproval): void
+    private function advanceFromSubtask(?Subtask $subtask, $authorizingApproval, ?int $userId): void
     {
         if (! $subtask) {
             return;
@@ -249,7 +259,7 @@ class SubtaskExecutionScheduler
                 continue;
             }
 
-            $this->dispatch($next, $approval);
+            $this->dispatchForUser($next, $approval, null, $userId);
         }
     }
 }

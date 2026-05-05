@@ -6,6 +6,7 @@ use App\Ai\Agents\ReviewResponder;
 use App\Enums\AgentRunKind;
 use App\Models\AgentRun;
 use App\Models\Subtask;
+use App\Services\Ai\ByokProviderResolver;
 use App\Services\ExecutionService;
 use App\Services\Reviews\ReviewCommentsFetcher;
 use App\Services\WorkspaceRunner;
@@ -43,6 +44,7 @@ class RespondToPrReviewJob implements ShouldQueue
         ExecutionService $execution,
         WorkspaceRunner $workspace,
         ReviewCommentsFetcher $fetcher,
+        ?ByokProviderResolver $byok = null,
     ): void {
         $run = AgentRun::findOrFail($this->agentRunId);
 
@@ -75,7 +77,7 @@ class RespondToPrReviewJob implements ShouldQueue
         $lockKey = sprintf('specify:review-response:%d:%s', $repo->getKey(), $branch);
 
         try {
-            Cache::lock($lockKey, 1800)->block(300, function () use ($run, $repo, $branch, $prNumber, $subtask, $execution, $workspace, $fetcher, $logCtx) {
+            Cache::lock($lockKey, 1800)->block(300, function () use ($run, $repo, $branch, $prNumber, $subtask, $execution, $workspace, $fetcher, $byok, $logCtx) {
                 $workingDir = $workspace->prepare($repo, $run);
                 $workspace->checkoutBranch($workingDir, $branch, baseBranch: $repo->default_branch);
                 Log::info('specify.review_response.workspace.ready', $logCtx + ['working_dir' => $workingDir]);
@@ -104,7 +106,13 @@ class RespondToPrReviewJob implements ShouldQueue
                     workingDir: $workingDir,
                 );
 
-                $response = $agent->prompt($agent->buildPrompt());
+                $resolver = $byok ?? app(ByokProviderResolver::class);
+                $provider = $resolver->forRun($run, ReviewResponder::class);
+                try {
+                    $response = $agent->prompt($agent->buildPrompt(), provider: $provider?->provider, model: $provider?->model);
+                } finally {
+                    $resolver->release($provider);
+                }
                 $output = $response->toArray();
 
                 $clarifications = (array) ($output['clarifications'] ?? []);

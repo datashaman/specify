@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Support\Collection;
@@ -17,7 +18,7 @@ use Illuminate\Support\Str;
 use InvalidArgumentException;
 use Laravel\Fortify\TwoFactorAuthenticatable;
 
-#[Fillable(['name', 'email', 'password', 'current_team_id', 'current_project_id', 'github_id', 'avatar_url', 'github_token', 'github_refresh_token', 'github_token_expires_at', 'github_scopes'])]
+#[Fillable(['name', 'email', 'password', 'current_team_id', 'current_project_id', 'github_id', 'avatar_url', 'github_token', 'github_refresh_token', 'github_token_expires_at', 'github_scopes', 'ai_provider'])]
 /**
  * Authenticated user.
  *
@@ -58,6 +59,11 @@ class User extends Authenticatable
     public function currentProject(): BelongsTo
     {
         return $this->belongsTo(Project::class, 'current_project_id');
+    }
+
+    public function aiCredentials(): HasMany
+    {
+        return $this->hasMany(UserAiCredential::class);
     }
 
     public function currentWorkspace(): ?Workspace

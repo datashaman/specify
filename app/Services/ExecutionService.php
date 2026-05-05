@@ -17,6 +17,7 @@ use App\Models\Story;
 use App\Models\StoryApproval;
 use App\Models\Subtask;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
 
@@ -40,11 +41,12 @@ class ExecutionService
     /**
      * Queue a `GenerateTasksJob` for the given Story and return the AgentRun row.
      */
-    public function dispatchTaskGeneration(Story $story, ?StoryApproval $approval = null): AgentRun
+    public function dispatchTaskGeneration(Story $story, ?StoryApproval $approval = null, ?int $userId = null): AgentRun
     {
         $run = AgentRun::create([
             'runnable_type' => $story->getMorphClass(),
             'runnable_id' => $story->getKey(),
+            'user_id' => $userId ?? Auth::id(),
             'authorizing_approval_type' => $approval?->getMorphClass(),
             'authorizing_approval_id' => $approval?->getKey(),
             'status' => AgentRunStatus::Queued,
@@ -69,9 +71,9 @@ class ExecutionService
      * (`finalizeSubtaskFromRun`) is the authoritative observer of all
      * siblings, not this return value.
      */
-    public function dispatchSubtaskExecution(Subtask $subtask, ?PlanApproval $approval = null, ?Repo $repo = null): AgentRun
+    public function dispatchSubtaskExecution(Subtask $subtask, ?PlanApproval $approval = null, ?Repo $repo = null, ?int $userId = null): AgentRun
     {
-        return $this->subtasks->dispatch($subtask, $approval, $repo);
+        return $this->subtasks->dispatch($subtask, $approval, $repo, $userId);
     }
 
     /**
@@ -111,6 +113,7 @@ class ExecutionService
             $run = AgentRun::create([
                 'runnable_type' => $originRun->runnable_type,
                 'runnable_id' => $originRun->runnable_id,
+                'user_id' => $originRun->user_id,
                 'repo_id' => $repo->getKey(),
                 'working_branch' => $originRun->working_branch,
                 'executor_driver' => $originRun->executor_driver,
@@ -174,6 +177,7 @@ class ExecutionService
             $run = AgentRun::create([
                 'runnable_type' => $executeRun->runnable_type,
                 'runnable_id' => $executeRun->runnable_id,
+                'user_id' => $executeRun->user_id,
                 'repo_id' => $repo->getKey(),
                 'working_branch' => $executeRun->working_branch,
                 'executor_driver' => $executeRun->executor_driver,
@@ -199,9 +203,9 @@ class ExecutionService
      *
      * @throws RuntimeException When the Story is not in Approved status.
      */
-    public function startStoryExecution(Story $story, ?PlanApproval $approval = null): void
+    public function startStoryExecution(Story $story, ?PlanApproval $approval = null, ?int $userId = null): void
     {
-        $this->subtasks->startStory($story, $approval);
+        $this->subtasks->startStory($story, $approval, $userId);
     }
 
     /**
@@ -426,6 +430,7 @@ class ExecutionService
             $repo,
             $driver ?? $fromRun->executor_driver,
             $fromRun->getKey(),
+            $fromRun->user_id,
         );
     }
 

@@ -8,6 +8,7 @@ test('authenticated application page routes use the project-first IA', function 
         'projects',
         'runs/{run}/events',
         'settings',
+        'settings/ai',
         'settings/appearance',
         'settings/profile',
         'settings/security',
