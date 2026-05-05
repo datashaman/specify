@@ -9,7 +9,7 @@ except to mark them Superseded.
 |---|-------|--------|
 | [0001](0001-story-and-plan-approval-gates.md) | Story and current Plan are the approval gates | Accepted |
 | [0002](0002-story-scenario-plan-task-subtask-hierarchy.md) | Story, Scenario, Plan, Task, Subtask hierarchy | Accepted |
-| [0003](0003-pluggable-executor-interface.md) | Pluggable Executor interface | Accepted |
+| [0003](0003-pluggable-executor-interface.md) | Pluggable Executor interface | Superseded by [0014](0014-executor-contract-and-runtime-locality.md) |
 | [0004](0004-pr-after-push-is-non-fatal.md) | Opening the pull request after push is a non-fatal step | Accepted |
 | [0005](0005-plans-grow-append-only-mid-run.md) | Plans grow append-only mid-run | Accepted |
 | [0006](0006-multi-executor-race-mode.md) | Multi-executor race mode | Accepted |
@@ -20,5 +20,6 @@ except to mark them Superseded.
 | [0011](0011-streaming-progress-events-from-executors.md) | Streaming progress events from executors | Proposed |
 | [0012](0012-project-first-information-architecture.md) | Project-first information architecture | Accepted |
 | [0013](0013-byok-and-executor-locality.md) | BYOK and executor locality for hosted deployments | Accepted |
+| [0014](0014-executor-contract-and-runtime-locality.md) | Executor contract and runtime locality | Accepted |
 
 Use [`0000-template.md`](0000-template.md) when adding a new ADR. Number sequentially and update this index.

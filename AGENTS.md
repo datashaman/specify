@@ -10,7 +10,7 @@ Specify is a Laravel 13 system where humans approve AI actions on code repos. **
 |---|---|
 | Touch the approval state machine | [ADR-0001](docs/adr/0001-story-and-plan-approval-gates.md), `app/Services/ApprovalService.php` |
 | Edit Story / criteria / scenarios / Plan / Task / Subtask | [ADR-0002](docs/adr/0002-story-scenario-plan-task-subtask-hierarchy.md), `app/Services/PlanWriter.php` |
-| Add or change an Executor | [ADR-0003](docs/adr/0003-pluggable-executor-interface.md), `app/Services/Executors/` |
+| Add or change an Executor | [ADR-0014](docs/adr/0014-executor-contract-and-runtime-locality.md), `app/Services/Executors/`, `config/specify.php` |
 | Race executors against each other | [ADR-0006](docs/adr/0006-multi-executor-race-mode.md), `config/specify.php` (`executor.race`), `App\Services\Executors\ExecutorFactory` |
 | Touch PR creation | [ADR-0004](docs/adr/0004-pr-after-push-is-non-fatal.md), `app/Services/PullRequests/` |
 | Touch advisory PR review | `app/Services/Reviews/` (`ReviewProvider`, `GithubReviewProvider`), `app/Jobs/ReviewPullRequestJob.php` — gated on `SPECIFY_REVIEW_ENABLED`, never blocks merge |
