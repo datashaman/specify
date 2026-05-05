@@ -106,8 +106,13 @@ class RespondToPrReviewJob implements ShouldQueue
                     workingDir: $workingDir,
                 );
 
-                $provider = ($byok ?? app(ByokProviderResolver::class))->forRun($run, ReviewResponder::class);
-                $response = $agent->prompt($agent->buildPrompt(), provider: $provider?->provider, model: $provider?->model);
+                $resolver = $byok ?? app(ByokProviderResolver::class);
+                $provider = $resolver->forRun($run, ReviewResponder::class);
+                try {
+                    $response = $agent->prompt($agent->buildPrompt(), provider: $provider?->provider, model: $provider?->model);
+                } finally {
+                    $resolver->release($provider);
+                }
                 $output = $response->toArray();
 
                 $clarifications = (array) ($output['clarifications'] ?? []);

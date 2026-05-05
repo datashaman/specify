@@ -35,9 +35,9 @@ class SubtaskExecutionScheduler
      * creates one sibling AgentRun per configured driver and returns the
      * first sibling for the caller's convenience.
      */
-    public function dispatch(Subtask $subtask, ?PlanApproval $approval = null, ?Repo $repo = null): AgentRun
+    public function dispatch(Subtask $subtask, ?PlanApproval $approval = null, ?Repo $repo = null, ?int $userId = null): AgentRun
     {
-        return $this->dispatchForUser($subtask, $approval, $repo, Auth::id());
+        return $this->dispatchForUser($subtask, $approval, $repo, $userId ?? Auth::id());
     }
 
     private function dispatchForUser(Subtask $subtask, ?PlanApproval $approval, ?Repo $repo, ?int $userId): AgentRun
@@ -79,7 +79,7 @@ class SubtaskExecutionScheduler
      *
      * @throws RuntimeException When the Story or current Plan is not ready for execution.
      */
-    public function startStory(Story $story, ?PlanApproval $approval = null): void
+    public function startStory(Story $story, ?PlanApproval $approval = null, ?int $userId = null): void
     {
         if (in_array($story->status, [StoryStatus::Done, StoryStatus::Cancelled, StoryStatus::Rejected], true)) {
             return;
@@ -104,7 +104,7 @@ class SubtaskExecutionScheduler
             ->latest('created_at')
             ->first();
 
-        $userId = Auth::id();
+        $userId ??= Auth::id();
 
         DB::transaction(function () use ($story, $approval, $userId) {
             foreach ($this->nextActionableSubtasks($story) as $subtask) {

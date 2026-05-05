@@ -44,8 +44,13 @@ class GenerateTasksJob implements ShouldQueue
 
         try {
             $agent = new TasksGenerator($story);
-            $provider = ($byok ?? app(ByokProviderResolver::class))->forRun($run, TasksGenerator::class);
-            $response = $agent->prompt($agent->buildPrompt(), provider: $provider?->provider, model: $provider?->model);
+            $resolver = $byok ?? app(ByokProviderResolver::class);
+            $provider = $resolver->forRun($run, TasksGenerator::class);
+            try {
+                $response = $agent->prompt($agent->buildPrompt(), provider: $provider?->provider, model: $provider?->model);
+            } finally {
+                $resolver->release($provider);
+            }
             $output = $response->toArray();
 
             $tasks = $planInputs->fromGeneratedTasks($story, $output['tasks'] ?? []);

@@ -72,11 +72,16 @@ class LaravelAiExecutor implements Executor
                 throw new RuntimeException('Laravel AI execution requires an AgentRun owner for BYOK credential resolution.');
             }
 
+            $resolver = $this->byok ?? app(ByokProviderResolver::class);
             $byok = $this->run !== null
-                ? ($this->byok ?? app(ByokProviderResolver::class))->forRun($this->run, SubtaskExecutor::class)
+                ? $resolver->forRun($this->run, SubtaskExecutor::class)
                 : null;
 
-            $response = $agent->prompt($prompt, provider: $byok?->provider, model: $byok?->model);
+            try {
+                $response = $agent->prompt($prompt, provider: $byok?->provider, model: $byok?->model);
+            } finally {
+                $resolver->release($byok);
+            }
         } catch (RequestException $e) {
             $status = $e->response?->status();
             $body = $e->response?->body();

@@ -57,8 +57,13 @@ class ReviewPullRequestJob implements ShouldQueue
 
             $files = array_values(array_filter(array_map('strval', $output['files_changed'] ?? [])));
             $reviewer = new AdrConformanceReviewer($adrs, $this->clamp($diff, 32_768), $files);
-            $aiProvider = ($byok ?? app(ByokProviderResolver::class))->forRun($run, AdrConformanceReviewer::class);
-            $response = $reviewer->prompt($reviewer->buildPrompt(), provider: $aiProvider?->provider, model: $aiProvider?->model)->toArray();
+            $resolver = $byok ?? app(ByokProviderResolver::class);
+            $aiProvider = $resolver->forRun($run, AdrConformanceReviewer::class);
+            try {
+                $response = $reviewer->prompt($reviewer->buildPrompt(), provider: $aiProvider?->provider, model: $aiProvider?->model)->toArray();
+            } finally {
+                $resolver->release($aiProvider);
+            }
 
             $violations = is_array($response['violations'] ?? null) ? $response['violations'] : [];
             $comments = $this->violationsToComments($violations);

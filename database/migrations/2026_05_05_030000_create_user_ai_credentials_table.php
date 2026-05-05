@@ -1,7 +1,10 @@
 <?php
 
+use App\Models\Story;
+use App\Models\Subtask;
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
@@ -28,6 +31,28 @@ return new class extends Migration
         Schema::table('agent_runs', function (Blueprint $table) {
             $table->foreignId('user_id')->nullable()->after('id')->constrained()->nullOnDelete();
         });
+
+        DB::table('agent_runs')
+            ->whereNull('user_id')
+            ->where('runnable_type', Story::class)
+            ->update([
+                'user_id' => DB::raw('(select stories.created_by_id from stories where stories.id = agent_runs.runnable_id)'),
+            ]);
+
+        DB::table('agent_runs')
+            ->whereNull('user_id')
+            ->where('runnable_type', Subtask::class)
+            ->update([
+                'user_id' => DB::raw('(
+                    select stories.created_by_id
+                    from subtasks
+                    inner join tasks on tasks.id = subtasks.task_id
+                    inner join plans on plans.id = tasks.plan_id
+                    inner join stories on stories.id = plans.story_id
+                    where subtasks.id = agent_runs.runnable_id
+                    limit 1
+                )'),
+            ]);
     }
 
     public function down(): void

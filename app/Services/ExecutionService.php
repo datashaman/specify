@@ -41,12 +41,12 @@ class ExecutionService
     /**
      * Queue a `GenerateTasksJob` for the given Story and return the AgentRun row.
      */
-    public function dispatchTaskGeneration(Story $story, ?StoryApproval $approval = null): AgentRun
+    public function dispatchTaskGeneration(Story $story, ?StoryApproval $approval = null, ?int $userId = null): AgentRun
     {
         $run = AgentRun::create([
             'runnable_type' => $story->getMorphClass(),
             'runnable_id' => $story->getKey(),
-            'user_id' => Auth::id(),
+            'user_id' => $userId ?? Auth::id(),
             'authorizing_approval_type' => $approval?->getMorphClass(),
             'authorizing_approval_id' => $approval?->getKey(),
             'status' => AgentRunStatus::Queued,
@@ -71,9 +71,9 @@ class ExecutionService
      * (`finalizeSubtaskFromRun`) is the authoritative observer of all
      * siblings, not this return value.
      */
-    public function dispatchSubtaskExecution(Subtask $subtask, ?PlanApproval $approval = null, ?Repo $repo = null): AgentRun
+    public function dispatchSubtaskExecution(Subtask $subtask, ?PlanApproval $approval = null, ?Repo $repo = null, ?int $userId = null): AgentRun
     {
-        return $this->subtasks->dispatch($subtask, $approval, $repo);
+        return $this->subtasks->dispatch($subtask, $approval, $repo, $userId);
     }
 
     /**
@@ -203,9 +203,9 @@ class ExecutionService
      *
      * @throws RuntimeException When the Story is not in Approved status.
      */
-    public function startStoryExecution(Story $story, ?PlanApproval $approval = null): void
+    public function startStoryExecution(Story $story, ?PlanApproval $approval = null, ?int $userId = null): void
     {
-        $this->subtasks->startStory($story, $approval);
+        $this->subtasks->startStory($story, $approval, $userId);
     }
 
     /**

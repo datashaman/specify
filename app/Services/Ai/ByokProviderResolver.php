@@ -56,4 +56,17 @@ class ByokProviderResolver
 
         return new ByokProvider($providerName, $model !== '' ? $model : null);
     }
+
+    public function release(?ByokProvider $provider): void
+    {
+        if ($provider === null) {
+            return;
+        }
+
+        Ai::forgetInstance($provider->provider);
+
+        $providers = (array) config('ai.providers', []);
+        unset($providers[$provider->provider]);
+        config(['ai.providers' => $providers]);
+    }
 }

@@ -2,14 +2,28 @@
 
 use App\Ai\Agents\TasksGenerator;
 use App\Enums\AgentRunStatus;
+use App\Enums\PlanStatus;
+use App\Enums\StoryStatus;
+use App\Enums\TeamRole;
+use App\Mcp\Tools\GenerateTasksTool;
+use App\Mcp\Tools\StartRunTool;
 use App\Models\AgentRun;
+use App\Models\Feature;
+use App\Models\Plan;
+use App\Models\Project;
 use App\Models\Story;
+use App\Models\Subtask;
+use App\Models\Task;
+use App\Models\Team;
 use App\Models\User;
 use App\Models\UserAiCredential;
+use App\Models\Workspace;
 use App\Services\Ai\ByokProviderResolver;
 use App\Services\ExecutionService;
 use App\Services\Executors\ExecutorFactory;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Queue;
+use Laravel\Mcp\Request;
 use Livewire\Livewire;
 
 test('user AI credentials are encrypted and hidden', function () {
@@ -75,6 +89,23 @@ test('BYOK resolver registers a per-run provider config from the run owner', fun
         ->and(config('ai.providers.'.$provider->provider.'.key'))->toBe('sk-openai-user-key');
 });
 
+test('BYOK resolver releases per-run provider config after use', function () {
+    $user = User::factory()->create(['ai_provider' => 'anthropic']);
+    UserAiCredential::factory()->for($user)->create([
+        'provider' => 'anthropic',
+        'api_key' => 'sk-ant-user-key',
+    ]);
+    $run = AgentRun::factory()->for($user)->create();
+    $resolver = app(ByokProviderResolver::class);
+
+    $provider = $resolver->forRun($run, TasksGenerator::class);
+    expect(config('ai.providers.'.$provider->provider))->not->toBeNull();
+
+    $resolver->release($provider);
+
+    expect(config('ai.providers.'.$provider->provider))->toBeNull();
+});
+
 test('task generation fails before provider calls when the run owner has no BYOK key', function () {
     config(['queue.default' => 'sync']);
 
@@ -117,6 +148,42 @@ test('task generation persists the triggering user on the run', function () {
     expect($run->fresh()->user_id)->toBe($user->getKey());
 });
 
+test('MCP task generation persists the resolved MCP user on the run', function () {
+    Queue::fake();
+    [$user, $story] = byokMcpStoryScene(StoryStatus::Approved);
+    config(['specify.mcp.user_email' => $user->email]);
+
+    $response = app(GenerateTasksTool::class)->handle(
+        new Request(['story_id' => $story->getKey()]),
+        app(ExecutionService::class),
+    );
+
+    $run = AgentRun::query()->where('runnable_type', Story::class)->sole();
+
+    expect($response->isError())->toBeFalse()
+        ->and($run->user_id)->toBe($user->getKey());
+});
+
+test('MCP start run persists the resolved MCP user on subtask runs', function () {
+    Queue::fake();
+    [$user, $story] = byokMcpStoryScene(StoryStatus::Approved);
+    $plan = Plan::factory()->for($story)->create(['status' => PlanStatus::Approved]);
+    $story->forceFill(['current_plan_id' => $plan->getKey()])->save();
+    $task = Task::factory()->for($plan)->create(['position' => 1]);
+    Subtask::factory()->for($task)->create(['position' => 1]);
+    config(['specify.mcp.user_email' => $user->email]);
+
+    $response = app(StartRunTool::class)->handle(
+        new Request(['story_id' => $story->getKey()]),
+        app(ExecutionService::class),
+    );
+
+    $run = AgentRun::query()->where('runnable_type', Subtask::class)->sole();
+
+    expect($response->isError())->toBeFalse()
+        ->and($run->user_id)->toBe($user->getKey());
+});
+
 test('hosted runtime blocks local-only executor drivers', function () {
     config(['specify.runtime.environment' => 'hosted']);
 
@@ -133,3 +200,19 @@ test('hosted runtime fails race config containing local-only drivers', function 
     expect(fn () => app(ExecutorFactory::class)->raceDrivers())
         ->toThrow(InvalidArgumentException::class, 'local-only');
 });
+
+function byokMcpStoryScene(StoryStatus $status): array
+{
+    $workspace = Workspace::factory()->create();
+    $team = Team::factory()->for($workspace)->create();
+    $user = User::factory()->create();
+    $team->addMember($user, TeamRole::Admin);
+    $project = Project::factory()->for($team)->create();
+    $feature = Feature::factory()->for($project)->create();
+    $story = Story::factory()->for($feature)->create([
+        'created_by_id' => $user->getKey(),
+        'status' => $status,
+    ]);
+
+    return [$user, $story];
+}

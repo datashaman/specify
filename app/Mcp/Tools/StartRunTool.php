@@ -41,7 +41,7 @@ class StartRunTool extends Tool
         }
 
         try {
-            $execution->startStoryExecution($story);
+            $execution->startStoryExecution($story, userId: $user->getKey());
         } catch (\RuntimeException $e) {
             return Response::error($e->getMessage());
         }
