@@ -63,7 +63,7 @@ Repo management surfaces:
 | Surface | Responsibility |
 |---|---|
 | Project Repos page | Human repo attachment, primary selection, removal. |
-| `add-github-repo-to-project` | Creates or reuses a workspace GitHub Repo, installs webhook when possible, and attaches it to a Project. |
+| `add-github-repo-to-project` | Creates or reuses a workspace GitHub Repo, installs webhook when missing and possible, and attaches it to a Project. |
 | `set-primary-repo` | Marks an attached Repo primary. |
 | `remove-project-repo` | Deletes GitHub webhook when applicable, detaches the Repo from Projects, then deletes the Repo row. |
 
@@ -72,9 +72,13 @@ Repo management requires project approver/manage rights.
 ## GitHub OAuth and webhooks
 
 GitHub Repos are normally created from the acting user's GitHub OAuth token.
-`AddGithubRepoToProjectTool` looks up the repo in `GithubRepoCatalog`, stores
-the repo URL, default branch, provider, and token, and then attempts webhook
-installation.
+`AddGithubRepoToProjectTool` looks up the repo in `GithubRepoCatalog`, then
+creates or reuses a matching workspace Repo by URL.
+
+When it creates a Repo, it stores the repo URL, default branch, provider, and
+token. When it reuses an existing Repo, it leaves the stored token and default
+branch as-is. The tool attempts webhook installation only when the reused or
+created Repo has no `webhook_secret`.
 
 Webhook installation:
 
@@ -195,9 +199,11 @@ Dispatch rules:
 - prepares the same workspace and branch
 - fetches review summary and inline comments
 - runs `ReviewResponder`
-- commits and pushes a `fix(review): ...` commit when there is a diff
-- marks the response run succeeded even when there is no diff but the response
-  contains clarifications
+- commits using the agent-provided `commit_message`, falling back to
+  `fix(review): address PR #N review`
+- pushes the commit when a diff exists
+- marks the response run succeeded on no-diff responses after the agent runs,
+  including clarification-only responses
 - does not open a new PR
 
 Review-response runs do not affect Subtask completion. The original Execute
