@@ -262,9 +262,12 @@ Primary MCP surfaces:
 - `request-plan-changes`
 - `reject-plan`
 
-MCP approval tools use `RecordsApprovalDecisions` and
-`ResolvesProjectAccess`. The user must be able to access the owning Project and
-must have approver rights in that Project.
+MCP submit tools use `ResolvesProjectAccess`: the user must be able to access the
+owning Project, but submit does not require approver rights.
+
+MCP decision tools use `RecordsApprovalDecisions` and `ResolvesProjectAccess`.
+The user must be able to access the owning Project and must have approver rights
+in that Project.
 
 ## Invariants to preserve
 
