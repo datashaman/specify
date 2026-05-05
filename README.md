@@ -40,7 +40,7 @@ Product edits reopen Story approval and current Plan approval. Plan/Task/Subtask
 
 ## Pluggable executors
 
-`Executor` interface — `needsWorkingDirectory()`, `execute(Subtask, ?workingDir, ?Repo, ?workingBranch): ExecutionResult`.
+`Executor` interface — `needsWorkingDirectory()`, `execute(Subtask, ?workingDir, ?Repo, ?workingBranch, ?contextBrief = null, ?emitter = null, ?promptOverride = null): ExecutionResult`.
 
 - `LaravelAiExecutor` — remote-capable; wraps the `SubtaskExecutor` agent, uses repo-editing tools, and resolves the run owner's BYOK credential.
 - `CliExecutor` — local-only; runs any one-shot agent CLI (claude, codex, gemini, aider) in cwd, observes via `git status`.

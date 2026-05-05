@@ -48,8 +48,9 @@ return [
     | to perform tasks like text, image, and audio creation via agents.
     |
     | Specify resolves user-triggered agent calls through per-run BYOK provider
-    | config. These base provider entries supply defaults such as endpoint URLs;
-    | run ownership supplies the API key.
+    | config. BYOK overrides `key` on a temporary per-run provider. These base
+    | provider entries may still read env keys for non-BYOK usage, and supply
+    | shared defaults such as endpoint URLs.
     |
     */
 
