@@ -215,8 +215,9 @@ MCP tools use Project context in two ways:
 
 `CurrentContextTool` returns acting user, current Workspace, current Team, and
 current Project. Tools that resolve Project-owned records use
-`ResolvesProjectAccess` so Story, Feature, Plan, Scenario, Task, and Subtask
-lookups all enforce the same access rule.
+`ResolvesProjectAccess` for Project, Feature, Story, Scenario, and Plan lookups.
+Tools that start from Task or Subtask manually resolve the owning Project through
+Plan and Story, then enforce the same access rule.
 
 Common MCP patterns:
 
@@ -224,7 +225,8 @@ Common MCP patterns:
 |---|---|
 | `list-projects` | Lists all accessible Projects. |
 | `switch-project` | Sets `users.current_project_id`. |
-| `list-features`, `list-stories`, `list-runs`, `list-repos` | Use explicit `project_id` or current Project. |
+| `list-features`, `list-stories`, `list-repos` | Use explicit `project_id` or current Project. |
+| `list-runs` | Requires at least one of `story_id`, `task_id`, or `subtask_id`, then authorises through the resolved Project. |
 | `create-feature`, `create-story`, `create-project` | Create records under the selected Project or Team. |
 | `add-github-repo-to-project`, `set-primary-repo`, `remove-project-repo` | Manage Project -> Repo attachment with approval-role checks. |
 | Story / Plan / Task / Subtask tools | Resolve access through the owning Project. |
@@ -242,7 +244,8 @@ URLs from the Project, Story, Subtask, and Run IDs when needed.
 - Do not attach a Repo to a Project in a different Workspace.
 - Do not set more than one primary Repo for a Project.
 - Do not create direct Task -> Story or Task -> Project ownership shortcuts.
-- Do not bypass `ResolvesProjectAccess` in MCP tools that touch
-  Project-owned records.
+- Do not bypass Project access checks in MCP tools that touch Project-owned
+  records; use `ResolvesProjectAccess` where it has a resolver and manual owner
+  resolution where it does not.
 - Do not expose run events without resolving the run back to an accessible
   Project.
