@@ -8,7 +8,6 @@ use App\Models\Story;
 use App\Services\Context\AssetUploader;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
 use InvalidArgumentException;
 
 class ContextAssetUploadController extends Controller
@@ -22,7 +21,7 @@ class ContextAssetUploadController extends Controller
             'story_id' => ['required_without:project_id', 'nullable', 'integer'],
         ]);
 
-        $user = Auth::user();
+        $user = $request->user();
 
         if (! empty($validated['story_id'])) {
             $story = Story::query()->with('feature')->find($validated['story_id']);
