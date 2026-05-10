@@ -4,6 +4,8 @@ namespace App\Mcp\Servers;
 
 use App\Mcp\Tools\AddAcceptanceCriterionTool;
 use App\Mcp\Tools\AddGithubRepoToProjectTool;
+use App\Mcp\Tools\AddProjectAssetTool;
+use App\Mcp\Tools\AddStoryAssetTool;
 use App\Mcp\Tools\AddStoryDependencyTool;
 use App\Mcp\Tools\ApprovePlanTool;
 use App\Mcp\Tools\ApproveStoryTool;
@@ -13,6 +15,7 @@ use App\Mcp\Tools\CreateProjectTool;
 use App\Mcp\Tools\CreateScenarioTool;
 use App\Mcp\Tools\CreateStoryTool;
 use App\Mcp\Tools\CurrentContextTool;
+use App\Mcp\Tools\DeleteContextItemTool;
 use App\Mcp\Tools\GenerateTasksTool;
 use App\Mcp\Tools\GetFeatureTool;
 use App\Mcp\Tools\GetPlanTool;
@@ -22,6 +25,7 @@ use App\Mcp\Tools\GetRunTool;
 use App\Mcp\Tools\GetStoryTool;
 use App\Mcp\Tools\GetTaskTool;
 use App\Mcp\Tools\ListActivityTool;
+use App\Mcp\Tools\ListContextItemsTool;
 use App\Mcp\Tools\ListFeaturesTool;
 use App\Mcp\Tools\ListPlansTool;
 use App\Mcp\Tools\ListProjectsTool;
@@ -44,6 +48,7 @@ use App\Mcp\Tools\StartRunTool;
 use App\Mcp\Tools\SubmitPlanTool;
 use App\Mcp\Tools\SubmitStoryTool;
 use App\Mcp\Tools\SwitchProjectTool;
+use App\Mcp\Tools\UpdateContextItemTool;
 use App\Mcp\Tools\UpdateFeatureTool;
 use App\Mcp\Tools\UpdatePlanTool;
 use App\Mcp\Tools\UpdateProjectTool;
@@ -131,6 +136,11 @@ class SpecifyServer extends Server
         ListReposTool::class,
         GetRepoTool::class,
         ListActivityTool::class,
+        ListContextItemsTool::class,
+        AddProjectAssetTool::class,
+        AddStoryAssetTool::class,
+        UpdateContextItemTool::class,
+        DeleteContextItemTool::class,
     ];
 
     protected array $resources = [

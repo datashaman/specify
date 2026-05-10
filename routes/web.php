@@ -23,6 +23,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::livewire('activity', 'pages::activity.index')->name('activity.index');
     Route::livewire('projects', 'pages::projects.index')->name('projects.index');
     Route::livewire('projects/{project}', 'pages::projects.show')->name('projects.show');
+    Route::livewire('projects/{project}/features', 'pages::features.index')->name('features.index');
     Route::livewire('projects/{project}/features/{feature}', 'pages::features.show')->name('features.show');
     Route::livewire('projects/{project}/stories', 'pages::stories.index')->name('stories.index');
     Route::livewire('projects/{project}/stories/create', 'pages::stories.create')->name('stories.create');
@@ -31,6 +32,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::livewire('projects/{project}/approvals', 'pages::approvals.index')->name('approvals.index');
     Route::livewire('projects/{project}/runs', 'pages::runs.index')->name('runs.index');
     Route::livewire('projects/{project}/repos', 'pages::repos.index')->name('repos.index');
+    Route::livewire('projects/{project}/assets', 'pages::context-items.project-assets')->name('assets.index');
     Route::livewire('projects/{project}/stories/{story}', 'pages::stories.show')->name('stories.show');
     Route::livewire('projects/{project}/stories/{story}/tasks/{task}', 'pages::tasks.show')->name('tasks.show');
     Route::livewire('projects/{project}/stories/{story}/subtasks/{subtask}', 'pages::subtasks.show')->name('subtasks.show');
