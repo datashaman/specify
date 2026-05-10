@@ -707,6 +707,17 @@ new #[Title('Story')] class extends Component {
         @endunless
 
         @unless ($editing)
+            {{-- ── AI context: per-story assets + picker over project assets ── --}}
+            <livewire:pages::context-items.story-context-picker
+                :story-id="$story->id"
+                :key="'story-context-picker-'.$story->id"
+            />
+
+            <livewire:pages::context-items.story-assets-panel
+                :story-id="$story->id"
+                :key="'story-assets-panel-'.$story->id"
+            />
+
             {{-- ── Plan: ACs → Tasks → Subtasks → runs (AC-led) ────────────── --}}
             @include('partials.story-show.plan', $this->planViewData)
         @endunless
