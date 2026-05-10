@@ -195,5 +195,17 @@ return [
             'window' => env('SPECIFY_CONTEXT_WINDOW', '30.days'),
             'max_files' => (int) env('SPECIFY_CONTEXT_MAX_FILES', 10),
         ],
+        'assets' => [
+            'disk' => env('SPECIFY_ASSETS_DISK', 'private'),
+            'max_file_kb' => (int) env('SPECIFY_ASSETS_MAX_FILE_KB', 10240),
+            'allowed_mimes' => array_values(array_filter(array_map(
+                'trim',
+                explode(',', (string) env(
+                    'SPECIFY_ASSETS_ALLOWED_MIMES',
+                    'image/png,image/jpeg,image/webp,image/gif,application/pdf,text/plain,text/markdown'
+                ))
+            ))),
+            'summary_threshold_chars' => (int) env('SPECIFY_ASSETS_SUMMARY_THRESHOLD', 2000),
+        ],
     ],
 ];

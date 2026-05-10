@@ -56,6 +56,11 @@ class Project extends Model
         return $this->hasMany(Feature::class);
     }
 
+    public function contextItems(): HasMany
+    {
+        return $this->hasMany(ContextItem::class);
+    }
+
     public function stories(): HasManyThrough
     {
         return $this->hasManyThrough(Story::class, Feature::class);
