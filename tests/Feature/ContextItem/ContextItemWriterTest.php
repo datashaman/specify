@@ -10,8 +10,13 @@ use App\Models\Story;
 use App\Models\User;
 use App\Services\Context\ContextItemWriter;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+
+beforeEach(function () {
+    Bus::fake();
+});
 
 function ciScene(): array
 {
@@ -39,7 +44,8 @@ test('createProjectItem creates project-scoped item without reopening any story'
 
     expect($item->project_id)->toBe($project->id);
     expect($item->story_id)->toBeNull();
-    expect($item->summary_status)->toBe(ContextItemSummaryStatus::Pending);
+    // Short text bodies skip summarisation; long bodies dispatch a job (slice 2 covers both).
+    expect($item->fresh()->summary_status)->toBe(ContextItemSummaryStatus::Skipped);
     expect($story->fresh()->revision)->toBe($beforeRev);
     expect($story->fresh()->status)->toBe(StoryStatus::Approved);
 });

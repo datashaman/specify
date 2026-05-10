@@ -15,9 +15,11 @@ use InvalidArgumentException;
 
 /**
  * Persists an uploaded file to the configured `private` disk and creates a
- * matching ContextItem row. Story summarisation (lazy) is owned by the
- * companion job in Slice 2 — uploads here always land in
- * `summary_status=pending` so that worker picks them up later.
+ * matching ContextItem row. Files land in `summary_status=skipped`
+ * because there is no extraction pipeline yet — `ContextCompressor` would
+ * have nothing to feed the summariser. When the extractor lands, it will
+ * flip the row to `Pending` and dispatch `SummariseContextItemJob` from
+ * there.
  */
 class AssetUploader
 {
@@ -50,7 +52,12 @@ class AssetUploader
                 'mime' => $file->getMimeType() ?: 'application/octet-stream',
                 'size' => $file->getSize(),
             ],
-            'summary_status' => ContextItemSummaryStatus::Pending,
+            // File items stay Skipped: there is no extraction pipeline yet,
+            // so ContextCompressor would have no body to compress and
+            // would mark Skipped on the first job run anyway. When the
+            // PDF/text extractor lands, this can flip to Pending and the
+            // extractor will dispatch SummariseContextItemJob from there.
+            'summary_status' => ContextItemSummaryStatus::Skipped,
             'created_by_id' => $actor->getKey(),
         ]);
     }

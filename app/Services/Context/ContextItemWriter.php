@@ -4,6 +4,7 @@ namespace App\Services\Context;
 
 use App\Enums\ContextItemSummaryStatus;
 use App\Enums\ContextItemType;
+use App\Jobs\SummariseContextItemJob;
 use App\Models\ContextItem;
 use App\Models\Project;
 use App\Models\Story;
@@ -34,7 +35,7 @@ class ContextItemWriter
     {
         $this->ensureNonFileType($attributes['type'] ?? null);
 
-        return ContextItem::create([
+        $item = ContextItem::create([
             'project_id' => $project->getKey(),
             'story_id' => null,
             'type' => $attributes['type'],
@@ -44,6 +45,10 @@ class ContextItemWriter
             'summary_status' => $this->initialSummaryStatus($attributes['type']),
             'created_by_id' => $actor->getKey(),
         ]);
+
+        $this->maybeDispatchSummarise($item);
+
+        return $item;
     }
 
     /**
@@ -81,6 +86,8 @@ class ContextItemWriter
 
             $this->revisions->recordContentArtifactChanged($story);
 
+            $this->maybeDispatchSummarise($item);
+
             return $item;
         });
     }
@@ -114,13 +121,26 @@ class ContextItemWriter
                 return $item;
             }
 
+            $bodyChanged = $item->isDirty('metadata') && $this->isTextItem($item);
+            if ($bodyChanged) {
+                $item->summary_status = ContextItemSummaryStatus::Pending;
+                $item->summary = null;
+                $item->summary_error = null;
+            }
+
             $item->save();
 
             if ($item->isStoryScoped() && $item->story) {
                 $this->revisions->recordContentArtifactChanged($item->story);
             }
 
-            return $item->refresh();
+            $fresh = $item->refresh();
+
+            if ($bodyChanged) {
+                $this->maybeDispatchSummarise($fresh);
+            }
+
+            return $fresh;
         });
     }
 
@@ -173,6 +193,34 @@ class ContextItemWriter
         return $resolved === ContextItemType::Link
             ? ContextItemSummaryStatus::Skipped
             : ContextItemSummaryStatus::Pending;
+    }
+
+    private function maybeDispatchSummarise(ContextItem $item): void
+    {
+        if (! $this->isTextItem($item)) {
+            return;
+        }
+
+        $body = (string) ($item->metadata['body'] ?? '');
+        $threshold = (int) config('specify.context.assets.summary_threshold_chars', 2000);
+
+        if (mb_strlen($body) < $threshold) {
+            // Short bodies stay raw — `bodyForContext()` handles them as-is.
+            $item->forceFill(['summary_status' => ContextItemSummaryStatus::Skipped->value])->save();
+
+            return;
+        }
+
+        SummariseContextItemJob::dispatch($item->getKey());
+    }
+
+    private function isTextItem(ContextItem $item): bool
+    {
+        $type = $item->type instanceof ContextItemType
+            ? $item->type
+            : ContextItemType::tryFrom((string) $item->type);
+
+        return $type === ContextItemType::Text;
     }
 
     private function deleteUnderlyingFile(ContextItem $item): void
