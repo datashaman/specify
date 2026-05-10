@@ -2,9 +2,11 @@
 
 namespace App\Providers;
 
+use App\Services\Context\CompositeContextBuilder;
 use App\Services\Context\ContextBuilder;
 use App\Services\Context\NullContextBuilder;
 use App\Services\Context\RecencyContextBuilder;
+use App\Services\Context\SelectedAssetsContextBuilder;
 use App\Services\Executors\Executor;
 use App\Services\Executors\ExecutorFactory;
 use App\Services\Prompts\PromptLoader;
@@ -40,11 +42,14 @@ class AppServiceProvider extends ServiceProvider
         $this->app->bind(ContextBuilder::class, function () {
             $driver = config('specify.context.builder', 'recency');
 
+            $recency = fn () => new RecencyContextBuilder(
+                window: (string) config('specify.context.recency.window', '30.days'),
+                maxFiles: (int) config('specify.context.recency.max_files', 10),
+            );
+
             return match ($driver) {
-                'recency' => new RecencyContextBuilder(
-                    window: (string) config('specify.context.recency.window', '30.days'),
-                    maxFiles: (int) config('specify.context.recency.max_files', 10),
-                ),
+                'recency' => $recency(),
+                'composite' => new CompositeContextBuilder($recency(), new SelectedAssetsContextBuilder),
                 'null', null, '' => new NullContextBuilder,
                 default => throw new InvalidArgumentException("Unknown context builder [{$driver}]."),
             };
