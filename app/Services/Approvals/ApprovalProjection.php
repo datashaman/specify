@@ -47,7 +47,7 @@ class ApprovalProjection
     {
         return $story->approvals
             ->where('story_revision', $story->revision ?? 1)
-            ->sortBy('created_at')
+            ->sortBy(fn ($a) => [$a->created_at?->getTimestamp(), (int) $a->id])
             ->values();
     }
 
@@ -60,7 +60,7 @@ class ApprovalProjection
     {
         return $story->approvals
             ->where('story_revision', '!=', $story->revision ?? 1)
-            ->sortByDesc('created_at')
+            ->sortByDesc(fn ($a) => [$a->created_at?->getTimestamp(), (int) $a->id])
             ->values();
     }
 
@@ -73,7 +73,7 @@ class ApprovalProjection
     {
         return $plan->approvals
             ->where('plan_revision', $plan->revision ?? 1)
-            ->sortBy('created_at')
+            ->sortBy(fn ($a) => [$a->created_at?->getTimestamp(), (int) $a->id])
             ->values();
     }
 
@@ -86,19 +86,39 @@ class ApprovalProjection
     {
         return $plan->approvals
             ->where('plan_revision', '!=', $plan->revision ?? 1)
-            ->sortByDesc('created_at')
+            ->sortByDesc(fn ($a) => [$a->created_at?->getTimestamp(), (int) $a->id])
             ->values();
     }
 
+    /**
+     * Mirrors {@see ApprovalGate::state()}: ChangesRequested clears the
+     * effective set, Reject is terminal (no effective approvers), Approve
+     * sets the row, Revoke clears that approver. Sort is (created_at, id)
+     * so same-second decisions remain deterministic.
+     */
     private function replay(Collection $approvals, string $revisionColumn, int $revision): array
     {
+        $rows = $approvals
+            ->where($revisionColumn, $revision)
+            ->sortBy(fn ($a) => [$a->created_at?->getTimestamp(), (int) $a->id]);
+
+        if ($rows->contains(fn ($a) => $a->decision === ApprovalDecision::Reject)) {
+            return [];
+        }
+
         $effective = [];
-        foreach ($approvals->where($revisionColumn, $revision)->sortBy('created_at') as $approval) {
+        foreach ($rows as $approval) {
             $key = (int) $approval->approver_id;
-            if ($approval->decision === ApprovalDecision::Approve) {
-                $effective[$key] = $approval;
-            } elseif ($approval->decision === ApprovalDecision::Revoke) {
-                unset($effective[$key]);
+            switch ($approval->decision) {
+                case ApprovalDecision::Approve:
+                    $effective[$key] = $approval;
+                    break;
+                case ApprovalDecision::Revoke:
+                    unset($effective[$key]);
+                    break;
+                case ApprovalDecision::ChangesRequested:
+                    $effective = [];
+                    break;
             }
         }
 

@@ -109,6 +109,54 @@ test('priorRevisionStoryApprovals returns prior revisions newest first', functio
         ->and($prior->last()->id)->toBe($rev1->id);
 });
 
+test('ChangesRequested clears effective approvers in the same revision', function () {
+    $story = makeStory();
+    $alice = User::factory()->create();
+    $bob = User::factory()->create();
+
+    recordStoryDecision($story, $alice, ApprovalDecision::Approve);
+    recordStoryDecision($story, $bob, ApprovalDecision::ChangesRequested);
+
+    expect(app(ApprovalProjection::class)->effectiveStoryApprovals($story->fresh('approvals')))->toBeEmpty();
+});
+
+test('ChangesRequested followed by Approve rebuilds effective set', function () {
+    $story = makeStory();
+    $alice = User::factory()->create();
+    $bob = User::factory()->create();
+
+    recordStoryDecision($story, $alice, ApprovalDecision::Approve);
+    recordStoryDecision($story, $bob, ApprovalDecision::ChangesRequested);
+    recordStoryDecision($story, $alice, ApprovalDecision::Approve);
+
+    expect(app(ApprovalProjection::class)->effectiveStoryApprovals($story->fresh('approvals')))
+        ->toHaveKey($alice->id);
+});
+
+test('Reject is terminal: no approver counts as effective', function () {
+    $story = makeStory();
+    $alice = User::factory()->create();
+    $bob = User::factory()->create();
+
+    recordStoryDecision($story, $alice, ApprovalDecision::Approve);
+    recordStoryDecision($story, $bob, ApprovalDecision::Approve);
+    recordStoryDecision($story, $bob, ApprovalDecision::Reject);
+
+    expect(app(ApprovalProjection::class)->effectiveStoryApprovals($story->fresh('approvals')))->toBeEmpty();
+});
+
+test('same-second decisions are ordered deterministically by id (revoke after approve)', function () {
+    $story = makeStory();
+    $alice = User::factory()->create();
+
+    Carbon\Carbon::setTestNow('2026-05-10 12:00:00');
+    recordStoryDecision($story, $alice, ApprovalDecision::Approve);
+    recordStoryDecision($story, $alice, ApprovalDecision::Revoke);
+    Carbon\Carbon::setTestNow();
+
+    expect(app(ApprovalProjection::class)->effectiveStoryApprovals($story->fresh('approvals')))->toBeEmpty();
+});
+
 test('plan projections mirror story projections via plan_revision', function () {
     $story = makeStory();
     $plan = Plan::factory()->for($story)->create(['revision' => 2]);
