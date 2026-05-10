@@ -139,3 +139,60 @@ test('member cannot delete a project', function () {
 
     expect(Project::find($project->id))->not->toBeNull();
 });
+
+test('new features receive monotonic per-project positions', function () {
+    ['project' => $project] = projectShowScene();
+    $a = Feature::factory()->for($project)->create();
+    $b = Feature::factory()->for($project)->create();
+    $c = Feature::factory()->for($project)->create();
+
+    expect([$a->fresh()->position, $b->fresh()->position, $c->fresh()->position])->toBe([1, 2, 3]);
+});
+
+test('reorderFeatures rewrites positions and survives a refresh', function () {
+    ['user' => $user, 'project' => $project] = projectShowScene();
+    $a = Feature::factory()->for($project)->create(['name' => 'Alpha']);
+    $b = Feature::factory()->for($project)->create(['name' => 'Bravo']);
+    $c = Feature::factory()->for($project)->create(['name' => 'Charlie']);
+
+    $this->actingAs($user);
+
+    Livewire::test('pages::projects.show', ['project' => $project->id])
+        ->call('reorderFeatures', [$c->id, $a->id, $b->id]);
+
+    expect($c->fresh()->position)->toBe(1);
+    expect($a->fresh()->position)->toBe(2);
+    expect($b->fresh()->position)->toBe(3);
+});
+
+test('reorderFeatures ignores foreign ids and noops on incomplete payload', function () {
+    ['user' => $user, 'project' => $project] = projectShowScene();
+    $a = Feature::factory()->for($project)->create();
+    $b = Feature::factory()->for($project)->create();
+    $c = Feature::factory()->for($project)->create();
+
+    $otherProject = Project::factory()->for($project->team)->create();
+    $foreign = Feature::factory()->for($otherProject)->create();
+
+    $this->actingAs($user);
+
+    Livewire::test('pages::projects.show', ['project' => $project->id])
+        ->call('reorderFeatures', [$b->id, $foreign->id, $a->id]);
+
+    expect($a->fresh()->position)->toBe(1);
+    expect($b->fresh()->position)->toBe(2);
+    expect($c->fresh()->position)->toBe(3);
+    expect($foreign->fresh()->position)->toBe(1);
+});
+
+test('Member cannot reorder features', function () {
+    ['user' => $user, 'project' => $project] = projectShowScene(TeamRole::Member);
+    $a = Feature::factory()->for($project)->create();
+    $b = Feature::factory()->for($project)->create();
+
+    $this->actingAs($user);
+
+    Livewire::test('pages::projects.show', ['project' => $project->id])
+        ->call('reorderFeatures', [$b->id, $a->id])
+        ->assertStatus(403);
+});
