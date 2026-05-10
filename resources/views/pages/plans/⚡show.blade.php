@@ -3,6 +3,7 @@
 use App\Enums\PlanStatus;
 use App\Models\Plan;
 use App\Services\Approvals\ApprovalProjection;
+use App\Services\Plans\PlanRunProjection;
 use Illuminate\Support\Facades\Auth;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Title;
@@ -73,7 +74,7 @@ new #[Title('Plan')] class extends Component {
             $subtaskCount = $tasks->reduce(fn ($acc, $task) => $acc + $task->subtasks->count(), 0);
             $effective = app(ApprovalProjection::class)->effectivePlanApprovals($plan);
             $policy = $plan->effectivePolicy();
-            $latestRun = $tasks->flatMap->subtasks->flatMap->agentRuns->sortByDesc('id')->first();
+            $latestRun = app(PlanRunProjection::class)->latestRun($plan);
             $branch = $latestRun?->working_branch;
             $repo = $latestRun?->repo;
         @endphp
