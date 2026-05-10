@@ -220,8 +220,10 @@ class Story extends Model
 
     /**
      * Story-scoped ContextItems (those whose `story_id` matches this story).
-     * Story-scoped items auto-include — they always render in the picker as
-     * checked and cannot be project-scoped after creation.
+     * `ContextItemWriter::createStoryItem` auto-attaches them to this
+     * Story's selection, and `ContextItemSelector` refuses to detach them
+     * — toggling story-scoped items off is not a picker concern. They
+     * leave the selection only when deleted via `ContextItemWriter::delete`.
      */
     public function ownedContextItems(): HasMany
     {
