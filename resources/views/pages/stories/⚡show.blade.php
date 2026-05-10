@@ -7,6 +7,7 @@ use App\Enums\TaskStatus;
 use App\Models\AcceptanceCriterion;
 use App\Models\AgentRun;
 use App\Models\Story;
+use App\Services\Approvals\ApprovalProjection;
 use App\Services\Stories\StoryContractEditor;
 use App\Services\Stories\StoryPageWorkflow;
 use App\Services\Stories\StoryRunProjection;
@@ -464,20 +465,8 @@ new #[Title('Story')] class extends Component {
     public function effectiveApprovals(): array
     {
         $story = $this->story;
-        if (! $story) {
-            return [];
-        }
-        $effective = [];
-        foreach ($story->approvals->where('story_revision', $story->revision ?? 1)->sortBy('created_at') as $a) {
-            $key = (int) $a->approver_id;
-            if ($a->decision === ApprovalDecision::Approve) {
-                $effective[$key] = $a;
-            } elseif ($a->decision === ApprovalDecision::Revoke) {
-                unset($effective[$key]);
-            }
-        }
 
-        return $effective;
+        return $story ? app(ApprovalProjection::class)->effectiveStoryApprovals($story) : [];
     }
 
     #[Computed]
@@ -498,21 +487,8 @@ new #[Title('Story')] class extends Component {
     public function effectivePlanApprovals(): array
     {
         $plan = $this->story?->currentPlan;
-        if (! $plan) {
-            return [];
-        }
 
-        $effective = [];
-        foreach ($plan->approvals->where('plan_revision', $plan->revision ?? 1)->sortBy('created_at') as $a) {
-            $key = (int) $a->approver_id;
-            if ($a->decision === ApprovalDecision::Approve) {
-                $effective[$key] = $a;
-            } elseif ($a->decision === ApprovalDecision::Revoke) {
-                unset($effective[$key]);
-            }
-        }
-
-        return $effective;
+        return $plan ? app(ApprovalProjection::class)->effectivePlanApprovals($plan) : [];
     }
 
     #[Computed]
@@ -637,10 +613,11 @@ new #[Title('Story')] class extends Component {
             && $canApprove;
         $hasAnyDecisionAction = $hasDraftSubmit || $hasAutoStart || $hasApprovalActions || $hasPlanSubmit || $hasPlanApprovalActions || $hasResume || $hasStartExecution;
         $isTerminal = in_array($story->status, [StoryStatus::Done, StoryStatus::Cancelled, StoryStatus::Rejected], true);
-        $rrCurrent = $story->approvals->where('story_revision', $story->revision ?? 1)->sortBy('created_at')->values();
-        $rrPrior = $story->approvals->where('story_revision', '!=', $story->revision ?? 1)->sortByDesc('created_at')->values();
-        $planCurrent = $currentPlan?->approvals?->where('plan_revision', $currentPlan->revision ?? 1)?->sortBy('created_at')?->values() ?? collect();
-        $planPrior = $currentPlan?->approvals?->where('plan_revision', '!=', $currentPlan->revision ?? 1)?->sortByDesc('created_at')?->values() ?? collect();
+        $projection = app(ApprovalProjection::class);
+        $rrCurrent = $projection->currentRevisionStoryApprovals($story);
+        $rrPrior = $projection->priorRevisionStoryApprovals($story);
+        $planCurrent = $currentPlan ? $projection->currentRevisionPlanApprovals($currentPlan) : collect();
+        $planPrior = $currentPlan ? $projection->priorRevisionPlanApprovals($currentPlan) : collect();
         $rrEligibleVisible = ! $isTerminal
             && $policy
             && ($policy->required_approvals ?? 0) > 1

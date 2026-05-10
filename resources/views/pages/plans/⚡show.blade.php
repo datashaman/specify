@@ -2,6 +2,7 @@
 
 use App\Enums\PlanStatus;
 use App\Models\Plan;
+use App\Services\Approvals\ApprovalProjection;
 use Illuminate\Support\Facades\Auth;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Title;
@@ -70,15 +71,7 @@ new #[Title('Plan')] class extends Component {
             $unmappedTasks = $tasksByAc->get(null, collect())->sortBy('position')->values();
             $acs = $story->acceptanceCriteria->sortBy('position')->values();
             $subtaskCount = $tasks->reduce(fn ($acc, $task) => $acc + $task->subtasks->count(), 0);
-            $effective = [];
-            foreach ($plan->approvals->where('plan_revision', $plan->revision ?? 1)->sortBy('created_at') as $approval) {
-                $key = (int) $approval->approver_id;
-                if ($approval->decision === \App\Enums\ApprovalDecision::Approve) {
-                    $effective[$key] = $approval;
-                } elseif ($approval->decision === \App\Enums\ApprovalDecision::Revoke) {
-                    unset($effective[$key]);
-                }
-            }
+            $effective = app(ApprovalProjection::class)->effectivePlanApprovals($plan);
             $policy = $plan->effectivePolicy();
             $latestRun = $tasks->flatMap->subtasks->flatMap->agentRuns->sortByDesc('id')->first();
             $branch = $latestRun?->working_branch;

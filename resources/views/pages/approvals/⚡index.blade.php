@@ -6,6 +6,7 @@ use App\Enums\StoryStatus;
 use App\Models\Plan;
 use App\Models\Project;
 use App\Models\Story;
+use App\Services\Approvals\ApprovalProjection;
 use App\Services\ApprovalService;
 use Illuminate\Support\Facades\Auth;
 use Livewire\Attributes\Computed;
@@ -151,16 +152,7 @@ new #[Title('Approvals')] class extends Component {
                 @forelse ($this->pendingStories as $story)
                     @php
                         $policy = $story->effectivePolicy();
-                        $revisionApprovals = $story->approvals->where('story_revision', $story->revision ?? 1);
-                        $effective = [];
-                        foreach ($revisionApprovals->sortBy('created_at') as $a) {
-                            $key = (int) $a->approver_id;
-                            if ($a->decision === ApprovalDecision::Approve) {
-                                $effective[$key] = $a;
-                            } elseif ($a->decision === ApprovalDecision::Revoke) {
-                                unset($effective[$key]);
-                            }
-                        }
+                        $effective = app(ApprovalProjection::class)->effectiveStoryApprovals($story);
                         $userApproved = isset($effective[auth()->id()]);
                     @endphp
                     <x-story.summary-card :story="$story" :href="route('stories.show', ['project' => $story->feature->project_id, 'story' => $story->id])" card-class="">
@@ -195,16 +187,7 @@ new #[Title('Approvals')] class extends Component {
                 @forelse ($this->pendingPlans as $plan)
                     @php
                         $policy = $plan->effectivePolicy();
-                        $revisionApprovals = $plan->approvals->where('plan_revision', $plan->revision ?? 1);
-                        $effective = [];
-                        foreach ($revisionApprovals->sortBy('created_at') as $a) {
-                            $key = (int) $a->approver_id;
-                            if ($a->decision === ApprovalDecision::Approve) {
-                                $effective[$key] = $a;
-                            } elseif ($a->decision === ApprovalDecision::Revoke) {
-                                unset($effective[$key]);
-                            }
-                        }
+                        $effective = app(ApprovalProjection::class)->effectivePlanApprovals($plan);
                         $userApproved = isset($effective[auth()->id()]);
                         $taskCount = $plan->tasks->count();
                         $subtaskCount = $plan->tasks->sum(fn ($task) => $task->subtasks->count());

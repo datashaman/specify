@@ -5,6 +5,7 @@ use App\Enums\PlanStatus;
 use App\Enums\StoryStatus;
 use App\Models\Plan;
 use App\Models\Story;
+use App\Services\Approvals\ApprovalProjection;
 use App\Services\ApprovalService;
 use Illuminate\Support\Facades\Auth;
 use Livewire\Attributes\Computed;
@@ -121,16 +122,7 @@ new #[Title('Triage')] class extends Component {
             @php
                 $project = $story->feature->project;
                 $policy = $story->effectivePolicy();
-                $revisionApprovals = $story->approvals->where('story_revision', $story->revision ?? 1);
-                $effective = [];
-                foreach ($revisionApprovals->sortBy('created_at') as $a) {
-                    $key = (int) $a->approver_id;
-                    if ($a->decision === \App\Enums\ApprovalDecision::Approve) {
-                        $effective[$key] = $a;
-                    } elseif ($a->decision === \App\Enums\ApprovalDecision::Revoke) {
-                        unset($effective[$key]);
-                    }
-                }
+                $effective = app(ApprovalProjection::class)->effectiveStoryApprovals($story);
                 $approveCount = count($effective);
                 $required = $policy->required_approvals;
                 $userApproved = isset($effective[$user->id]);
@@ -208,16 +200,7 @@ new #[Title('Triage')] class extends Component {
             @php
                 $project = $plan->story->feature->project;
                 $policy = $plan->effectivePolicy();
-                $revisionApprovals = $plan->approvals->where('plan_revision', $plan->revision ?? 1);
-                $effective = [];
-                foreach ($revisionApprovals->sortBy('created_at') as $a) {
-                    $key = (int) $a->approver_id;
-                    if ($a->decision === \App\Enums\ApprovalDecision::Approve) {
-                        $effective[$key] = $a;
-                    } elseif ($a->decision === \App\Enums\ApprovalDecision::Revoke) {
-                        unset($effective[$key]);
-                    }
-                }
+                $effective = app(ApprovalProjection::class)->effectivePlanApprovals($plan);
                 $approveCount = count($effective);
                 $required = $policy->required_approvals;
                 $userApproved = isset($effective[$user->id]);
