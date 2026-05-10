@@ -83,6 +83,7 @@ return [
 
     'mcp' => [
         'user_email' => env('MCP_USER_EMAIL'),
+        'api_key' => env('SPECIFY_API_KEY'),
     ],
 
     /*

@@ -3,6 +3,11 @@
 namespace App\Mcp\Servers;
 
 use App\Mcp\Tools\AddAcceptanceCriterionTool;
+use App\Mcp\Tools\AddProjectAssetTool;
+use App\Mcp\Tools\AddStoryAssetTool;
+use App\Mcp\Tools\DeleteContextItemTool;
+use App\Mcp\Tools\ListContextItemsTool;
+use App\Mcp\Tools\UpdateContextItemTool;
 use App\Mcp\Tools\AddGithubRepoToProjectTool;
 use App\Mcp\Tools\AddStoryDependencyTool;
 use App\Mcp\Tools\ApprovePlanTool;
@@ -131,6 +136,11 @@ class SpecifyServer extends Server
         ListReposTool::class,
         GetRepoTool::class,
         ListActivityTool::class,
+        ListContextItemsTool::class,
+        AddProjectAssetTool::class,
+        AddStoryAssetTool::class,
+        UpdateContextItemTool::class,
+        DeleteContextItemTool::class,
     ];
 
     protected array $resources = [
