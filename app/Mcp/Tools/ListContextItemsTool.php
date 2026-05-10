@@ -29,6 +29,10 @@ class ListContextItemsTool extends Tool
             'story_id' => ['nullable', 'integer'],
         ]);
 
+        if (! empty($validated['story_id']) && ! empty($validated['project_id'])) {
+            return Response::error('Provide either project_id or story_id, not both.');
+        }
+
         if (! empty($validated['story_id'])) {
             $story = $this->resolveAccessibleStory($validated['story_id'], $user);
             if ($story instanceof Response) {

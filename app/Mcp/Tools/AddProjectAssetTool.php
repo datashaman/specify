@@ -6,6 +6,7 @@ use App\Enums\ContextItemType;
 use App\Mcp\Concerns\ResolvesProjectAccess;
 use App\Services\Context\ContextItemWriter;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
+use Illuminate\Validation\ValidationException;
 use InvalidArgumentException;
 use Laravel\Mcp\Request;
 use Laravel\Mcp\Response;
@@ -26,13 +27,17 @@ class AddProjectAssetTool extends Tool
             return $user;
         }
 
-        $validated = $request->validate([
-            'project_id' => ['required', 'integer'],
-            'type' => ['required', 'string', 'in:text,link'],
-            'title' => ['required', 'string', 'max:255'],
-            'body' => ['nullable', 'string', 'max:10000'],
-            'url' => ['nullable', 'string', 'url', 'max:2048'],
-        ]);
+        try {
+            $validated = $request->validate([
+                'project_id' => ['required', 'integer'],
+                'type' => ['required', 'string', 'in:text,link'],
+                'title' => ['required', 'string', 'max:255'],
+                'body' => ['required_if:type,text', 'nullable', 'string', 'max:10000'],
+                'url' => ['required_if:type,link', 'nullable', 'string', 'url', 'max:2048'],
+            ]);
+        } catch (ValidationException $e) {
+            return Response::error(implode(' ', array_merge(...array_values($e->errors()))));
+        }
 
         $project = $this->resolveAccessibleProject($validated['project_id'], $user);
         if ($project instanceof Response) {

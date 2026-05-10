@@ -17,8 +17,8 @@ class ContextAssetUploadController extends Controller
         $validated = $request->validate([
             'file' => ['required', 'file'],
             'title' => ['nullable', 'string', 'max:255'],
-            'project_id' => ['required_without:story_id', 'nullable', 'integer'],
-            'story_id' => ['required_without:project_id', 'nullable', 'integer'],
+            'project_id' => ['required_without:story_id', 'nullable', 'integer', 'prohibited_with:story_id'],
+            'story_id' => ['required_without:project_id', 'nullable', 'integer', 'prohibited_with:project_id'],
         ]);
 
         $user = $request->user();

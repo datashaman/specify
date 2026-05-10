@@ -13,7 +13,7 @@ use Laravel\Mcp\Response;
 use Laravel\Mcp\Server\Attributes\Description;
 use Laravel\Mcp\Server\Tool;
 
-#[Description('Update the title or body of an existing text or link context asset. File assets can only have their title changed.')]
+#[Description('Update an existing context asset. Text assets: update title and/or body. Link assets: update title and/or url. File assets: title only.')]
 class UpdateContextItemTool extends Tool
 {
     use ResolvesProjectAccess;
@@ -31,6 +31,7 @@ class UpdateContextItemTool extends Tool
             'id' => ['required', 'integer'],
             'title' => ['nullable', 'string', 'max:255'],
             'body' => ['nullable', 'string', 'max:10000'],
+            'url' => ['nullable', 'string', 'url', 'max:2048'],
         ]);
 
         $item = ContextItem::query()
@@ -47,6 +48,8 @@ class UpdateContextItemTool extends Tool
         }
         if (isset($validated['body']) && $item->type === ContextItemType::Text) {
             $changes['metadata'] = ['body' => $validated['body']];
+        } elseif (isset($validated['url']) && $item->type === ContextItemType::Link) {
+            $changes['metadata'] = array_merge($item->metadata ?? [], ['url' => $validated['url']]);
         }
 
         if (empty($changes)) {
@@ -75,6 +78,7 @@ class UpdateContextItemTool extends Tool
             'id' => $schema->integer()->description('Context item ID to update.')->required(),
             'title' => $schema->string()->description('New title.'),
             'body' => $schema->string()->description('New body text. Only applies to text-type assets.'),
+            'url' => $schema->string()->description('New URL. Only applies to link-type assets.'),
         ];
     }
 }
