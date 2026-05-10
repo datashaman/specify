@@ -20,6 +20,8 @@ Living document. Terms are added as they're sharpened during design discussions.
 
 - **Team** — workspace-scoped, M:N with User via `team_user`.
 - **Repo** — workspace-scoped, attached to Projects via `project_repo`. Carries `provider`, encrypted `access_token`, and `webhook_secret`.
+- **ContextItem** — product-owner reference asset (file / link / text) attached to a Project (shared) or a single Story (scoped). Story-scoped items auto-include and reopen Story approval on CRUD; project-scoped items do not. See ADR-0015.
+- **Story context selection** — the set of ContextItems a Story has selected, recorded in `context_item_story`. Toggling inclusion reopens Story approval — exactly once per `bulkSet` save. The picker's source is `Story::availableContextItems()` (project-scoped + own).
 - **ApprovalPolicy** — cascade `workspace -> project -> story` with a `required_approvals` threshold. Resolved policy decides how many Approve decisions a Story or Plan needs; Plans use their Story's effective policy. StoryApproval gates the product contract and PlanApproval gates execution against the current Plan. The threshold is surfaced in the UI as tally pills (`Approved · 2/2`, `Pending · 1/2`, `Changes requested`). The approval rail shows immutable **decision logs** (Approve / ChangesRequested / Reject / Revoke, approver, time) rather than flat approver lists. ChangesRequested resets the relevant tally — the editor must surface this consequence before the click. Reject is terminal and lives in a "more" menu with a hard confirm. **Story authors cannot approve their own Stories** — the Approve button is hidden for the author. When threshold > 1, the rail lists eligible approvers.
 
 ## Runs and race mode
