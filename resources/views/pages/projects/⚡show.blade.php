@@ -280,6 +280,11 @@ new #[Title('Project')] class extends Component {
             </div>
         </section>
 
+        <livewire:pages::context-items.project-assets-panel
+            :project-id="$this->project->id"
+            :key="'project-assets-panel-'.$this->project->id"
+        />
+
         @if ($canManageFeatures)
             <flux:modal name="new-feature-modal" class="md:w-96">
                 <form wire:submit.prevent="createFeature" class="flex flex-col gap-4">

@@ -8,7 +8,9 @@ use App\Models\ContextItem;
 use App\Models\Project;
 use App\Models\Story;
 use App\Models\User;
+use App\Services\Stories\StoryRevisionLifecycle;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use InvalidArgumentException;
@@ -23,6 +25,8 @@ use InvalidArgumentException;
  */
 class AssetUploader
 {
+    public function __construct(private StoryRevisionLifecycle $revisions) {}
+
     public function store(UploadedFile $file, Project $project, ?Story $story, User $actor): ContextItem
     {
         $this->ensureStoryBelongsToProject($project, $story);
@@ -36,30 +40,49 @@ class AssetUploader
             throw new \RuntimeException('Failed to store uploaded asset.');
         }
 
-        return ContextItem::create([
-            'project_id' => $project->getKey(),
-            'story_id' => $story?->getKey(),
-            'type' => ContextItemType::File,
-            'title' => $file->getClientOriginalName() ?: basename($storedPath),
-            'description' => null,
-            'metadata' => [
-                'disk' => $disk,
-                'path' => $storedPath,
-                'original_name' => $file->getClientOriginalName(),
-                // Server-detected MIME — getClientMimeType() is user-controlled and
-                // trivial to spoof. The detected value is what we record and what
-                // later checks should rely on.
-                'mime' => $file->getMimeType() ?: 'application/octet-stream',
-                'size' => $file->getSize(),
-            ],
-            // File items stay Skipped: there is no extraction pipeline yet,
-            // so ContextCompressor would have no body to compress and
-            // would mark Skipped on the first job run anyway. When the
-            // PDF/text extractor lands, this can flip to Pending and the
-            // extractor will dispatch SummariseContextItemJob from there.
-            'summary_status' => ContextItemSummaryStatus::Skipped,
-            'created_by_id' => $actor->getKey(),
-        ]);
+        return DB::transaction(function () use ($project, $story, $actor, $disk, $storedPath, $file): ContextItem {
+            $item = ContextItem::create([
+                'project_id' => $project->getKey(),
+                'story_id' => $story?->getKey(),
+                'type' => ContextItemType::File,
+                'title' => $file->getClientOriginalName() ?: basename($storedPath),
+                'description' => null,
+                'metadata' => [
+                    'disk' => $disk,
+                    'path' => $storedPath,
+                    'original_name' => $file->getClientOriginalName(),
+                    // Server-detected MIME — getClientMimeType() is user-controlled and
+                    // trivial to spoof. The detected value is what we record and what
+                    // later checks should rely on.
+                    'mime' => $file->getMimeType() ?: 'application/octet-stream',
+                    'size' => $file->getSize(),
+                ],
+                // File items stay Skipped: there is no extraction pipeline yet,
+                // so ContextCompressor would have no body to compress and
+                // would mark Skipped on the first job run anyway. When the
+                // PDF/text extractor lands, this can flip to Pending and the
+                // extractor will dispatch SummariseContextItemJob from there.
+                'summary_status' => ContextItemSummaryStatus::Skipped,
+                'created_by_id' => $actor->getKey(),
+            ]);
+
+            // Story-scoped uploads must follow the same approval-reopen +
+            // auto-include contract as `ContextItemWriter::createStoryItem`
+            // (per ADR-0015). Without these two calls, a file uploaded
+            // through the Story panel would silently bypass approval review
+            // and never appear in the picker as included.
+            if ($story !== null) {
+                $story->includedContextItems()->syncWithoutDetaching([
+                    $item->getKey() => [
+                        'included_at' => now(),
+                        'included_by_id' => $actor->getKey(),
+                    ],
+                ]);
+                $this->revisions->recordContentArtifactChanged($story);
+            }
+
+            return $item;
+        });
     }
 
     private function ensureStoryBelongsToProject(Project $project, ?Story $story): void

@@ -1,0 +1,264 @@
+<?php
+
+use App\Enums\ContextItemType;
+use App\Models\ContextItem;
+use App\Models\Project;
+use App\Services\Context\AssetUploader;
+use App\Services\Context\ContextItemWriter;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Auth;
+use Livewire\Attributes\Computed;
+use Livewire\Attributes\Validate;
+use Livewire\Component;
+use Livewire\WithFileUploads;
+
+new class extends Component {
+    use WithFileUploads;
+
+    public int $project_id;
+
+    #[Validate('required|in:text,link,file')]
+    public string $newType = 'text';
+
+    #[Validate('required|string|max:255')]
+    public string $newTitle = '';
+
+    #[Validate('nullable|string|max:10000')]
+    public string $newBody = '';
+
+    #[Validate('nullable|url')]
+    public string $newUrl = '';
+
+    public mixed $newFile = null;
+
+    public ?int $editingId = null;
+
+    #[Validate('required|string|max:255')]
+    public string $editTitle = '';
+
+    #[Validate('nullable|string|max:10000')]
+    public string $editBody = '';
+
+    public function mount(int $projectId): void
+    {
+        $this->project_id = $projectId;
+        $this->ensureMember();
+    }
+
+    #[Computed]
+    public function project(): ?Project
+    {
+        return Project::query()
+            ->whereIn('id', Auth::user()->accessibleProjectIds())
+            ->find($this->project_id);
+    }
+
+    #[Computed]
+    public function items()
+    {
+        $project = $this->project;
+        if ($project === null) {
+            return collect();
+        }
+
+        return $project->contextItems()
+            ->whereNull('story_id')
+            ->orderByDesc('id')
+            ->get();
+    }
+
+    public function create(): void
+    {
+        $this->ensureMember();
+
+        $rules = ['newType' => 'required|in:text,link,file', 'newTitle' => 'required|string|max:255'];
+        match ($this->newType) {
+            'text' => $rules['newBody'] = 'required|string|max:10000',
+            'link' => $rules['newUrl'] = 'required|url',
+            'file' => $rules['newFile'] = 'required|file',
+        };
+        $this->validate($rules);
+
+        $project = $this->project;
+        $actor = Auth::user();
+
+        try {
+            if ($this->newType === 'file') {
+                /** @var UploadedFile $file */
+                $file = $this->newFile;
+                app(AssetUploader::class)->store($file, $project, null, $actor);
+            } else {
+                $type = ContextItemType::from($this->newType);
+                $metadata = $type === ContextItemType::Text
+                    ? ['body' => $this->newBody]
+                    : ['url' => $this->newUrl];
+
+                app(ContextItemWriter::class)->createProjectItem($project, [
+                    'type' => $type,
+                    'title' => $this->newTitle,
+                    'metadata' => $metadata,
+                ], $actor);
+            }
+        } catch (InvalidArgumentException $e) {
+            // AssetUploader and ContextItemWriter throw InvalidArgumentException
+            // for MIME / size / type-shape violations. Surface as a form-level
+            // validation error so the user sees the message instead of a 500.
+            $this->addError('newFile', $e->getMessage());
+
+            return;
+        }
+
+        $this->reset(['newTitle', 'newBody', 'newUrl', 'newFile']);
+        $this->newType = 'text';
+        unset($this->items);
+    }
+
+    public function startEdit(int $itemId): void
+    {
+        $this->ensureMember();
+        $item = $this->itemFor($itemId);
+
+        $this->editingId = $item->id;
+        $this->editTitle = (string) $item->title;
+        $this->editBody = (string) ($item->metadata['body'] ?? '');
+    }
+
+    public function cancelEdit(): void
+    {
+        $this->editingId = null;
+        $this->editTitle = '';
+        $this->editBody = '';
+        $this->resetErrorBag();
+    }
+
+    public function saveEdit(): void
+    {
+        $this->ensureMember();
+        if ($this->editingId === null) {
+            return;
+        }
+
+        $item = $this->itemFor($this->editingId);
+
+        $rules = ['editTitle' => 'required|string|max:255'];
+        if ($item->type !== ContextItemType::File) {
+            $rules['editBody'] = 'nullable|string|max:10000';
+        }
+        $this->validate($rules);
+
+        $changes = ['title' => $this->editTitle];
+        if ($item->type === ContextItemType::Text) {
+            $changes['metadata'] = ['body' => $this->editBody];
+        }
+
+        app(ContextItemWriter::class)->update($item, $changes, Auth::user());
+
+        $this->cancelEdit();
+        unset($this->items);
+    }
+
+    public function delete(int $itemId): void
+    {
+        $this->ensureMember();
+        $item = $this->itemFor($itemId);
+
+        app(ContextItemWriter::class)->delete($item, Auth::user());
+
+        unset($this->items);
+    }
+
+    private function itemFor(int $itemId): ContextItem
+    {
+        $project = $this->project;
+        abort_unless($project, 404);
+
+        $item = ContextItem::query()
+            ->where('project_id', $project->id)
+            ->whereNull('story_id')
+            ->find($itemId);
+        abort_unless($item, 404);
+
+        return $item;
+    }
+
+    private function ensureMember(): void
+    {
+        $user = Auth::user();
+        abort_unless(
+            in_array((int) $this->project_id, $user->accessibleProjectIds(), true),
+            403,
+        );
+    }
+}; ?>
+
+<section data-section="project-assets" class="flex flex-col gap-4">
+    <div class="flex items-center justify-between">
+        <flux:heading size="lg">{{ __('Assets') }}</flux:heading>
+        <flux:text size="sm" class="text-zinc-500">
+            {{ __('Reference material for AI plan generation. Project assets are shared across all stories in this project.') }}
+        </flux:text>
+    </div>
+
+    <div data-section="project-assets-create" class="flex flex-col gap-2 rounded-md border border-zinc-200 p-4 dark:border-zinc-800">
+        <flux:heading size="sm">{{ __('Add asset') }}</flux:heading>
+        <flux:select wire:model.live="newType" :label="__('Type')">
+            <flux:select.option value="text">{{ __('Text note') }}</flux:select.option>
+            <flux:select.option value="link">{{ __('Link') }}</flux:select.option>
+            <flux:select.option value="file">{{ __('File') }}</flux:select.option>
+        </flux:select>
+        <flux:input wire:model="newTitle" :label="__('Title')" required />
+
+        @if ($newType === 'text')
+            <flux:textarea wire:model="newBody" :label="__('Body')" rows="4" required />
+        @elseif ($newType === 'link')
+            <flux:input wire:model="newUrl" :label="__('URL')" type="url" required />
+        @elseif ($newType === 'file')
+            <flux:field>
+                <flux:label>{{ __('File') }}</flux:label>
+                <input type="file" wire:model="newFile" class="text-sm" />
+                <flux:error name="newFile" />
+            </flux:field>
+        @endif
+
+        <div>
+            <flux:button wire:click="create" variant="primary">{{ __('Add') }}</flux:button>
+        </div>
+    </div>
+
+    <div data-section="project-assets-list" class="flex flex-col gap-2">
+        @forelse ($this->items as $item)
+            <div data-asset-id="{{ $item->id }}" class="flex flex-col gap-2 rounded-md border border-zinc-200 p-3 dark:border-zinc-800">
+                @if ($editingId === $item->id)
+                    <flux:input wire:model="editTitle" :label="__('Title')" required />
+                    @if ($item->type === \App\Enums\ContextItemType::Text)
+                        <flux:textarea wire:model="editBody" :label="__('Body')" rows="4" />
+                    @endif
+                    <div class="flex gap-2">
+                        <flux:button wire:click="saveEdit" variant="primary" size="sm">{{ __('Save') }}</flux:button>
+                        <flux:button wire:click="cancelEdit" variant="ghost" size="sm">{{ __('Cancel') }}</flux:button>
+                    </div>
+                @else
+                    <div class="flex items-start justify-between gap-2">
+                        <div class="flex min-w-0 flex-col">
+                            <flux:text class="font-medium">{{ $item->title }}</flux:text>
+                            <flux:text size="xs" class="text-zinc-500">{{ $item->type->value }}</flux:text>
+                            @if ($item->type === \App\Enums\ContextItemType::Link && filled($item->metadata['url'] ?? null))
+                                <a href="{{ $item->metadata['url'] }}" target="_blank" rel="noopener noreferrer" class="truncate text-xs text-blue-600 hover:underline dark:text-blue-400">
+                                    {{ $item->metadata['url'] }}
+                                </a>
+                            @elseif ($item->type === \App\Enums\ContextItemType::File && filled($item->metadata['original_name'] ?? null))
+                                <flux:text size="xs" class="text-zinc-500">{{ $item->metadata['original_name'] }}</flux:text>
+                            @endif
+                        </div>
+                        <div class="flex shrink-0 gap-2">
+                            <flux:button wire:click="startEdit({{ $item->id }})" size="xs" icon="pencil-square">{{ __('Edit') }}</flux:button>
+                            <flux:button wire:click="delete({{ $item->id }})" size="xs" variant="danger" icon="trash">{{ __('Delete') }}</flux:button>
+                        </div>
+                    </div>
+                @endif
+            </div>
+        @empty
+            <flux:text class="text-zinc-500">{{ __('No assets yet.') }}</flux:text>
+        @endforelse
+    </div>
+</section>
