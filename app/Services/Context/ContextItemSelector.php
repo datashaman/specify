@@ -51,9 +51,14 @@ class ContextItemSelector
 
     /**
      * Replace the project-scoped selection for a Story with the given set
-     * of ContextItem IDs. Story-scoped items remain attached either way.
+     * of ContextItem IDs. Story-scoped items remain attached either way —
+     * they're managed by `ContextItemWriter::createStoryItem` / `delete`,
+     * never by the picker.
      *
-     * @param  array<int|string>  $itemIds  Desired included project-scoped item IDs.
+     * @param  array<int|string>  $itemIds  Desired included **project-scoped** item IDs.
+     *                                      Story-scoped IDs are rejected; they cannot be
+     *                                      detached this way and would conflict with the
+     *                                      pivot's composite primary key on re-attach.
      */
     public function bulkSet(Story $story, array $itemIds, User $actor): void
     {
@@ -68,9 +73,9 @@ class ContextItemSelector
 
                 foreach ($items as $item) {
                     $this->ensureSameProject($story, $item);
-                    if ($item->isStoryScoped() && (int) $item->story_id !== (int) $story->getKey()) {
+                    if ($item->isStoryScoped()) {
                         throw new InvalidArgumentException(
-                            "Context item {$item->getKey()} is scoped to a different Story."
+                            "Context item {$item->getKey()} is story-scoped; bulkSet only manages project-scoped selections."
                         );
                     }
                 }

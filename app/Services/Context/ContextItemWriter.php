@@ -98,6 +98,16 @@ class ContextItemWriter
                 return $item;
             }
 
+            // File-typed items have storage-bearing metadata (disk, path, mime,
+            // size). Letting callers rewrite those keys would let a tampered
+            // request retarget `deleteUnderlyingFile()` at someone else's bytes.
+            // The uploader owns file metadata; updates here are name-only.
+            if (array_key_exists('metadata', $payload) && $item->type === ContextItemType::File) {
+                throw new InvalidArgumentException(
+                    'File metadata is immutable through ContextItemWriter::update — re-upload via AssetUploader.'
+                );
+            }
+
             $item->forceFill($payload);
 
             if (! $item->isDirty()) {
@@ -174,6 +184,16 @@ class ContextItemWriter
         $disk = (string) ($item->metadata['disk'] ?? '');
         $path = (string) ($item->metadata['path'] ?? '');
         if ($disk === '' || $path === '') {
+            return;
+        }
+
+        // Defense-in-depth against tampered metadata: only delete on a disk
+        // that's both registered in `filesystems.php` AND the configured
+        // assets disk. Refuse silently otherwise — better an orphaned blob
+        // than an arbitrary cross-disk delete.
+        $configured = (string) config('specify.context.assets.disk', 'private');
+        $known = array_key_exists($disk, (array) config('filesystems.disks', []));
+        if (! $known || $disk !== $configured) {
             return;
         }
 

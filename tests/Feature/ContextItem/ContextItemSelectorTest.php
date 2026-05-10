@@ -105,11 +105,14 @@ test('bulkSet rejects cross-project items', function () {
         ->toThrow(InvalidArgumentException::class);
 });
 
-test('bulkSet rejects story-scoped items belonging to a different story', function () {
+test('bulkSet rejects any story-scoped item (including own)', function () {
     ['project' => $project, 'story' => $story, 'actor' => $actor] = selectorScene();
+    $own = ContextItem::factory()->for($project)->for($story)->forText()->create();
     $otherStory = Story::factory()->for($story->feature)->create();
     $alien = ContextItem::factory()->for($project)->for($otherStory)->forText()->create();
 
     expect(fn () => app(ContextItemSelector::class)->bulkSet($story, [$alien->id], $actor))
+        ->toThrow(InvalidArgumentException::class);
+    expect(fn () => app(ContextItemSelector::class)->bulkSet($story, [$own->id], $actor))
         ->toThrow(InvalidArgumentException::class);
 });

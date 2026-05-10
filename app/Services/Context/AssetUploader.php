@@ -44,7 +44,10 @@ class AssetUploader
                 'disk' => $disk,
                 'path' => $storedPath,
                 'original_name' => $file->getClientOriginalName(),
-                'mime' => $file->getClientMimeType(),
+                // Server-detected MIME — getClientMimeType() is user-controlled and
+                // trivial to spoof. The detected value is what we record and what
+                // later checks should rely on.
+                'mime' => $file->getMimeType() ?: 'application/octet-stream',
                 'size' => $file->getSize(),
             ],
             'summary_status' => ContextItemSummaryStatus::Pending,
@@ -73,8 +76,9 @@ class AssetUploader
         }
 
         $allowed = (array) config('specify.context.assets.allowed_mimes', []);
-        if ($allowed !== [] && ! in_array($file->getClientMimeType(), $allowed, true)) {
-            throw new InvalidArgumentException("MIME type {$file->getClientMimeType()} is not allowed.");
+        $detected = $file->getMimeType() ?: 'application/octet-stream';
+        if ($allowed !== [] && ! in_array($detected, $allowed, true)) {
+            throw new InvalidArgumentException("MIME type {$detected} is not allowed.");
         }
     }
 

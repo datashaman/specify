@@ -132,6 +132,46 @@ test('delete on story-scoped item soft-deletes row, removes file, reopens approv
     expect($story->fresh()->revision)->toBe($beforeRev + 1);
 });
 
+test('update refuses to mutate metadata on file-typed items', function () {
+    Storage::fake('private');
+    ['story' => $story, 'project' => $project, 'actor' => $actor] = ciScene();
+    $stored = UploadedFile::fake()->create('doc.pdf', 4, 'application/pdf')->storeAs(
+        'context/'.Str::ulid(), 'doc.pdf', ['disk' => 'private']
+    );
+    $item = ContextItem::factory()->for($project)->for($story)->forFile($stored, 'doc.pdf', 'application/pdf')->create();
+
+    expect(fn () => app(ContextItemWriter::class)->update($item, [
+        'metadata' => ['disk' => 'public', 'path' => 'someone/elses/file.txt'],
+    ], $actor))->toThrow(InvalidArgumentException::class);
+
+    // Title-only updates on file items remain allowed.
+    app(ContextItemWriter::class)->update($item, ['title' => 'Renamed.pdf'], $actor);
+    expect($item->fresh()->title)->toBe('Renamed.pdf');
+});
+
+test('delete refuses to delete from a non-configured disk', function () {
+    Storage::fake('private');
+    Storage::fake('public');
+    ['story' => $story, 'project' => $project, 'actor' => $actor] = ciScene();
+
+    $tampered = UploadedFile::fake()->create('canary.pdf', 4, 'application/pdf')->storeAs(
+        'shared/canary', 'canary.pdf', ['disk' => 'public']
+    );
+    Storage::disk('public')->assertExists($tampered);
+
+    // Item claims `public` disk in metadata but assets are configured to `private`.
+    $item = ContextItem::factory()->for($project)->for($story)->create([
+        'type' => ContextItemType::File,
+        'metadata' => ['disk' => 'public', 'path' => $tampered, 'mime' => 'application/pdf'],
+    ]);
+
+    app(ContextItemWriter::class)->delete($item, $actor);
+
+    // Row gone, but the canary on the wrong disk survives.
+    expect(ContextItem::query()->whereKey($item->id)->exists())->toBeFalse();
+    Storage::disk('public')->assertExists($tampered);
+});
+
 test('delete on project-scoped item does not reopen any story', function () {
     ['project' => $project, 'story' => $story, 'actor' => $actor] = ciScene();
     $item = ContextItem::factory()->for($project)->forText()->create();
