@@ -27,9 +27,16 @@ class TasksGenerator implements Agent, HasStructuredOutput
         return app(PromptLoader::class)->load('tasks-generator');
     }
 
+    /**
+     * Hard cap on the rendered "Selected context assets" block. Keeps the
+     * plan-generation prompt within budget when many large assets are
+     * selected; items past the cap are dropped with a truncation marker.
+     */
+    public const CONTEXT_ASSETS_CAP_BYTES = 8192;
+
     public function buildPrompt(): string
     {
-        $story = $this->story->loadMissing('feature.project', 'acceptanceCriteria', 'scenarios.acceptanceCriterion');
+        $story = $this->story->loadMissing('feature.project', 'acceptanceCriteria', 'scenarios.acceptanceCriterion', 'includedContextItems');
 
         $criteria = $story->acceptanceCriteria
             ->sortBy('position')
@@ -55,6 +62,8 @@ SCENARIO;
             })
             ->implode("\n\n");
 
+        $contextAssets = $this->renderContextAssetsBlock($story);
+
         return <<<PROMPT
 Project: {$story->feature->project->name}
 Feature: {$story->feature->name}
@@ -68,9 +77,51 @@ Acceptance Criteria (position. text):
 
 Scenarios (position. Given / When / Then):
 {$scenarios}
-
+{$contextAssets}
 Generate an implementation plan that fully satisfies the acceptance criteria and scenarios above. Shape Tasks around coherent implementation work that may span acceptance criteria, scenarios, or shared enabling work. Each Task must have one or more Subtasks.
 PROMPT;
+    }
+
+    private function renderContextAssetsBlock(Story $story): string
+    {
+        $items = $story->includedContextItems;
+        if ($items->isEmpty()) {
+            return '';
+        }
+
+        // Cap accounts for the wrapping header and the worst-case truncation
+        // note as well as item bodies — the entire block stays under the cap,
+        // not just the sum of items.
+        $header = "\n## Selected context assets\n\n";
+        $noteTemplate = "\n_Truncated: dropped %d item(s) over the ".self::CONTEXT_ASSETS_CAP_BYTES."-byte cap._\n";
+        $worstCaseNote = sprintf($noteTemplate, $items->count());
+        $overhead = strlen($header) + strlen($worstCaseNote) + 1; // +1 for trailing newline
+        $itemBudget = self::CONTEXT_ASSETS_CAP_BYTES - $overhead;
+
+        $rendered = [];
+        $usedBytes = 0;
+        $droppedCount = 0;
+
+        foreach ($items as $item) {
+            $type = $item->type?->value ?? 'unknown';
+            $body = trim($item->bodyForContext());
+            $entry = "### {$item->title} ({$type})\n".($body === '' ? '(no extractable body)' : $body)."\n";
+            $entryBytes = strlen($entry);
+
+            if ($usedBytes + $entryBytes > $itemBudget) {
+                $droppedCount++;
+
+                continue;
+            }
+
+            $rendered[] = $entry;
+            $usedBytes += $entryBytes;
+        }
+
+        $body = implode("\n", $rendered);
+        $note = $droppedCount === 0 ? '' : sprintf($noteTemplate, $droppedCount);
+
+        return $header.$body.$note."\n";
     }
 
     public function schema(JsonSchema $schema): array

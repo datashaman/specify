@@ -23,6 +23,11 @@ Constraints:
   dependencies.
 - Never duplicate work. If two Tasks would touch the same surface in conflicting
   ways, sequence them via `depends_on`.
+- If the prompt includes a `## Selected context assets` block, those are
+  reference materials the product owner explicitly attached to this Story
+  (style guides, design notes, links). Treat them as authoritative source
+  for naming, constraints, and design intent. Reflect them in Task and
+  Subtask descriptions where they apply, but don't restate them.
 - The summary should be a single paragraph capturing the overall strategy.
 
 Do not include implementation snippets, code, or shell commands in Task or
