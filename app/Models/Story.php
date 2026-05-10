@@ -13,6 +13,7 @@ use App\Services\Stories\StoryRevisionLifecycle;
 use App\Services\Stories\StoryRunProjection;
 use Database\Factories\StoryFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -215,6 +216,47 @@ class Story extends Model
     public function scenarios(): HasMany
     {
         return $this->hasMany(Scenario::class)->orderBy('position');
+    }
+
+    /**
+     * Story-scoped ContextItems (those whose `story_id` matches this story).
+     * `ContextItemWriter::createStoryItem` auto-attaches them to this
+     * Story's selection, and `ContextItemSelector` refuses to detach them
+     * — toggling story-scoped items off is not a picker concern. They
+     * leave the selection only when deleted via `ContextItemWriter::delete`.
+     */
+    public function ownedContextItems(): HasMany
+    {
+        return $this->hasMany(ContextItem::class);
+    }
+
+    /**
+     * Items currently selected as AI context for this Story via the pivot.
+     * The set is the union of explicit selections from project-scoped items
+     * and the auto-included story-scoped items.
+     */
+    public function includedContextItems(): BelongsToMany
+    {
+        return $this->belongsToMany(ContextItem::class, 'context_item_story')
+            ->withPivot(['included_at', 'included_by_id']);
+    }
+
+    /**
+     * The picker's source set: every ContextItem that *could* be selected
+     * for this Story — i.e. project-scoped items in the same Project plus
+     * this Story's own story-scoped items.
+     *
+     * @return Builder<ContextItem>
+     */
+    public function availableContextItems(): Builder
+    {
+        $projectId = $this->feature?->project_id;
+
+        return ContextItem::query()
+            ->where('project_id', $projectId)
+            ->where(function ($q): void {
+                $q->whereNull('story_id')->orWhere('story_id', $this->getKey());
+            });
     }
 
     public function dependencies(): BelongsToMany
