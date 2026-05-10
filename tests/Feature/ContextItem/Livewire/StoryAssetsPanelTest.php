@@ -109,13 +109,11 @@ test('upload story-scoped file persists, auto-includes, and bumps revision once'
     expect($item->story_id)->toBe($story->id);
     Storage::disk('private')->assertExists($item->metadata['path']);
 
-    // AssetUploader does not call the writer's recordContentArtifactChanged
-    // helper today — story-scoped file uploads land via the uploader, which
-    // creates the row but doesn't bump revision or attach to the pivot.
-    // This test pins that current behaviour so a future change has to be
-    // intentional.
-    expect($story->fresh()->revision)->toBe($beforeRev);
-    expect($story->includedContextItems()->whereKey($item->id)->exists())->toBeFalse();
+    // Story-scoped file uploads now follow the same contract as text/link
+    // creation: revision bumps once and the item auto-includes into the
+    // Story's selection.
+    expect($story->fresh()->revision)->toBe($beforeRev + 1);
+    expect($story->includedContextItems()->whereKey($item->id)->exists())->toBeTrue();
 });
 
 test('edit story-scoped item bumps revision', function () {

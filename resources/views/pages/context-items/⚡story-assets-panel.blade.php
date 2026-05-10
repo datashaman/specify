@@ -86,21 +86,30 @@ new class extends Component {
         $project = $story->feature->project;
         $actor = Auth::user();
 
-        if ($this->newType === 'file') {
-            /** @var UploadedFile $file */
-            $file = $this->newFile;
-            app(AssetUploader::class)->store($file, $project, $story, $actor);
-        } else {
-            $type = ContextItemType::from($this->newType);
-            $metadata = $type === ContextItemType::Text
-                ? ['body' => $this->newBody]
-                : ['url' => $this->newUrl];
+        try {
+            if ($this->newType === 'file') {
+                /** @var UploadedFile $file */
+                $file = $this->newFile;
+                app(AssetUploader::class)->store($file, $project, $story, $actor);
+            } else {
+                $type = ContextItemType::from($this->newType);
+                $metadata = $type === ContextItemType::Text
+                    ? ['body' => $this->newBody]
+                    : ['url' => $this->newUrl];
 
-            app(ContextItemWriter::class)->createStoryItem($story, [
-                'type' => $type,
-                'title' => $this->newTitle,
-                'metadata' => $metadata,
-            ], $actor);
+                app(ContextItemWriter::class)->createStoryItem($story, [
+                    'type' => $type,
+                    'title' => $this->newTitle,
+                    'metadata' => $metadata,
+                ], $actor);
+            }
+        } catch (InvalidArgumentException $e) {
+            // AssetUploader and ContextItemWriter throw InvalidArgumentException
+            // for MIME / size / type-shape violations. Surface as a form-level
+            // validation error so the user sees the message instead of a 500.
+            $this->addError('newFile', $e->getMessage());
+
+            return;
         }
 
         $this->reset(['newTitle', 'newBody', 'newUrl', 'newFile']);
@@ -238,11 +247,18 @@ new class extends Component {
                     </div>
                 @else
                     <div class="flex items-start justify-between gap-2">
-                        <div class="flex flex-col">
+                        <div class="flex min-w-0 flex-col">
                             <flux:text class="font-medium">{{ $item->title }}</flux:text>
                             <flux:text size="xs" class="text-zinc-500">{{ $item->type->value }}</flux:text>
+                            @if ($item->type === \App\Enums\ContextItemType::Link && filled($item->metadata['url'] ?? null))
+                                <a href="{{ $item->metadata['url'] }}" target="_blank" rel="noopener noreferrer" class="truncate text-xs text-blue-600 hover:underline dark:text-blue-400">
+                                    {{ $item->metadata['url'] }}
+                                </a>
+                            @elseif ($item->type === \App\Enums\ContextItemType::File && filled($item->metadata['original_name'] ?? null))
+                                <flux:text size="xs" class="text-zinc-500">{{ $item->metadata['original_name'] }}</flux:text>
+                            @endif
                         </div>
-                        <div class="flex gap-2">
+                        <div class="flex shrink-0 gap-2">
                             <flux:button wire:click="startEdit({{ $item->id }})" size="xs" icon="pencil-square">{{ __('Edit') }}</flux:button>
                             <flux:button wire:click="delete({{ $item->id }})" size="xs" variant="danger" icon="trash">{{ __('Delete') }}</flux:button>
                         </div>
