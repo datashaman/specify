@@ -67,7 +67,10 @@ test('builder clamps to MAX_BYTES with a truncation note', function () {
 
     $brief = (new SelectedAssetsContextBuilder)->build($subtask, null, null);
 
-    expect(strlen($brief))->toBeLessThan(SelectedAssetsContextBuilder::MAX_BYTES + 256);
+    // Cap accounting now bounds the entire rendered brief (wrapper tags,
+    // header, body, and the worst-case truncation note). Assert the strict
+    // bound rather than a loose slack — that's the contract.
+    expect(strlen($brief))->toBeLessThanOrEqual(SelectedAssetsContextBuilder::MAX_BYTES);
     expect($brief)->toContain('Truncated:');
 });
 
