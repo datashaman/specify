@@ -3,8 +3,8 @@
 use App\Enums\StoryStatus;
 use App\Enums\TaskStatus;
 use App\Models\Feature;
+use App\Services\Ordering\PositionReorderer;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\DB;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Title;
 use Livewire\Attributes\Validate;
@@ -110,27 +110,7 @@ new #[Title('Feature')] class extends Component {
         abort_unless($feature, 404);
         abort_unless(Auth::user()->canApproveInProject($feature->project), 403);
 
-        $owned = $feature->stories()->pluck('id')->all();
-        $clean = array_values(array_filter(
-            array_map('intval', $orderedIds),
-            fn (int $id) => in_array($id, $owned, true),
-        ));
-
-        if (count($clean) !== count($owned)) {
-            return;
-        }
-
-        DB::transaction(function () use ($clean) {
-            $offset = count($clean) + 1;
-
-            foreach ($clean as $i => $id) {
-                DB::table('stories')->where('id', $id)->update(['position' => $offset + $i]);
-            }
-
-            foreach ($clean as $i => $id) {
-                DB::table('stories')->where('id', $id)->update(['position' => $i + 1]);
-            }
-        });
+        app(PositionReorderer::class)->reorder('stories', 'feature_id', (int) $feature->id, $orderedIds);
 
         unset($this->stories);
     }

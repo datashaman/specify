@@ -33,6 +33,8 @@ use App\Mcp\Tools\ListTasksTool;
 use App\Mcp\Tools\RejectPlanTool;
 use App\Mcp\Tools\RejectStoryTool;
 use App\Mcp\Tools\RemoveProjectRepoTool;
+use App\Mcp\Tools\ReorderFeaturesTool;
+use App\Mcp\Tools\ReorderStoriesTool;
 use App\Mcp\Tools\RequestPlanChangesTool;
 use App\Mcp\Tools\RequestStoryChangesTool;
 use App\Mcp\Tools\SetCurrentPlanTool;
@@ -44,6 +46,7 @@ use App\Mcp\Tools\SubmitStoryTool;
 use App\Mcp\Tools\SwitchProjectTool;
 use App\Mcp\Tools\UpdateFeatureTool;
 use App\Mcp\Tools\UpdatePlanTool;
+use App\Mcp\Tools\UpdateProjectTool;
 use App\Mcp\Tools\UpdateScenarioTool;
 use App\Mcp\Tools\UpdateStoryTool;
 use App\Mcp\Tools\UpdateSubtaskTool;
@@ -84,6 +87,7 @@ class SpecifyServer extends Server
         ListProjectsTool::class,
         GetProjectTool::class,
         CreateProjectTool::class,
+        UpdateProjectTool::class,
         AddGithubRepoToProjectTool::class,
         RemoveProjectRepoTool::class,
         SetPrimaryRepoTool::class,
@@ -91,10 +95,12 @@ class SpecifyServer extends Server
         GetFeatureTool::class,
         CreateFeatureTool::class,
         UpdateFeatureTool::class,
+        ReorderFeaturesTool::class,
         ListStoriesTool::class,
         GetStoryTool::class,
         CreateStoryTool::class,
         UpdateStoryTool::class,
+        ReorderStoriesTool::class,
         AddAcceptanceCriterionTool::class,
         ListScenariosTool::class,
         CreateScenarioTool::class,

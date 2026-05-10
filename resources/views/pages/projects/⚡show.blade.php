@@ -3,6 +3,7 @@
 use App\Enums\FeatureStatus;
 use App\Models\Feature;
 use App\Models\Project;
+use App\Services\Ordering\PositionReorderer;
 use Illuminate\Support\Facades\Auth;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Title;
@@ -54,8 +55,26 @@ new #[Title('Project')] class extends Component {
     public function features()
     {
         return $this->project
-            ? $this->project->features()->withCount('stories')->orderBy('name')->get()
+            ? $this->project->features()
+                ->withCount('stories')
+                ->orderBy('position')
+                ->orderBy('id')
+                ->get()
             : collect();
+    }
+
+    /**
+     * @param  array<int, int>  $orderedIds  Feature IDs in the new visual order.
+     */
+    public function reorderFeatures(array $orderedIds): void
+    {
+        $project = $this->project;
+        abort_unless($project, 404);
+        abort_unless(Auth::user()->canApproveInProject($project), 403);
+
+        app(PositionReorderer::class)->reorder('features', 'project_id', (int) $project->id, $orderedIds);
+
+        unset($this->features);
     }
 
     public function canEditProject(): bool
@@ -216,23 +235,49 @@ new #[Title('Project')] class extends Component {
                 @endif
             </div>
 
-            @forelse ($this->features as $feature)
-                <flux:card>
-                    <div class="flex items-center justify-between gap-2">
-                        <div>
-                            <a href="{{ route('features.show', ['project' => $this->project->id, 'feature' => $feature->id]) }}" wire:navigate>
-                                <flux:heading>{{ $feature->name }}</flux:heading>
-                            </a>
-                            @if ($feature->description)
-                                <x-markdown :content="$feature->description" class="mt-1" />
-                            @endif
-                        </div>
-                        <flux:badge>{{ $feature->stories_count }} {{ __('stories') }}</flux:badge>
+            @php $canReorderFeatures = $canManageFeatures && $this->features->count() > 1; @endphp
+            <div
+                class="flex flex-col gap-3"
+                @if ($canReorderFeatures)
+                    x-data
+                    x-sortable="$wire.reorderFeatures"
+                @endif
+                data-features-list
+            >
+                @forelse ($this->features as $feature)
+                    <div
+                        wire:key="feature-{{ $feature->id }}"
+                        @if ($canReorderFeatures) data-sortable-id="{{ $feature->id }}" @endif
+                    >
+                        <flux:card>
+                            <div class="flex items-center gap-3">
+                                @if ($canReorderFeatures)
+                                    <button
+                                        type="button"
+                                        data-sortable-handle
+                                        class="flex flex-none cursor-grab items-center text-zinc-400 hover:text-zinc-600 active:cursor-grabbing dark:hover:text-zinc-300"
+                                        aria-label="{{ __('Drag to reorder') }}"
+                                        title="{{ __('Drag to reorder') }}"
+                                    >
+                                        <flux:icon.bars-3 class="size-5" />
+                                    </button>
+                                @endif
+                                <div class="min-w-0 flex-1">
+                                    <a href="{{ route('features.show', ['project' => $this->project->id, 'feature' => $feature->id]) }}" wire:navigate>
+                                        <flux:heading>{{ $feature->name }}</flux:heading>
+                                    </a>
+                                    @if ($feature->description)
+                                        <x-markdown :content="$feature->description" class="mt-1" />
+                                    @endif
+                                </div>
+                                <flux:badge>{{ $feature->stories_count }} {{ __('stories') }}</flux:badge>
+                            </div>
+                        </flux:card>
                     </div>
-                </flux:card>
-            @empty
-                <flux:text class="text-zinc-500">{{ __('No features yet.') }}</flux:text>
-            @endforelse
+                @empty
+                    <flux:text class="text-zinc-500">{{ __('No features yet.') }}</flux:text>
+                @endforelse
+            </div>
         </section>
 
         @if ($canManageFeatures)
