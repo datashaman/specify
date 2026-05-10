@@ -74,8 +74,14 @@ Long bodies are compressed by `ContextSummariser` (laravel/ai) via
   then falls back to a truncated raw body so plan generation still works.
 - Short text (under `specify.context.assets.summary_threshold_chars`,
   default 2000) is marked `Skipped` at create time — no point summarising.
-- Summarisation runs eagerly on upload / create / body-change. There is no
-  background re-summarise.
+- **Text items only in v1.** `SummariseContextItemJob` only runs for text
+  bodies; link items are `Skipped` at create time. File uploads also land
+  `Skipped` because there is no extraction pipeline yet — `AssetUploader`
+  writes the row with `summary_status=skipped` and does not dispatch.
+  When PDF / image extraction lands, the extractor will flip the row to
+  `Pending` and dispatch from there.
+- Summarisation runs eagerly on text create / text body-change. There is
+  no background re-summarise.
 
 ### Injection points
 
