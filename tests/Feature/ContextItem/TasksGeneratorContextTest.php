@@ -4,12 +4,10 @@ use App\Ai\Agents\TasksGenerator;
 use App\Enums\ContextItemSummaryStatus;
 use App\Models\AcceptanceCriterion;
 use App\Models\ContextItem;
-use App\Models\Project;
 use App\Models\Story;
 
 function tgScene(): Story
 {
-    $project = Project::factory()->create();
     $story = Story::factory()->create();
     AcceptanceCriterion::factory()->for($story)->create(['position' => 1, 'statement' => 'first']);
 
@@ -69,11 +67,12 @@ test('buildPrompt enforces the byte cap and notes truncation', function () {
     expect($prompt)->toContain('## Selected context assets');
     expect($prompt)->toContain('Truncated:');
 
-    // Block (between header and the next blank line + truncation marker) is bounded
-    // by the cap; full prompt is naturally larger because of story framing copy.
+    // Block (between header and the closing-instructions tail) stays within
+    // the cap. Use strrpos so a context body that happens to contain the
+    // closing-instructions phrase doesn't mismeasure the block.
     $blockPosition = strpos($prompt, '## Selected context assets');
-    $blockEnd = strpos($prompt, 'Generate an implementation plan');
-    expect($blockEnd - $blockPosition)->toBeLessThan(TasksGenerator::CONTEXT_ASSETS_CAP_BYTES + 512);
+    $blockEnd = strrpos($prompt, 'Generate an implementation plan');
+    expect($blockEnd - $blockPosition)->toBeLessThan(TasksGenerator::CONTEXT_ASSETS_CAP_BYTES + 256);
 });
 
 test('buildPrompt prefers summary over raw body when summary is ready', function () {

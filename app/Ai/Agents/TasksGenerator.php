@@ -89,9 +89,18 @@ PROMPT;
             return '';
         }
 
+        // Cap accounts for the wrapping header and the worst-case truncation
+        // note as well as item bodies — the entire block stays under the cap,
+        // not just the sum of items.
+        $header = "\n## Selected context assets\n\n";
+        $noteTemplate = "\n_Truncated: dropped %d item(s) over the ".self::CONTEXT_ASSETS_CAP_BYTES."-byte cap._\n";
+        $worstCaseNote = sprintf($noteTemplate, $items->count());
+        $overhead = strlen($header) + strlen($worstCaseNote) + 1; // +1 for trailing newline
+        $itemBudget = self::CONTEXT_ASSETS_CAP_BYTES - $overhead;
+
         $rendered = [];
         $usedBytes = 0;
-        $droppedTitles = [];
+        $droppedCount = 0;
 
         foreach ($items as $item) {
             $type = $item->type?->value ?? 'unknown';
@@ -99,8 +108,8 @@ PROMPT;
             $entry = "### {$item->title} ({$type})\n".($body === '' ? '(no extractable body)' : $body)."\n";
             $entryBytes = strlen($entry);
 
-            if ($usedBytes + $entryBytes > self::CONTEXT_ASSETS_CAP_BYTES) {
-                $droppedTitles[] = $item->title;
+            if ($usedBytes + $entryBytes > $itemBudget) {
+                $droppedCount++;
 
                 continue;
             }
@@ -109,16 +118,10 @@ PROMPT;
             $usedBytes += $entryBytes;
         }
 
-        if ($rendered === [] && $droppedTitles === []) {
-            return '';
-        }
-
         $body = implode("\n", $rendered);
-        $note = $droppedTitles === []
-            ? ''
-            : "\n_Truncated: dropped ".count($droppedTitles).' item(s) over the '.self::CONTEXT_ASSETS_CAP_BYTES."-byte cap._\n";
+        $note = $droppedCount === 0 ? '' : sprintf($noteTemplate, $droppedCount);
 
-        return "\n## Selected context assets\n\n{$body}{$note}\n";
+        return $header.$body.$note."\n";
     }
 
     public function schema(JsonSchema $schema): array
