@@ -15,8 +15,6 @@ test('latestRun returns null for a plan with no runs', function () {
     $plan = Plan::factory()->for($story)->create();
     Task::factory()->for($plan)->create(['position' => 1]);
 
-    $plan->load('tasks.subtasks.agentRuns');
-
     expect(app(PlanRunProjection::class)->latestRun($plan))->toBeNull();
 });
 
@@ -41,7 +39,22 @@ test('latestRun returns the highest-id AgentRun across all subtasks of the plan'
         'working_branch' => 'second-branch',
     ]);
 
-    $plan->load('tasks.subtasks.agentRuns.repo');
-
     expect(app(PlanRunProjection::class)->latestRun($plan)?->id)->toBe($latest->id);
+});
+
+test('latestRun self-loads relations when caller did not eager-load', function () {
+    $story = makeStory();
+    $plan = Plan::factory()->for($story)->create();
+    $task = Task::factory()->for($plan)->create(['position' => 1]);
+    $sub = Subtask::factory()->for($task)->create(['position' => 1]);
+    $run = AgentRun::factory()->create([
+        'runnable_type' => Subtask::class,
+        'runnable_id' => $sub->id,
+        'status' => AgentRunStatus::Succeeded,
+    ]);
+
+    $fresh = Plan::query()->findOrFail($plan->id);
+    expect($fresh->relationLoaded('tasks'))->toBeFalse();
+
+    expect(app(PlanRunProjection::class)->latestRun($fresh)?->id)->toBe($run->id);
 });

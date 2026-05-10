@@ -9,8 +9,9 @@ use App\Models\Plan;
  * Derived run/branch/repo view for a Plan, mirroring StoryRunProjection but
  * scoped to a single Plan rather than the story's current plan.
  *
- * Operates on already-loaded relations so callers can rely on their own
- * eager-load shape without paying for an extra query here.
+ * Self-loads `tasks.subtasks.agentRuns.repo` via loadMissing so callers don't
+ * have to remember the eager-load shape; if they already loaded it, this is
+ * a no-op.
  */
 class PlanRunProjection
 {
@@ -20,10 +21,19 @@ class PlanRunProjection
      */
     public function latestRun(Plan $plan): ?AgentRun
     {
-        return $plan->tasks
-            ->flatMap->subtasks
-            ->flatMap->agentRuns
-            ->sortByDesc('id')
-            ->first();
+        $plan->loadMissing('tasks.subtasks.agentRuns.repo');
+
+        $latest = null;
+        foreach ($plan->tasks as $task) {
+            foreach ($task->subtasks as $subtask) {
+                foreach ($subtask->agentRuns as $run) {
+                    if ($latest === null || $run->id > $latest->id) {
+                        $latest = $run;
+                    }
+                }
+            }
+        }
+
+        return $latest;
     }
 }
