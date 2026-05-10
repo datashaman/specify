@@ -26,7 +26,8 @@ test('store persists file and creates a project-scoped ContextItem', function ()
     expect($item->type)->toBe(ContextItemType::File);
     expect($item->project_id)->toBe($project->id);
     expect($item->story_id)->toBeNull();
-    expect($item->summary_status)->toBe(ContextItemSummaryStatus::Pending);
+    // Slice 2: file uploads land Skipped — extraction pipeline is future work.
+    expect($item->summary_status)->toBe(ContextItemSummaryStatus::Skipped);
     expect($item->created_by_id)->toBe($actor->id);
     expect($item->title)->toBe('Spec Notes.pdf');
     expect($item->metadata['original_name'])->toBe('Spec Notes.pdf');

@@ -76,7 +76,7 @@ test('update without body change does not dispatch', function () {
     expect($item->fresh()->summary_status->value)->toBe('ready');
 });
 
-test('AssetUploader dispatches summarise for text-mime files over threshold', function () {
+test('AssetUploader does not dispatch summarise — file extraction is future work', function () {
     Storage::fake('private');
     $project = Project::factory()->create();
     $actor = User::factory()->create();
@@ -85,5 +85,9 @@ test('AssetUploader dispatches summarise for text-mime files over threshold', fu
 
     $item = app(AssetUploader::class)->store($file, $project, null, $actor);
 
-    Bus::assertDispatched(SummariseContextItemJob::class, fn ($job) => $job->contextItemId === $item->id);
+    // No extraction pipeline yet, so files land Skipped and the job stays
+    // off the queue. The future extractor will flip status to Pending and
+    // dispatch from there.
+    Bus::assertNotDispatched(SummariseContextItemJob::class);
+    expect($item->summary_status->value)->toBe('skipped');
 });

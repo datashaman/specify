@@ -16,8 +16,11 @@ use Throwable;
  *
  * Missing creds are not failures — they collapse to `summary_status=skipped`
  * so plan generation can fall back to the truncated raw body. Real
- * failures (provider errors, exceptions) record `summary_status=failed`
- * with the error message in `summary_error`.
+ * failures (provider errors, exceptions) record `summary_status=failed`.
+ *
+ * `summary_error` carries the human-readable note in both cases (skip
+ * reason or failure cause). The status enum is the source of truth for
+ * "did this succeed"; the column is just the audit trail.
  */
 class SummariseContextItemJob implements ShouldQueue
 {
@@ -37,7 +40,10 @@ class SummariseContextItemJob implements ShouldQueue
         $item->forceFill([
             'summary_status' => $result->status->value,
             'summary' => $result->status === ContextItemSummaryStatus::Ready ? $result->summary : null,
-            'summary_error' => $result->status === ContextItemSummaryStatus::Failed ? $result->error : null,
+            // Persist the message for both Skipped (skip reason) and Failed
+            // (failure cause). Status is the source of truth for outcome;
+            // this column is the audit trail.
+            'summary_error' => $result->status === ContextItemSummaryStatus::Ready ? null : $result->error,
         ])->save();
     }
 

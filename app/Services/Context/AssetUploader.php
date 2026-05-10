@@ -4,7 +4,6 @@ namespace App\Services\Context;
 
 use App\Enums\ContextItemSummaryStatus;
 use App\Enums\ContextItemType;
-use App\Jobs\SummariseContextItemJob;
 use App\Models\ContextItem;
 use App\Models\Project;
 use App\Models\Story;
@@ -35,7 +34,7 @@ class AssetUploader
             throw new \RuntimeException('Failed to store uploaded asset.');
         }
 
-        $item = ContextItem::create([
+        return ContextItem::create([
             'project_id' => $project->getKey(),
             'story_id' => $story?->getKey(),
             'type' => ContextItemType::File,
@@ -51,27 +50,14 @@ class AssetUploader
                 'mime' => $file->getMimeType() ?: 'application/octet-stream',
                 'size' => $file->getSize(),
             ],
-            'summary_status' => ContextItemSummaryStatus::Pending,
+            // File items stay Skipped: there is no extraction pipeline yet,
+            // so ContextCompressor would have no body to compress and
+            // would mark Skipped on the first job run anyway. When the
+            // PDF/text extractor lands, this can flip to Pending and the
+            // extractor will dispatch SummariseContextItemJob from there.
+            'summary_status' => ContextItemSummaryStatus::Skipped,
             'created_by_id' => $actor->getKey(),
         ]);
-
-        if ($this->shouldSummariseFile($file)) {
-            SummariseContextItemJob::dispatch($item->getKey());
-        }
-
-        return $item;
-    }
-
-    private function shouldSummariseFile(UploadedFile $file): bool
-    {
-        $mime = (string) $file->getClientMimeType();
-        if (! str_starts_with($mime, 'text/') && $mime !== 'application/pdf') {
-            return false;
-        }
-
-        $threshold = (int) config('specify.context.assets.summary_threshold_chars', 2000);
-
-        return $file->getSize() >= $threshold;
     }
 
     private function ensureStoryBelongsToProject(Project $project, ?Story $story): void

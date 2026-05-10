@@ -8,7 +8,7 @@ use App\Models\User;
 use App\Models\UserAiCredential;
 use App\Services\Ai\ContextCompressor;
 
-test('job marks item Skipped when creator has no BYOK creds', function () {
+test('job marks item Skipped when creator has no BYOK creds and records the reason', function () {
     $creator = User::factory()->create();
     $item = ContextItem::factory()->forText(str_repeat('lorem ipsum ', 200))->create([
         'created_by_id' => $creator->id,
@@ -20,6 +20,9 @@ test('job marks item Skipped when creator has no BYOK creds', function () {
     $fresh = $item->fresh();
     expect($fresh->summary_status)->toBe(ContextItemSummaryStatus::Skipped);
     expect($fresh->summary)->toBeNull();
+    // Skip reasons are persisted in summary_error too — the column is the
+    // audit trail, not strictly a failure log.
+    expect($fresh->summary_error)->not->toBeNull();
 });
 
 test('job marks item Skipped when creator is null', function () {
