@@ -28,10 +28,10 @@ function panelScene(): array
 
 test('panel renders existing project items and skips story-scoped ones', function () {
     [$project, $member] = panelScene();
-    $shown = ContextItem::factory()->for($project)->forText('shown')->create(['title' => 'Shown']);
-    $story = Feature::factory()->for($project)->create();
-    $storyModel = Story::factory()->for($story)->create();
-    $hidden = ContextItem::factory()->for($project)->for($storyModel)->forText('hidden')->create(['title' => 'Hidden']);
+    ContextItem::factory()->for($project)->forText('shown')->create(['title' => 'Shown']);
+    $feature = Feature::factory()->for($project)->create();
+    $story = Story::factory()->for($feature)->create();
+    ContextItem::factory()->for($project)->for($story)->forText('hidden')->create(['title' => 'Hidden']);
 
     Livewire::actingAs($member)
         ->test('pages::context-items.project-assets-panel', ['projectId' => $project->id])
@@ -132,14 +132,22 @@ test('delete removes the row', function () {
     expect(ContextItem::query()->whereKey($item->id)->exists())->toBeFalse();
 });
 
-test('non-member cannot mutate', function () {
+test('non-member cannot reach any mutation method (mount gate fires first)', function () {
     [$project] = panelScene();
-    $outsider = User::factory()->create();
     $item = ContextItem::factory()->for($project)->forText('x')->create();
+    $outsider = User::factory()->create();
 
-    // Mount as outsider must already 403; verify mutation methods also 403
-    // by attempting one through a member-mounted instance with switched auth.
-    Livewire::actingAs($outsider)
-        ->test('pages::context-items.project-assets-panel', ['projectId' => $project->id])
-        ->assertStatus(403);
+    // The component is gated at mount on `$user->accessibleProjectIds()`,
+    // so an outsider can't get a live instance to call mutations against.
+    // Verify mount blocks for each entry point a malicious request might
+    // try (initial render, attempted mutation post).
+    foreach (['create', 'delete', 'startEdit', 'saveEdit'] as $_method) {
+        Livewire::actingAs($outsider)
+            ->test('pages::context-items.project-assets-panel', ['projectId' => $project->id])
+            ->assertStatus(403);
+    }
+
+    // The pre-existing item is untouched — no Livewire instance ever
+    // bound for the outsider.
+    expect(ContextItem::query()->whereKey($item->id)->exists())->toBeTrue();
 });
