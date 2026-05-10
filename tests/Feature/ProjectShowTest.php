@@ -149,7 +149,7 @@ test('new features receive monotonic per-project positions', function () {
     expect([$a->fresh()->position, $b->fresh()->position, $c->fresh()->position])->toBe([1, 2, 3]);
 });
 
-test('reorderFeatures rewrites positions and survives a refresh', function () {
+test('reorderFeatures rewrites positions to match the supplied id order', function () {
     ['user' => $user, 'project' => $project] = projectShowScene();
     $a = Feature::factory()->for($project)->create(['name' => 'Alpha']);
     $b = Feature::factory()->for($project)->create(['name' => 'Bravo']);

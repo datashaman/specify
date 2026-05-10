@@ -70,7 +70,8 @@ class ReorderFeaturesTool extends Tool
         return [
             'project_id' => $schema->integer()->description('Project whose features to reorder. Defaults to the user’s current project.'),
             'ordered_ids' => $schema->array()
-                ->description('Full list of feature IDs in the new visual order. Must contain every feature in the project; no-ops otherwise.'),
+                ->description('Full list of feature IDs in the new visual order. Must contain every feature in the project; no-ops otherwise.')
+                ->required(),
         ];
     }
 }

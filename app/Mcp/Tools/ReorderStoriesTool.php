@@ -65,7 +65,8 @@ class ReorderStoriesTool extends Tool
         return [
             'feature_id' => $schema->integer()->description('Feature whose stories to reorder.')->required(),
             'ordered_ids' => $schema->array()
-                ->description('Full list of story IDs in the new visual order. Must contain every story in the feature; no-ops otherwise.'),
+                ->description('Full list of story IDs in the new visual order. Must contain every story in the feature; no-ops otherwise.')
+                ->required(),
         ];
     }
 }
