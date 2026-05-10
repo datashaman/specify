@@ -19,11 +19,11 @@ function projectShowScene(TeamRole $role = TeamRole::Admin): array
     return compact('user', 'project');
 }
 
-test('admin can create a feature on the project page', function () {
+test('admin can create a feature on the features page', function () {
     ['user' => $user, 'project' => $project] = projectShowScene();
     $this->actingAs($user);
 
-    Livewire::test('pages::projects.show', ['project' => $project->id])
+    Livewire::test('pages::features.index', ['project' => $project->id])
         ->set('newFeatureName', 'Authoring')
         ->set('newFeatureDescription', 'Story creation flows')
         ->call('createFeature');
@@ -35,7 +35,7 @@ test('member cannot create a feature', function () {
     ['user' => $user, 'project' => $project] = projectShowScene(TeamRole::Member);
     $this->actingAs($user);
 
-    Livewire::test('pages::projects.show', ['project' => $project->id])
+    Livewire::test('pages::features.index', ['project' => $project->id])
         ->set('newFeatureName', 'NoEntry')
         ->call('createFeature')
         ->assertStatus(403);
@@ -61,7 +61,7 @@ test('lists existing features with story counts', function () {
 
     $this->actingAs($user);
 
-    Livewire::test('pages::projects.show', ['project' => $project->id])
+    Livewire::test('pages::features.index', ['project' => $project->id])
         ->assertSee('Visible Feature');
 });
 
@@ -157,7 +157,7 @@ test('reorderFeatures rewrites positions to match the supplied id order', functi
 
     $this->actingAs($user);
 
-    Livewire::test('pages::projects.show', ['project' => $project->id])
+    Livewire::test('pages::features.index', ['project' => $project->id])
         ->call('reorderFeatures', [$c->id, $a->id, $b->id]);
 
     expect($c->fresh()->position)->toBe(1);
@@ -176,7 +176,7 @@ test('reorderFeatures ignores foreign ids and noops on incomplete payload', func
 
     $this->actingAs($user);
 
-    Livewire::test('pages::projects.show', ['project' => $project->id])
+    Livewire::test('pages::features.index', ['project' => $project->id])
         ->call('reorderFeatures', [$b->id, $foreign->id, $a->id]);
 
     expect($a->fresh()->position)->toBe(1);
@@ -192,7 +192,7 @@ test('Member cannot reorder features', function () {
 
     $this->actingAs($user);
 
-    Livewire::test('pages::projects.show', ['project' => $project->id])
+    Livewire::test('pages::features.index', ['project' => $project->id])
         ->call('reorderFeatures', [$b->id, $a->id])
         ->assertStatus(403);
 });

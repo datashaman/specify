@@ -30,7 +30,7 @@
                             <flux:sidebar.item icon="layout-grid" :href="route('projects.show', $currentProjectId)" :current="request()->routeIs('projects.show')" wire:navigate>
                                 {{ __('Overview') }}
                             </flux:sidebar.item>
-                            <flux:sidebar.item icon="rectangle-stack" :href="route('projects.show', $currentProjectId).'#features'" :current="request()->routeIs('features.show')" wire:navigate>
+                            <flux:sidebar.item icon="rectangle-stack" :href="route('features.index', ['project' => $currentProjectId])" :current="request()->routeIs('features.*')" wire:navigate>
                                 {{ __('Features') }}
                             </flux:sidebar.item>
                             <flux:sidebar.item icon="bookmark" :href="route('stories.index', ['project' => $currentProjectId])" :current="request()->routeIs('stories.*')" wire:navigate>
@@ -47,6 +47,9 @@
                             </flux:sidebar.item>
                             <flux:sidebar.item icon="folder-open" :href="route('repos.index', ['project' => $currentProjectId])" :current="request()->routeIs('repos.*')" wire:navigate>
                                 {{ __('Repos') }}
+                            </flux:sidebar.item>
+                            <flux:sidebar.item icon="archive-box" :href="route('assets.index', ['project' => $currentProjectId])" :current="request()->routeIs('assets.*')" wire:navigate>
+                                {{ __('Assets') }}
                             </flux:sidebar.item>
                         </flux:sidebar.group>
                     @else
