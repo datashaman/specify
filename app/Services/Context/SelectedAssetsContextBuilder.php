@@ -32,6 +32,18 @@ class SelectedAssetsContextBuilder implements ContextBuilder
                 return '';
             }
 
+            // Cap accounts for the wrapping `<context-brief>` tag, the
+            // header, and the worst-case truncation note as well as item
+            // entries — the ENTIRE rendered brief stays under MAX_BYTES,
+            // matching RecencyContextBuilder's strict-clamp behaviour.
+            $openTag = "<context-brief>\n\n";
+            $closeTag = "\n\n</context-brief>";
+            $header = "## Selected context assets\n\n";
+            $noteTemplate = "\n\n_Truncated: %d item(s) over the ".self::MAX_BYTES.'-byte cap._';
+            $worstCaseNote = sprintf($noteTemplate, $items->count());
+            $overhead = strlen($openTag) + strlen($closeTag) + strlen($header) + strlen($worstCaseNote);
+            $itemBudget = self::MAX_BYTES - $overhead;
+
             $rendered = [];
             $usedBytes = 0;
             $dropped = 0;
@@ -40,9 +52,9 @@ class SelectedAssetsContextBuilder implements ContextBuilder
                 $type = $item->type?->value ?? 'unknown';
                 $body = trim($item->bodyForContext());
                 $entry = "### {$item->title} ({$type})\n".($body === '' ? '(no extractable body)' : $body);
-                $entryBytes = strlen($entry) + 2; // separator allowance
+                $entryBytes = strlen($entry) + 2; // "\n\n" separator allowance
 
-                if ($usedBytes + $entryBytes > self::MAX_BYTES) {
+                if ($usedBytes + $entryBytes > $itemBudget) {
                     $dropped++;
 
                     continue;
@@ -57,11 +69,9 @@ class SelectedAssetsContextBuilder implements ContextBuilder
             }
 
             $body = implode("\n\n", $rendered);
-            $note = $dropped === 0
-                ? ''
-                : "\n\n_Truncated: {$dropped} item(s) over the ".self::MAX_BYTES.'-byte cap._';
+            $note = $dropped === 0 ? '' : sprintf($noteTemplate, $dropped);
 
-            return "<context-brief>\n\n## Selected context assets\n\n{$body}{$note}\n\n</context-brief>";
+            return $openTag.$header.$body.$note.$closeTag;
         } catch (Throwable $e) {
             Log::warning('specify.context.selected_assets.failed', [
                 'subtask_id' => $subtask->getKey(),
