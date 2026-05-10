@@ -151,7 +151,9 @@ return [
     | Per-subtask context brief prepended to the executor prompt. "recency"
     | (default) emits a small markdown block with files mentioned in the
     | Subtask description, recent commits touching them, and prior failed
-    | runs on the same Subtask. "null" disables the brief entirely.
+    | runs on the same Subtask. "composite" chains "recency" with the
+    | story's selected ContextItems (4 KB cap each). "null" disables the
+    | brief entirely.
     |
     */
 
