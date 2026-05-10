@@ -17,6 +17,7 @@ Requires PHP `^8.4`, Node, and SQLite by default. `composer setup` creates `data
 `Workspace -> Team -> Project -> Feature -> Story -> AcceptanceCriterion / Scenario -> Plan -> Task -> Subtask`.
 
 - **Workspace** — tenant boundary, owned by a User. `Team` is workspace-scoped (M:N via `team_user`); Projects belong to Teams.
+- **Feature** — product-owner grouping inside a Project. A Feature carries a name and description; Stories belong to Features. Reorderable within a Project; the canonical sort is `position`.
 - **Story** — product-owner unit of value; carries kind, actor, intent, outcome, `revision` (auto-bumps on product edits), `description`, `notes`, acceptance criteria, and scenarios.
 - **Plan** — implementation interpretation of a Story. `stories.current_plan_id` points at the active Plan; previous Plans remain history.
 - **Task** — delivery work item under a Plan. A Task may reference an acceptance criterion or scenario, but it is not defined as one acceptance criterion. Subtasks are the executor's step list.
