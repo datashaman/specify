@@ -17,6 +17,7 @@ Specify is a Laravel 13 system where humans approve AI actions on code repos. **
 | Add an MCP tool | `app/Mcp/Tools/` (follow the existing `#[Description]` + `handle()` shape) |
 | Edit an agent's system prompt | `prompts/*.md` (loaded by `App\Services\Prompts\PromptLoader`) |
 | Tune the per-subtask context brief | `app/Services/Context/` (`ContextBuilder` interface + `RecencyContextBuilder`) |
+| Add or change a Project / Story context asset | [ADR-0015](docs/adr/0015-project-and-story-context-assets.md), `app/Services/Context/` (`AssetUploader`, `ContextItemWriter`, `ContextItemSelector`), `app/Jobs/SummariseContextItemJob.php` |
 | Run the suite | `composer test` (Pint check + Pest) |
 
 ## Specify-specific rules
@@ -28,6 +29,7 @@ Specify is a Laravel 13 system where humans approve AI actions on code repos. **
 - **PR opening is non-fatal.** A failed PR creation must record `pull_request_error` on the AgentRun and let the run still succeed (ADR-0004). Don't fail the run on PR errors.
 - **`AgentRun` is append-only.** `StoryApproval` and `PlanApproval` are immutable. Treat them as audit logs — corrections happen by writing new rows, never by mutating old ones.
 - **"The database" means the Laravel app DB.** Per-run git working directories under `storage/app/runs/...` are filesystem state, not database state.
+- **Story-scoped context CRUD reopens approval; project-scoped does not.** ContextItem mutations follow the same revision-bump rules as `AcceptanceCriterion` / `Scenario` — see ADR-0015. Never bypass `ContextItemSelector` for pivot writes; the bulk path is what keeps approval-reopens to one per save.
 
 ## Framework guidance — ask Boost
 
