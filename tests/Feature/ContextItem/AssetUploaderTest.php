@@ -8,10 +8,12 @@ use App\Models\Story;
 use App\Models\User;
 use App\Services\Context\AssetUploader;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Storage;
 
 beforeEach(function () {
     Storage::fake('private');
+    Bus::fake();
 });
 
 test('store persists file and creates a project-scoped ContextItem', function () {

@@ -4,6 +4,7 @@ namespace App\Services\Context;
 
 use App\Enums\ContextItemSummaryStatus;
 use App\Enums\ContextItemType;
+use App\Jobs\SummariseContextItemJob;
 use App\Models\ContextItem;
 use App\Models\Project;
 use App\Models\Story;
@@ -34,7 +35,7 @@ class AssetUploader
             throw new \RuntimeException('Failed to store uploaded asset.');
         }
 
-        return ContextItem::create([
+        $item = ContextItem::create([
             'project_id' => $project->getKey(),
             'story_id' => $story?->getKey(),
             'type' => ContextItemType::File,
@@ -53,6 +54,24 @@ class AssetUploader
             'summary_status' => ContextItemSummaryStatus::Pending,
             'created_by_id' => $actor->getKey(),
         ]);
+
+        if ($this->shouldSummariseFile($file)) {
+            SummariseContextItemJob::dispatch($item->getKey());
+        }
+
+        return $item;
+    }
+
+    private function shouldSummariseFile(UploadedFile $file): bool
+    {
+        $mime = (string) $file->getClientMimeType();
+        if (! str_starts_with($mime, 'text/') && $mime !== 'application/pdf') {
+            return false;
+        }
+
+        $threshold = (int) config('specify.context.assets.summary_threshold_chars', 2000);
+
+        return $file->getSize() >= $threshold;
     }
 
     private function ensureStoryBelongsToProject(Project $project, ?Story $story): void
